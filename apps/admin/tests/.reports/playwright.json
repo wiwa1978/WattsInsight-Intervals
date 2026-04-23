@@ -1,0 +1,226 @@
+{
+  "config": {
+    "configFile": "/home/wim/Code/Repositories/Personal/nextjs-saas-boilerplate-drizzle-singletenant-hono-final/apps/admin/playwright.config.ts",
+    "rootDir": "/home/wim/Code/Repositories/Personal/nextjs-saas-boilerplate-drizzle-singletenant-hono-final/apps/admin/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 3
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/wim/Code/Repositories/Personal/nextjs-saas-boilerplate-drizzle-singletenant-hono-final/apps/admin/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/wim/Code/Repositories/Personal/nextjs-saas-boilerplate-drizzle-singletenant-hono-final/apps/admin/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 6,
+    "webServer": {
+      "command": "bun run dev",
+      "url": "http://127.0.0.1:3101",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "authenticated.spec.ts",
+      "file": "authenticated.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "admin authenticated",
+          "file": "authenticated.spec.ts",
+          "line": 6,
+          "column": 6,
+          "specs": [
+            {
+              "title": "logs in and lands on admin overview",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD to run authenticated tests.",
+                      "location": {
+                        "file": "/home/wim/Code/Repositories/Personal/nextjs-saas-boilerplate-drizzle-singletenant-hono-final/apps/admin/tests/e2e/authenticated.spec.ts",
+                        "line": 8,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 11,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-23T10:49:55.161Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD to run authenticated tests.",
+                          "location": {
+                            "file": "/home/wim/Code/Repositories/Personal/nextjs-saas-boilerplate-drizzle-singletenant-hono-final/apps/admin/tests/e2e/authenticated.spec.ts",
+                            "line": 8,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "54f44905dc7ce2cd4d41-6a51eb4c7a301fd2bb18",
+              "file": "authenticated.spec.ts",
+              "line": 14,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "smoke.spec.ts",
+      "file": "smoke.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "admin smoke",
+          "file": "smoke.spec.ts",
+          "line": 3,
+          "column": 6,
+          "specs": [
+            {
+              "title": "loads localized login route",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 1677,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-23T10:49:55.199Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4219922fea2e2bd3c691-4f45659b708af4d5c971",
+              "file": "smoke.spec.ts",
+              "line": 4,
+              "column": 7
+            },
+            {
+              "title": "loads dutch login route",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 1683,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-23T10:49:55.212Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4219922fea2e2bd3c691-00dfa336edcec7705c48",
+              "file": "smoke.spec.ts",
+              "line": 10,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-04-23T10:49:49.063Z",
+    "duration": 8093.087,
+    "expected": 2,
+    "skipped": 1,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

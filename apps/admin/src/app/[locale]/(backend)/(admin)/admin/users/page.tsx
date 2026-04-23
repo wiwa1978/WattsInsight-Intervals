@@ -1,0 +1,205 @@
+"use client";
+
+import * as React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { generateRandomString } from "better-auth/crypto";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import { UserStatsCard } from "@/components/layout/backend/admin/users/user-stats-card";
+import { UsersTable, User } from "@/components/layout/backend/admin/users/users-table";
+import { Container } from "@/components/ui/container";
+import { authConfig } from "@/config/auth";
+import { useRouter } from "@/i18n/navigation";
+import {
+  getAdminUserStats,
+  getUsers,
+  impersonateAdminUser,
+  revokeAdminUserSessions,
+  setAdminUserPassword,
+  setAdminUserRole,
+  unbanAdminUser,
+} from "@/lib/services/admin";
+
+const USERS_QUERY_KEY = "admin-users";
+const USER_STATS_QUERY_KEY = "admin-user-stats";
+
+export default function AdminUsersPage() {
+  const t = useTranslations("admin.users");
+  const tSuccess = useTranslations("admin.success");
+  const tErrors = useTranslations("admin.errors");
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const limit = authConfig.adminPaginationLimit;
+  const offset = (currentPage - 1) * limit;
+
+  const usersQuery = useQuery({
+    queryKey: [USERS_QUERY_KEY, currentPage, limit],
+    queryFn: async () => {
+      const result = await getUsers(limit, offset);
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      return result.data;
+    },
+  });
+
+  const statsQuery = useQuery({
+    queryKey: [USER_STATS_QUERY_KEY],
+    queryFn: getAdminUserStats,
+  });
+
+  const refreshUsers = React.useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: [USERS_QUERY_KEY] });
+  }, [queryClient]);
+
+  const refreshStats = React.useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: [USER_STATS_QUERY_KEY] });
+  }, [queryClient]);
+
+  const setRoleMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: "user" | "admin" }) => {
+      const result = await setAdminUserRole(userId, role);
+      if ((result as { error?: unknown }).error) {
+        throw new Error(tErrors("roleUpdateFailed"));
+      }
+      return result;
+    },
+    onSuccess: async () => {
+      toast.success(tSuccess("roleUpdated"));
+      await Promise.all([refreshUsers(), refreshStats()]);
+    },
+    onError: () => {
+      toast.error(tErrors("roleUpdateFailed"));
+    },
+  });
+
+  const unbanMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const result = await unbanAdminUser(userId);
+      if ((result as { error?: unknown }).error) {
+        throw new Error(tErrors("unbanFailed"));
+      }
+      return result;
+    },
+    onSuccess: async () => {
+      toast.success(tSuccess("userUnbanned"));
+      await refreshUsers();
+    },
+    onError: () => {
+      toast.error(tErrors("unbanFailed"));
+    },
+  });
+
+  const impersonateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const result = await impersonateAdminUser(userId);
+      if ((result as { error?: unknown }).error) {
+        throw new Error(tErrors("impersonateFailed"));
+      }
+      return result;
+    },
+    onSuccess: () => {
+      toast.success(tSuccess("impersonating"));
+      router.push("/admin/overview");
+      router.refresh();
+    },
+    onError: () => {
+      toast.error(tErrors("impersonateFailed"));
+    },
+  });
+
+  const revokeSessionsMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const result = await revokeAdminUserSessions(userId);
+      if ((result as { error?: unknown }).error) {
+        throw new Error(tErrors("revokeSessionsFailed"));
+      }
+      return result;
+    },
+    onSuccess: () => {
+      toast.success(tSuccess("sessionsRevoked"));
+    },
+    onError: () => {
+      toast.error(tErrors("revokeSessionsFailed"));
+    },
+  });
+
+  const setPasswordMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const password = generateRandomString(16);
+      const result = await setAdminUserPassword(userId, password);
+      if ((result as { error?: unknown }).error) {
+        throw new Error("Failed to set password");
+      }
+
+      return password;
+    },
+    onSuccess: async (password) => {
+      await navigator.clipboard.writeText(password).catch(() => undefined);
+      toast.success("Password updated. New password copied to clipboard.");
+    },
+    onError: () => {
+      toast.error("Failed to set password");
+    },
+  });
+
+  const users = (usersQuery.data?.users ?? []) as User[];
+  const filteredUsers = React.useMemo(() => {
+    if (!searchQuery) return users;
+
+    const query = searchQuery.toLowerCase();
+    return users.filter(
+      (user) => user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query),
+    );
+  }, [users, searchQuery]);
+
+  const totalUsers = usersQuery.data?.total ?? 0;
+  const totalAdmins = statsQuery.data?.totalAdmins ?? 0;
+  const totalBanned = statsQuery.data?.totalBanned ?? 0;
+  const displayTotal = searchQuery ? filteredUsers.length : totalUsers;
+  const totalPages = Math.max(1, Math.ceil(totalUsers / limit));
+  const from = totalUsers > 0 ? offset + 1 : 0;
+  const to = Math.min(offset + users.length, totalUsers);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCurrentPage(1);
+  };
+
+  return (
+    <Container className="py-6">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">{t("title")}</h1>
+        <p className="mt-2 text-muted-foreground">{t("description")}</p>
+      </div>
+
+      <UserStatsCard totalUsers={totalUsers} totalAdmins={totalAdmins} totalBanned={totalBanned} />
+
+      <UsersTable
+        users={filteredUsers}
+        loading={usersQuery.isLoading}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={handleSearch}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        displayTotal={displayTotal}
+        from={from}
+        to={to}
+        onSetRole={(userId, role) => setRoleMutation.mutateAsync({ userId, role }).then(() => undefined)}
+        onUnban={(userId) => unbanMutation.mutateAsync(userId).then(() => undefined)}
+        onImpersonate={(userId) => impersonateMutation.mutateAsync(userId).then(() => undefined)}
+        onRevokeSessions={(userId) => revokeSessionsMutation.mutateAsync(userId).then(() => undefined)}
+        onSetPassword={(userId) => setPasswordMutation.mutateAsync(userId).then(() => undefined)}
+        onRefresh={() => {
+          void refreshUsers();
+        }}
+      />
+    </Container>
+  );
+}

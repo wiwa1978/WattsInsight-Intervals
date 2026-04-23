@@ -1,0 +1,231 @@
+import { z } from "zod";
+
+// ============================================================================
+// Zod Validation Schemas
+// ============================================================================
+
+// Constants for validation
+const DISCOUNT_CODE_MAX_LENGTH = 50;
+const DISCOUNT_DESCRIPTION_MAX_LENGTH = 500;
+
+export const createDiscountSchema = z.object({
+  code: z
+    .string()
+    .min(1, "Discount code is required")
+    .max(50, "Discount code must be less than 50 characters")
+    .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)"),
+  type: z.enum(["fixed", "percentage"]),
+  value: z
+    .number()
+    .min(0.01, "Value must be greater than 0")
+    .max(1000000, "Value is too large"),
+  startDate: z.date(),
+  endDate: z.date(),
+  maxUses: z.number().min(1).optional().nullable(),
+  userIds: z.array(z.string()).min(1, "At least one user must be selected"),
+  sendEmail: z.boolean().optional(),
+  sendNotification: z.boolean().optional(),
+});
+
+export const updateDiscountSchema = z.object({
+  id: z.string().uuid("Invalid discount ID"),
+  code: z
+    .string()
+    .min(1, "Discount code is required")
+    .max(50, "Discount code must be less than 50 characters")
+    .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)")
+    .optional(),
+  type: z.enum(["fixed", "percentage"]).optional(),
+  value: z
+    .number()
+    .min(0.01, "Value must be greater than 0")
+    .max(1000000, "Value is too large")
+    .optional(),
+  startDate: z.date().optional(),
+  endDate: z.date().optional(),
+  maxUses: z.number().min(1).optional().nullable(),
+  status: z.enum(["active", "inactive", "expired"]).optional(),
+  sendEmail: z.boolean().optional(),
+  sendNotification: z.boolean().optional(),
+});
+
+export const assignDiscountSchema = z.object({
+  discountId: z.string().uuid("Invalid discount ID"),
+  userIds: z.array(z.string().uuid("Invalid user ID")).min(1, "At least one user must be selected"),
+});
+
+export const removeDiscountSchema = z.object({
+  discountId: z.string().uuid("Invalid discount ID"),
+  userIds: z.array(z.string().uuid("Invalid user ID")).min(1, "At least one user must be selected"),
+});
+
+// Admin billing schemas
+const discountTypeSchema = z.enum(["fixed", "percentage"]);
+
+export const adminCreateDiscountSchema = z.object({
+  code: z.string()
+    .min(1, "Code is required")
+    .max(DISCOUNT_CODE_MAX_LENGTH, `Code must be at most ${DISCOUNT_CODE_MAX_LENGTH} characters`)
+    .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)"),
+  type: discountTypeSchema,
+  value: z.number().min(0.01, "Value must be greater than 0"),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+  maxUses: z.number().int().min(1, "Max uses must be at least 1").nullable(),
+  isActive: z.boolean().optional().default(true),
+  description: z.string()
+    .max(DISCOUNT_DESCRIPTION_MAX_LENGTH, `Description must be at most ${DISCOUNT_DESCRIPTION_MAX_LENGTH} characters`)
+    .optional()
+    .nullable(),
+  sendEmail: z.boolean().optional(),
+  sendNotification: z.boolean().optional(),
+});
+
+export const adminUpdateDiscountSchema = z.object({
+  id: z.string().uuid(),
+  code: z.string()
+    .min(1, "Code is required")
+    .max(DISCOUNT_CODE_MAX_LENGTH, `Code must be at most ${DISCOUNT_CODE_MAX_LENGTH} characters`)
+    .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)")
+    .optional(),
+  type: discountTypeSchema.optional(),
+  value: z.number().min(0.01, "Value must be greater than 0").optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+  maxUses: z.number().int().min(1, "Max uses must be at least 1").nullable().optional(),
+  isActive: z.boolean().optional(),
+  description: z.string()
+    .max(DISCOUNT_DESCRIPTION_MAX_LENGTH, `Description must be at most ${DISCOUNT_DESCRIPTION_MAX_LENGTH} characters`)
+    .optional()
+    .nullable(),
+  sendEmail: z.boolean().optional(),
+  sendNotification: z.boolean().optional(),
+});
+
+export const assignUsersToDiscountSchema = z.object({
+  discountId: z.string().uuid(),
+  userIds: z.array(z.string().uuid()).min(1, "At least one user must be selected"),
+});
+
+export const removeUsersFromDiscountSchema = z.object({
+  discountId: z.string().uuid(),
+  userIds: z.array(z.string().uuid()).min(1, "At least one user must be selected"),
+});
+
+export const validateDiscountCodeSchema = z.object({
+  code: z.string(),
+  userId: z.string().optional(),
+});
+
+// ============================================================================
+// Dodo Payments API Validation Schemas
+// ============================================================================
+
+/**
+ * Discount type enum for Dodo Payments API
+ * Note: Dodo Payments only supports percentage-based discounts
+ */
+export const dodoDiscountTypeSchema = z.literal("percentage", {
+  message: "Dodo Payments only supports percentage-based discounts",
+});
+
+/**
+ * Schema for creating a discount in Dodo Payments
+ * Matches the exact API specification:
+ * - amount: integer<int32> required - basis points (e.g., 540 = 5.4%)
+ * - type: "percentage" required
+ * - code: string | null
+ * - expires_at: string<date-time> | null
+ * - name: string | null
+ * - restricted_to: string[] | null: List of product IDs to restrict usage
+ * - subscription_cycles: integer<int32> | null: Number of subscription billing cycles
+ * - usage_limit: integer<int32> | null: Must be >= 1 if provided
+ */
+export const dodoCreateDiscountSchema = z.object({
+  amount: z
+    .number({
+      message: "Amount is required and must be a number",
+    })
+    .int("Amount must be an integer")
+    .safe("Amount must be a safe integer")
+    .min(1, "Amount must be at least 1"),
+  type: dodoDiscountTypeSchema,
+  code: z.string().nullable().optional(),
+  expires_at: z.string().datetime().nullable().optional(),
+  name: z.string().nullable().optional(),
+  restricted_to: z.array(z.string()).nullable().optional(),
+  subscription_cycles: z
+    .number({
+      message: "Subscription cycles must be a number",
+    })
+    .int("Subscription cycles must be an integer")
+    .safe("Subscription cycles must be a safe integer")
+    .min(0, "Subscription cycles must be 0 or greater")
+    .nullable()
+    .optional(),
+  usage_limit: z
+    .number({
+      message: "Usage limit must be a number",
+    })
+    .int("Usage limit must be an integer")
+    .safe("Usage limit must be a safe integer")
+    .min(1, "Usage limit must be at least 1 if provided")
+    .nullable()
+    .optional(),
+});
+
+/**
+ * Schema for updating a discount in Dodo Payments
+ * All fields are optional
+ */
+export const dodoUpdateDiscountSchema = z.object({
+  amount: z
+    .number({
+      message: "Amount must be a number",
+    })
+    .int("Amount must be an integer")
+    .safe("Amount must be a safe integer")
+    .min(1, "Amount must be at least 1")
+    .optional(),
+  type: dodoDiscountTypeSchema.optional(),
+  code: z.string().nullable().optional(),
+  expires_at: z.string().datetime().nullable().optional(),
+  name: z.string().nullable().optional(),
+  restricted_to: z.array(z.string()).nullable().optional(),
+  subscription_cycles: z
+    .number({
+      message: "Subscription cycles must be a number",
+    })
+    .int("Subscription cycles must be an integer")
+    .safe("Subscription cycles must be a safe integer")
+    .min(0, "Subscription cycles must be 0 or greater")
+    .nullable()
+    .optional(),
+  usage_limit: z
+    .number({
+      message: "Usage limit must be a number",
+    })
+    .int("Usage limit must be an integer")
+    .safe("Usage limit must be a safe integer")
+    .min(1, "Usage limit must be at least 1 if provided")
+    .nullable()
+    .optional(),
+});
+
+/**
+ * Schema for Dodo Payments discount response
+ */
+export const dodoDiscountSchema = z.object({
+  amount: z.number().int().safe(),
+  business_id: z.string(),
+  code: z.string().nullable(),
+  created_at: z.string().datetime(),
+  discount_id: z.string(),
+  expires_at: z.string().datetime().nullable(),
+  name: z.string().nullable(),
+  restricted_to: z.array(z.string()).nullable(),
+  subscription_cycles: z.number().int().safe().nullable(),
+  times_used: z.number().int().safe(),
+  type: dodoDiscountTypeSchema,
+  usage_limit: z.number().int().safe().nullable(),
+});

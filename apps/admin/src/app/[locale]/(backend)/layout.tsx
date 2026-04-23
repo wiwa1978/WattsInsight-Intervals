@@ -1,0 +1,35 @@
+import * as React from "react"
+import { type Metadata } from "next";
+import { redirect } from "next/navigation";
+import { DashboardSidebar } from "@/components/layout/backend/shared/dashboard-sidebar"
+import { DashboardNavProvider } from "@/components/providers/backend-nav-provider"
+import { getServerSession } from "@/lib/auth-session";
+import { getMainAppLoginUrl } from "@/lib/main-app-url";
+
+export const metadata: Metadata = {
+  title: "(Admin) - Single Tenant with API SaaS boilerplate",
+  description: "(Admin) - Single Tenant with API SaaS boilerplate",
+  icons: [{ rel: "icon", url: "/favicon.ico" }],
+};
+
+export default async function DashboardLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode
+  params: Promise<{ locale: string }>
+}) {
+  const { locale } = await params;
+  const session = await getServerSession();
+
+  if (!session?.user?.id) {
+    redirect(getMainAppLoginUrl(locale));
+  }
+
+  return (
+    <DashboardNavProvider>
+      <DashboardSidebar>{children}</DashboardSidebar>
+    </DashboardNavProvider>
+  )
+
+}
