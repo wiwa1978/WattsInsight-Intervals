@@ -135,12 +135,6 @@ Run all three:
 bun run dev:all
 ```
 
-Stop dev processes:
-
-```bash
-bun run dev:stop
-```
-
 ## Environment
 
 Use these templates:

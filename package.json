@@ -8,11 +8,10 @@
   ],
   "scripts": {
     "dev": "bun run dev:all",
-    "dev:stop": "node scripts/stop-dev-processes.mjs",
     "dev:api": "bun run --cwd apps/api dev",
     "dev:web": "bun run --cwd apps/web dev",
     "dev:admin": "bun run --cwd apps/admin dev",
-    "dev:all": "bun run dev:stop && bunx concurrently --kill-others-on-fail -n api,web,admin -c cyan,magenta,green \"bun run dev:api\" \"bun run dev:web\" \"bun run dev:admin\"",
+    "dev:all": "bunx concurrently --kill-others-on-fail -n api,web,admin -c cyan,magenta,green \"bun run dev:api\" \"bun run dev:web\" \"bun run dev:admin\"",
     "test:api": "bun run --cwd apps/api test",
     "test:web": "bun run --cwd apps/web test",
     "test:admin": "bun run --cwd apps/admin test",
@@ -20,8 +19,7 @@
     "test:e2e:web": "bun run --cwd apps/web test:e2e",
     "test:e2e:admin": "bun run --cwd apps/admin test:e2e",
     "test:e2e:all": "bun run test:e2e:web && bun run test:e2e:admin",
-    "test:ci": "./scripts/run-all-tests.sh",
-    "test:report": "node scripts/generate-test-report.mjs reports/test-report.md",
+    "test:ci": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:admin && bun run test:api && bun run test:web && bun run test:admin",
     "typecheck:api": "bun run --cwd apps/api typecheck",
     "typecheck:web": "bun run --cwd apps/web typecheck",
     "typecheck:admin": "bun run --cwd apps/admin typecheck"
