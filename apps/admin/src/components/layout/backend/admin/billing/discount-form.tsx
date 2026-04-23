@@ -28,14 +28,25 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   generateDiscountCodeAction,
+  searchUsersForDiscount,
   validateDiscountCodeAction,
 } from "@/lib/services/discounts";
-import { UserMultiSelect } from "./user-multi-select";
+import { UserMultiSelect, type UserOption } from "./user-multi-select";
 import { createDiscountSchema } from "@/schemas/discounts";
 import type { DiscountFormData } from "@/types/discounts";
 
+const discountFormSchema = createDiscountSchema.extend({
+  startDate: z.date(),
+  endDate: z.date(),
+  userIds: z.array(z.string().uuid()).min(1, "At least one user must be selected"),
+});
+
+type DiscountFormValues = z.infer<typeof discountFormSchema>;
+
 interface DiscountFormProps {
-  initialData?: Partial<DiscountFormData>;
+  initialData?: Partial<DiscountFormData> & {
+    selectedUsers?: UserOption[];
+  };
   onSubmit: (data: DiscountFormData) => Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -57,8 +68,8 @@ export function DiscountForm({
     message?: string;
   } | null>(null);
 
-  const form = useForm<z.infer<typeof createDiscountSchema>>({
-    resolver: zodResolver(createDiscountSchema),
+  const form = useForm<DiscountFormValues>({
+    resolver: zodResolver(discountFormSchema),
     defaultValues: {
       code: initialData?.code || "",
       type: "percentage", // Always percentage for Dodo Payments
@@ -140,7 +151,7 @@ export function DiscountForm({
     }
   };
 
-  const handleSubmit = async (data: z.infer<typeof createDiscountSchema>) => {
+  const handleSubmit = async (data: DiscountFormValues) => {
     // Validate code before submission
     if (codeValidation && !codeValidation.valid) {
       return;
@@ -382,6 +393,8 @@ export function DiscountForm({
                 <UserMultiSelect
                   selectedUserIds={field.value}
                   onSelectionChange={field.onChange}
+                  searchUsers={searchUsersForDiscount}
+                  initialUsers={initialData?.selectedUsers}
                   disabled={isSubmitting}
                   placeholder="Search and select users..."
                 />

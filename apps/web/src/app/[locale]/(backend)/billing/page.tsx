@@ -5,6 +5,7 @@ import { getServerSession } from "@/lib/auth-session";
 import { getCreditPurchases } from "@/lib/services/credits";
 import { PurchaseHistory } from "@/components/layout/backend/billing/purchase-history";
 import { CreditPricing } from "@/components/layout/backend/billing/credit-pricing";
+import { RedeemVoucherCard } from "@/components/layout/backend/billing/redeem-voucher-card";
 import { Separator } from "@/components/ui/separator";
 import {
   TransactionHistory,
@@ -29,6 +30,8 @@ export default async function BillingPage() {
         </div>
 
         <CreditPricing showContainer={false} />
+
+        <RedeemVoucherCard />
 
         <Separator className="my-8" />
 

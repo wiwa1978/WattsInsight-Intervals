@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown, User, Mail } from "lucide-react";
+import { Check, ChevronsUpDown, Mail, User, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,43 +18,87 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { searchUsersForDiscount } from "@/lib/services/discounts";
 
-interface User {
+export interface UserOption {
   id: string;
-  name: string;
+  name: string | null;
   email: string;
 }
 
 interface UserMultiSelectProps {
   selectedUserIds: string[];
   onSelectionChange: (userIds: string[]) => void;
+  searchUsers: (query: string, limit?: number) => Promise<UserOption[]>;
+  initialUsers?: UserOption[];
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  searchPlaceholder?: string;
+  minSearchLength?: number;
+  loadingMessage?: string;
+  emptyMessage?: string;
+  minSearchMessage?: string;
+  selectionSummary?: (count: number) => string;
 }
 
 export function UserMultiSelect({
   selectedUserIds,
   onSelectionChange,
+  searchUsers,
+  initialUsers = [],
   disabled = false,
   placeholder = "Select users...",
   className,
+  searchPlaceholder = "Search users by name or email...",
+  minSearchLength = 2,
+  loadingMessage = "Searching...",
+  emptyMessage = "No users found",
+  minSearchMessage,
+  selectionSummary,
 }: UserMultiSelectProps) {
   const [open, setOpen] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState<string>("");
-  const [users, setUsers] = React.useState<User[]>([]);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [users, setUsers] = React.useState<UserOption[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [selectedUsers, setSelectedUsers] = React.useState<User[]>([]);
 
-  // Debounced search
+  const [knownUsers, setKnownUsers] = React.useState<Record<string, UserOption>>(() =>
+    Object.fromEntries(initialUsers.map((user) => [user.id, user])),
+  );
+
+  const mergeKnownUsers = React.useCallback((incomingUsers: UserOption[]) => {
+    if (incomingUsers.length === 0) {
+      return;
+    }
+
+    setKnownUsers((current) => {
+      const next = { ...current };
+      for (const user of incomingUsers) {
+        next[user.id] = user;
+      }
+      return next;
+    });
+  }, []);
+
+  React.useEffect(() => {
+    mergeKnownUsers(initialUsers);
+  }, [initialUsers, mergeKnownUsers]);
+
+  const selectedUsers = React.useMemo(
+    () =>
+      selectedUserIds.map((userId) => {
+        return knownUsers[userId] ?? { id: userId, name: userId, email: "" };
+      }),
+    [knownUsers, selectedUserIds],
+  );
+
   React.useEffect(() => {
     const timer = setTimeout(async () => {
-      if (searchQuery.trim().length >= 2) {
+      if (searchQuery.trim().length >= minSearchLength) {
         setLoading(true);
         try {
-          const results = await searchUsersForDiscount(searchQuery, 20);
+          const results = await searchUsers(searchQuery, 20);
           setUsers(results);
+          mergeKnownUsers(results);
         } catch (error) {
           console.error("Failed to search users:", error);
           setUsers([]);
@@ -67,54 +111,20 @@ export function UserMultiSelect({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [mergeKnownUsers, minSearchLength, searchQuery, searchUsers]);
 
-  // Fetch initial selected users on mount (for edit mode)
-  React.useEffect(() => {
-    const fetchInitialUsers = async () => {
-      if (selectedUserIds.length === 0) {
-        setSelectedUsers([]);
-        return;
-      }
-
-      try {
-        // Fetch users by searching for each ID
-        const allResults: User[] = [];
-        for (const id of selectedUserIds) {
-          const results = await searchUsersForDiscount(id, 1);
-          if (results.length > 0) {
-            allResults.push(results[0]);
-          }
-        }
-        setSelectedUsers(allResults);
-      } catch (error) {
-        console.error("Failed to fetch selected users:", error);
-      }
-    };
-
-    // Only run on mount, not on every selection change
-    fetchInitialUsers();
-  }, []);
-
-  const toggleUser = (userId: string) => {
-    if (selectedUserIds.includes(userId)) {
-      onSelectionChange(selectedUserIds.filter((id) => id !== userId));
+  const toggleUser = (user: UserOption) => {
+    if (selectedUserIds.includes(user.id)) {
+      onSelectionChange(selectedUserIds.filter((id) => id !== user.id));
     } else {
-      // Find the user in the current search results
-      const userToSelect = users.find((u) => u.id === userId);
-      if (userToSelect) {
-        // Add the full user object to selectedUsers
-        setSelectedUsers([...selectedUsers, userToSelect]);
-      }
-      onSelectionChange([...selectedUserIds, userId]);
+      mergeKnownUsers([user]);
+      onSelectionChange([...selectedUserIds, user.id]);
     }
   };
 
   const removeUser = (userId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     onSelectionChange(selectedUserIds.filter((id) => id !== userId));
-    // Remove from selectedUsers state
-    setSelectedUsers(selectedUsers.filter((u) => u.id !== userId));
   };
 
   return (
@@ -132,7 +142,9 @@ export function UserMultiSelect({
               <span className="text-muted-foreground">{placeholder}</span>
             ) : (
               <span className="truncate">
-                {selectedUsers.length} user{selectedUsers.length !== 1 ? "s" : ""} selected
+                {selectionSummary
+                  ? selectionSummary(selectedUsers.length)
+                  : `${selectedUsers.length} user${selectedUsers.length !== 1 ? "s" : ""} selected`}
               </span>
             )}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -141,20 +153,20 @@ export function UserMultiSelect({
         <PopoverContent className="w-full p-0" align="start">
           <Command filter={() => 1}>
             <CommandInput
-              placeholder="Search users by name or email..."
+              placeholder={searchPlaceholder}
               value={searchQuery}
               onValueChange={setSearchQuery}
             />
             <CommandList>
               {loading ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
-                  Searching...
+                  {loadingMessage}
                 </div>
               ) : users.length === 0 ? (
                 <CommandEmpty>
-                  {searchQuery.trim().length < 2
-                    ? "Type at least 2 characters to search"
-                    : "No users found"}
+                  {searchQuery.trim().length < minSearchLength
+                    ? (minSearchMessage ?? `Type at least ${minSearchLength} characters to search`)
+                    : emptyMessage}
                 </CommandEmpty>
               ) : (
                 <CommandGroup>
@@ -163,7 +175,7 @@ export function UserMultiSelect({
                       key={user.id}
                       value={user.id}
                       onSelect={() => {
-                        toggleUser(user.id);
+                        toggleUser(user);
                       }}
                     >
                       <div className="flex items-center gap-2 flex-1">
@@ -171,7 +183,7 @@ export function UserMultiSelect({
                           <User className="h-4 w-4 text-primary" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-medium">{user.name}</span>
+                          <span className="font-medium">{user.name || user.email}</span>
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Mail className="h-3 w-3" />
                             {user.email}
@@ -198,9 +210,10 @@ export function UserMultiSelect({
               key={user.id}
               variant="secondary"
               className="gap-1 pr-1"
+              title={user.email || user.id}
             >
               <span className="max-w-[150px] truncate">
-                {user.name}
+                {user.name || user.email || user.id}
               </span>
               <button
                 type="button"
@@ -208,19 +221,7 @@ export function UserMultiSelect({
                 className="ml-1 rounded-full hover:bg-destructive/20 p-0.5 transition-colors"
                 disabled={disabled}
               >
-                <svg
-                  className="h-3 w-3"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-3 w-3" />
               </button>
             </Badge>
           ))}

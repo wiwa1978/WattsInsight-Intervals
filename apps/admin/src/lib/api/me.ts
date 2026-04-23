@@ -29,6 +29,18 @@ export async function downloadMyInvoice(paymentId: string) {
   });
 }
 
+export async function redeemMyVoucher(code: string) {
+  return apiRequest<{
+    success: boolean;
+    creditsAdded?: number;
+    newBalance?: number;
+    error?: string;
+  }>("/me/vouchers/redeem", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
 export async function getMyNotifications(limit = 20) {
   const result = await apiRequest<{ success: boolean; data: unknown }>(`/me/notifications?limit=${limit}`);
   return result.data;

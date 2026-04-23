@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DiscountDialog } from "./discount-dialog";
+import type { UserOption } from "./user-multi-select";
 import { DiscountsTable } from "./discounts-table";
 import type {
   DiscountWithUsers,
@@ -95,7 +96,7 @@ export function DiscountsSection() {
     );
   };
 
-  const getInitialFormData = (): Partial<DiscountFormData> & { id?: string } | undefined => {
+  const getInitialFormData = (): (Partial<DiscountFormData> & { id?: string; selectedUsers?: UserOption[] }) | undefined => {
     if (!selectedDiscount) return undefined;
 
     return {
@@ -107,6 +108,16 @@ export function DiscountsSection() {
       endDate: new Date(selectedDiscount.endDate),
       maxUses: selectedDiscount.maxUses ?? undefined,
       userIds: selectedDiscount.userDiscounts?.map((ud) => ud.userId) || [],
+      selectedUsers: selectedDiscount.userDiscounts
+        ?.flatMap((userDiscount) =>
+          userDiscount.user
+            ? [{
+                id: userDiscount.user.id,
+                name: userDiscount.user.name,
+                email: userDiscount.user.email,
+              }]
+            : [],
+        ) || [],
     };
   };
 

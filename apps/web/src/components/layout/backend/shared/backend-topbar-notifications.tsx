@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Bell, Check, Trash2, X } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
@@ -22,66 +23,83 @@ import {
   markAsRead,
 } from "@/lib/services/notifications";
 import { useSession } from "@/lib/auth-client";
+import { webQueryKeys } from "@/lib/query/keys";
 
 export function BackendTopbarNotifications() {
   const t = useTranslations("notifications");
   const locale = useLocale();
   const { data: session } = useSession();
-  const [notifications, setNotifications] = React.useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = React.useState(0);
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const queryClient = useQueryClient();
 
-  const fetchNotifications = React.useCallback(async () => {
-    if (!session?.user?.id) return;
+  const notificationsQuery = useQuery({
+    queryKey: webQueryKeys.notifications(authConfig.notificationsDropdownLimit),
+    queryFn: async () => {
+      const result = await getNotifications(authConfig.notificationsDropdownLimit);
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to fetch notifications");
+      }
+      return result.data as Notification[];
+    },
+    enabled: Boolean(session?.user?.id),
+    refetchInterval: authConfig.notificationsPollingInterval > 0 ? authConfig.notificationsPollingInterval : false,
+  });
 
-    setIsLoading(true);
-    const [notifResult, countResult] = await Promise.all([
-      getNotifications(authConfig.notificationsDropdownLimit),
-      getUnreadCount(),
+  const unreadCountQuery = useQuery({
+    queryKey: webQueryKeys.unreadNotifications,
+    queryFn: async () => {
+      const result = await getUnreadCount();
+      if (!result.success) {
+        throw new Error("Failed to fetch unread count");
+      }
+      return result.count;
+    },
+    enabled: Boolean(session?.user?.id),
+    refetchInterval: authConfig.notificationsPollingInterval > 0 ? authConfig.notificationsPollingInterval : false,
+  });
+
+  const refreshNotifications = React.useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: webQueryKeys.notifications(authConfig.notificationsDropdownLimit) }),
+      queryClient.invalidateQueries({ queryKey: webQueryKeys.unreadNotifications }),
     ]);
+  }, [queryClient]);
 
-    if (notifResult.success && notifResult.data) {
-      setNotifications(notifResult.data as Notification[]);
-    }
-    if (countResult.success) {
-      setUnreadCount(countResult.count);
-    }
-    setIsLoading(false);
-  }, [session?.user?.id]);
+  const markAsReadMutation = useMutation({
+    mutationFn: markAsRead,
+    onSuccess: refreshNotifications,
+  });
 
-  React.useEffect(() => {
-    fetchNotifications();
-    
-    // Poll for new notifications if polling is enabled
-    if (authConfig.notificationsPollingInterval > 0) {
-      const interval = setInterval(() => {
-        fetchNotifications();
-      }, authConfig.notificationsPollingInterval);
-      
-      return () => clearInterval(interval);
-    }
-  }, [fetchNotifications]);
+  const markAllAsReadMutation = useMutation({
+    mutationFn: markAllAsRead,
+    onSuccess: refreshNotifications,
+  });
+
+  const deleteNotificationMutation = useMutation({
+    mutationFn: deleteNotification,
+    onSuccess: refreshNotifications,
+  });
 
   const handleMarkAsRead = async (notificationId: string) => {
     if (!session?.user?.id) return;
-    await markAsRead(notificationId);
-    await fetchNotifications();
+    await markAsReadMutation.mutateAsync(notificationId);
   };
 
   const handleMarkAllAsRead = async () => {
     if (!session?.user?.id) return;
-    await markAllAsRead();
-    await fetchNotifications();
+    await markAllAsReadMutation.mutateAsync();
   };
 
   const handleDelete = async (notificationId: string) => {
     if (!session?.user?.id) return;
-    await deleteNotification(notificationId);
-    await fetchNotifications();
+    await deleteNotificationMutation.mutateAsync(notificationId);
   };
 
   if (!session?.user) return null;
+
+  const notifications = notificationsQuery.data ?? [];
+  const unreadCount = unreadCountQuery.data ?? 0;
+  const isLoading = notificationsQuery.isLoading || unreadCountQuery.isLoading;
 
   const getTypeColor = (type: Notification["type"]) => {
     switch (type) {
@@ -102,8 +120,7 @@ export function BackendTopbarNotifications() {
       onOpenChange={(open) => {
         setIsOpen(open);
         if (open) {
-          // Refetch notifications when opening the dropdown
-          fetchNotifications();
+          void refreshNotifications();
         }
       }}
     >

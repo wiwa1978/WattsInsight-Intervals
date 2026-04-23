@@ -14,11 +14,17 @@ describe("web navigation config", () => {
     expect(FrontendAuthItems.signup.url).toBe("/signup");
   });
 
-  it("contains only dashboard in sidebar nav", () => {
-    expect(BackendNavItems).toHaveLength(1);
-    expect(BackendNavItems[0]).toMatchObject({
-      title: "dashboard.nav.overview",
-      url: "/dashboard",
-    });
+  it("contains expected dashboard sidebar entries", () => {
+    expect(BackendNavItems).toHaveLength(2);
+    expect(BackendNavItems).toEqual([
+      expect.objectContaining({
+        title: "dashboard.nav.overview",
+        url: "/dashboard",
+      }),
+      expect.objectContaining({
+        title: "dashboard.nav.billing",
+        url: "/billing",
+      }),
+    ]);
   });
 });

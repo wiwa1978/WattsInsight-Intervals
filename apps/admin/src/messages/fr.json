@@ -615,7 +615,9 @@
       "users": "Utilisateurs",
       "billing": "Facturation",
       "notifications": "Notifications",
-      "discounts": "Codes de réduction"
+      "discounts": "Codes de réduction",
+      "vouchers": "Bons",
+      "logs": "Journaux"
     },
     "backToPortal": "Retour au Portail",
     "impersonation": {
@@ -845,6 +847,29 @@
           "page": "Page {current} sur {total}",
           "previous": "Précédent",
           "next": "Suivant"
+        },
+        "types": {
+          "purchase": "Achat",
+          "usage": "Utilisation",
+          "refund": "Remboursement",
+          "bonus": "Bonus",
+          "admin_adjustment": "Ajustement admin",
+          "voucher": "Bon"
+        },
+        "details": {
+          "title": "Détails de la transaction",
+          "description": "Consultez les informations détaillées de cette transaction de crédits",
+          "transactionId": "ID de transaction",
+          "userId": "ID utilisateur",
+          "referenceId": "ID de référence",
+          "date": "Date",
+          "type": "Type",
+          "amount": "Montant",
+          "balanceBefore": "Solde avant",
+          "balanceAfter": "Solde après",
+          "descriptionLabel": "Description",
+          "referenceType": "Type de référence",
+          "metadata": "Métadonnées"
         }
       },
       "purchases": {
@@ -950,6 +975,80 @@
       "types": {
         "percentage": "Pourcentage",
         "fixed": "Fixe"
+      }
+    },
+    "vouchers": {
+      "title": "Gestion des bons",
+      "description": "Créez des bons que les utilisateurs peuvent échanger contre des crédits.",
+      "loading": "Chargement des bons...",
+      "empty": "Aucun bon trouvé.",
+      "filters": {
+        "searchPlaceholder": "Rechercher par code ou e-mail de l'utilisateur assigné...",
+        "statusPlaceholder": "Filtrer par statut",
+        "statusAll": "Tous les statuts"
+      },
+      "table": {
+        "code": "Code",
+        "credits": "Crédits",
+        "status": "Statut",
+        "redemptions": "Utilisations",
+        "assignedTo": "Attribué à",
+        "allUsers": "Tous les utilisateurs",
+        "selectedUsers": "{count} utilisateurs sélectionnés",
+        "expiresAt": "Expire le",
+        "actions": "Actions"
+      },
+      "statuses": {
+        "active": "Actif",
+        "inactive": "Inactif",
+        "redeemed": "Utilisé",
+        "expired": "Expiré"
+      },
+      "actions": {
+        "create": "Créer un bon",
+        "edit": "Modifier",
+        "save": "Enregistrer les modifications",
+        "activate": "Activer",
+        "deactivate": "Désactiver"
+      },
+      "dialog": {
+        "title": "Créer un bon",
+        "description": "Créez un code bon qui se convertit en crédits utilisateur.",
+        "editTitle": "Modifier le bon",
+        "editDescription": "Mettez à jour les détails du bon, sa portée d'attribution et ses limites d'utilisation."
+      },
+      "form": {
+        "code": "Code du bon",
+        "codePlaceholder": "Entrez le code du bon",
+        "creditAmount": "Montant de crédits",
+        "assignmentScope": "Disponibilité",
+        "assignmentScopePlaceholder": "Sélectionnez qui peut utiliser ce bon",
+        "assignmentScopes": {
+          "selected": "Utilisateurs sélectionnés",
+          "all": "Tous les utilisateurs"
+        },
+        "users": "Utilisateurs éligibles",
+        "usersDescription": "Sélectionnez un ou plusieurs utilisateurs pouvant utiliser ce bon.",
+        "usersPlaceholder": "Sélectionner des utilisateurs...",
+        "usersSearchPlaceholder": "Rechercher des utilisateurs par nom ou e-mail...",
+        "usersLoading": "Recherche des utilisateurs...",
+        "usersEmpty": "Aucun utilisateur trouvé",
+        "usersMinSearch": "Saisissez au moins 2 caractères pour rechercher",
+        "usersSelected": "{count} utilisateurs sélectionnés",
+        "maxRedemptions": "Utilisations max",
+        "maxRedemptionsSelectedDescription": "Correspond automatiquement au nombre d'utilisateurs sélectionnés : {count}",
+        "maxRedemptionsAllDescription": "Définissez combien d'utilisateurs au total peuvent utiliser ce bon.",
+        "expiresAt": "Expire le",
+        "expiresAtPlaceholder": "Choisissez une date d'expiration",
+        "expiresAtDescription": "Laissez vide pour garder le bon valide jusqu'à son utilisation ou sa désactivation manuelle."
+      },
+      "success": {
+        "created": "Bon créé avec succès.",
+        "updated": "Bon mis à jour avec succès."
+      },
+      "errors": {
+        "loadFailed": "Échec du chargement des bons.",
+        "statusLocked": "Ce bon ne peut plus être activé ou désactivé."
       }
     },
     "dashboard": {
@@ -1081,6 +1180,10 @@
     "creditPurchaseSuccess": {
       "title": "Achat de crédits réussi",
       "message": "Achat réussi de {credits} crédits pour €{amount} (TVA incluse). Vos crédits sont maintenant disponibles."
+    },
+    "voucherRedeemed": {
+      "title": "Bon utilisé",
+      "message": "Votre bon {code} a été utilisé avec succès et a ajouté {credits} crédits à votre compte."
     },
     "creditsAdded": {
       "title": "Crédits ajoutés à votre compte",
@@ -1233,7 +1336,9 @@
     "users": "Utilisateurs",
     "notifications": "Notifications",
     "projects": "Projets",
-    "discounts": "Codes de réduction"
+    "discounts": "Codes de réduction",
+    "vouchers": "Bons",
+    "logs": "Journaux"
   },
   "creditProgressBar": {
     "creditsOf": "{current} sur {total} crédits",

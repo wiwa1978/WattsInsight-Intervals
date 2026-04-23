@@ -1,46 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getCreditBalance } from "@/lib/services/credits";
 import { Loader2, Sparkles, Coins } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
-
-interface CreditData {
-  balance: number;
-  totalPurchased: number;
-}
+import { webQueryKeys } from "@/lib/query/keys";
 
 export function CreditProgressBar() {
   const t = useTranslations("creditProgressBar");
   const { state } = useSidebar();
-  const [creditData, setCreditData] = useState<CreditData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const creditBalanceQuery = useQuery({
+    queryKey: webQueryKeys.creditBalance,
+    queryFn: getCreditBalance,
+    staleTime: 30_000,
+  });
 
-  useEffect(() => {
-    fetchCredits();
-  }, []);
-
-  const fetchCredits = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getCreditBalance();
-      setCreditData({
-        balance: data.balance,
-        totalPurchased: data.totalPurchased,
-      });
-    } catch (err) {
-      console.error("Failed to fetch credits:", err);
-      setError(t("error"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (creditBalanceQuery.isLoading) {
     return (
       <div className="px-3 py-1">
         <div className="flex items-center justify-center py-1">
@@ -50,11 +27,11 @@ export function CreditProgressBar() {
     );
   }
 
-  if (error) {
+  if (creditBalanceQuery.isError) {
     return null;
   }
 
-  const currentCredits = creditData?.balance || 0;
+  const currentCredits = creditBalanceQuery.data?.balance || 0;
 
   const isCollapsed = state === "collapsed";
 

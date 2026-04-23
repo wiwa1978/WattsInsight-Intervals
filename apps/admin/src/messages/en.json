@@ -615,7 +615,9 @@
       "users": "Users",
       "billing": "Billing",
       "notifications": "Notifications",
-      "discounts": "Discounts"
+      "discounts": "Discounts",
+      "vouchers": "Vouchers",
+      "logs": "Logs"
     },
     "dashboard": {
       "stats": {
@@ -860,6 +862,29 @@
           "page": "Page {current} of {total}",
           "previous": "Previous",
           "next": "Next"
+        },
+        "types": {
+          "purchase": "Purchase",
+          "usage": "Usage",
+          "refund": "Refund",
+          "bonus": "Bonus",
+          "admin_adjustment": "Admin Adjustment",
+          "voucher": "Voucher"
+        },
+        "details": {
+          "title": "Transaction Details",
+          "description": "View detailed information about this credit transaction",
+          "transactionId": "Transaction ID",
+          "userId": "User ID",
+          "referenceId": "Reference ID",
+          "date": "Date",
+          "type": "Type",
+          "amount": "Amount",
+          "balanceBefore": "Balance Before",
+          "balanceAfter": "Balance After",
+          "descriptionLabel": "Description",
+          "referenceType": "Reference Type",
+          "metadata": "Metadata"
         }
       },
       "purchases": {
@@ -965,6 +990,80 @@
       "types": {
         "percentage": "Percentage",
         "fixed": "Fixed"
+      }
+    },
+    "vouchers": {
+      "title": "Voucher Management",
+      "description": "Create vouchers that users can redeem for credits.",
+      "loading": "Loading vouchers...",
+      "empty": "No vouchers found.",
+      "filters": {
+        "searchPlaceholder": "Search by code or assigned user email...",
+        "statusPlaceholder": "Filter by status",
+        "statusAll": "All statuses"
+      },
+      "table": {
+        "code": "Code",
+        "credits": "Credits",
+        "status": "Status",
+        "redemptions": "Redemptions",
+        "assignedTo": "Assigned To",
+        "allUsers": "All users",
+        "selectedUsers": "{count} selected users",
+        "expiresAt": "Expires At",
+        "actions": "Actions"
+      },
+      "statuses": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "redeemed": "Redeemed",
+        "expired": "Expired"
+      },
+      "actions": {
+        "create": "Create Voucher",
+        "edit": "Edit",
+        "save": "Save Changes",
+        "activate": "Activate",
+        "deactivate": "Deactivate"
+      },
+      "dialog": {
+        "title": "Create Voucher",
+        "description": "Create a voucher code that redeems into user credits.",
+        "editTitle": "Edit Voucher",
+        "editDescription": "Update voucher details, assignment scope, and redemption limits."
+      },
+      "form": {
+        "code": "Voucher Code",
+        "codePlaceholder": "Enter voucher code",
+        "creditAmount": "Credit Amount",
+        "assignmentScope": "Availability",
+        "assignmentScopePlaceholder": "Select who can redeem this voucher",
+        "assignmentScopes": {
+          "selected": "Selected users",
+          "all": "All users"
+        },
+        "users": "Eligible Users",
+        "usersDescription": "Select one or more users who can redeem this voucher.",
+        "usersPlaceholder": "Select users...",
+        "usersSearchPlaceholder": "Search users by name or email...",
+        "usersLoading": "Searching users...",
+        "usersEmpty": "No users found",
+        "usersMinSearch": "Type at least 2 characters to search",
+        "usersSelected": "{count} users selected",
+        "maxRedemptions": "Max Redemptions",
+        "maxRedemptionsSelectedDescription": "Automatically matched to the selected user count: {count}",
+        "maxRedemptionsAllDescription": "Set how many total users can redeem this voucher.",
+        "expiresAt": "Expires At",
+        "expiresAtPlaceholder": "Pick an expiration date",
+        "expiresAtDescription": "Leave empty to keep the voucher valid until it is redeemed or manually deactivated."
+      },
+      "success": {
+        "created": "Voucher created successfully.",
+        "updated": "Voucher updated successfully."
+      },
+      "errors": {
+        "loadFailed": "Failed to load vouchers.",
+        "statusLocked": "This voucher can no longer be activated or deactivated."
       }
     }
   },
@@ -1072,6 +1171,10 @@
     "creditPurchaseSuccess": {
       "title": "Credit purchase successful",
       "message": "Successfully purchased {credits} credits for €{amount} (incl VAT). Your credits are now available for use."
+    },
+    "voucherRedeemed": {
+      "title": "Voucher redeemed",
+      "message": "Your voucher {code} was redeemed successfully and added {credits} credits to your account."
     }
   },
   "emailVerification": {
@@ -1216,7 +1319,9 @@
     "users": "Users",
     "notifications": "Notifications",
     "projects": "Projects",
-    "discounts": "Discounts"
+    "discounts": "Discounts",
+    "vouchers": "Vouchers",
+    "logs": "Logs"
   },
   "creditProgressBar": {
     "creditsOf": "{current} of {total} credits",

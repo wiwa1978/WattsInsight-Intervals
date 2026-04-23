@@ -11,7 +11,44 @@ import { requestId } from "hono/request-id";
 import { z } from "zod";
 
 import { authAdditionalUserFields, createAuthModule } from "@platform/auth-core";
-import { mobileRefreshRequestSchema, mobileTokenRequestSchema } from "@platform/contracts";
+import {
+  banUserSchema,
+  billingListQuerySchema,
+  billingRangeQuerySchema,
+  clientLogSchema,
+  countriesQuerySchema,
+  createDiscountSchema,
+  createCheckoutRequestSchema,
+  discountIdParamSchema,
+  discountListQuerySchema,
+  discountUserAssignmentSchema,
+  generateDiscountCodeSchema,
+  invoiceRequestSchema,
+  logEntriesQuerySchema,
+  logFilesQuerySchema,
+  mobileRefreshRequestSchema,
+  mobileTokenRequestSchema,
+  notificationIdParamSchema,
+  notificationsListQuerySchema,
+  optionalLimitQuerySchema,
+  paginationQuerySchema,
+  searchUsersQuerySchema,
+  sendNotificationBaseSchema,
+  sendNotificationToUsersSchema,
+  setRoleSchema,
+  setUserPasswordSchema,
+  timeRangeSchema,
+  updateDiscountSchema,
+  userIdParamSchema,
+  userOnlySchema,
+  validateDiscountCodeSchema,
+  createVoucherSchema,
+  redeemVoucherSchema,
+  updateVoucherSchema,
+  verifyBanSecretSchema,
+  voucherIdParamSchema,
+  voucherListQuerySchema,
+} from "@platform/contracts";
 import { createEmailModule, createResendProvider } from "@platform/email-core";
 import { createPaymentsModule } from "@platform/payments-core";
 import { country, createPlatformDb, mobileRefreshToken, user } from "@platform/platform-db";
@@ -24,109 +61,12 @@ import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createNotificationsService } from "./modules/notifications/service";
 import { logger } from "./observability/logger";
+import { createVouchersService } from "./modules/vouchers/service";
 import { Sentry, setupSentry } from "./observability/sentry";
 
 type JsonContext = {
   json: (body: unknown, status?: number) => Response;
 };
-
-const paginationQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
-});
-
-const optionalLimitQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
-
-const timeRangeSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
-const userIdParamSchema = z.object({ userId: z.string().uuid() });
-const discountIdParamSchema = z.object({ discountId: z.string().uuid() });
-const notificationIdParamSchema = z.object({ notificationId: z.string().uuid() });
-const searchUsersQuerySchema = z.object({
-  query: z.string().trim().min(2).max(255),
-  limit: z.coerce.number().int().min(1).max(50).default(20),
-});
-const notificationsListQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
-const countriesQuerySchema = z.object({
-  lang: z.enum(["en", "fr", "nl"]).default("en"),
-});
-const billingRangeQuerySchema = z.object({
-  timeRange: timeRangeSchema.default("daily"),
-});
-const billingListQuerySchema = paginationQuerySchema.extend({
-  searchEmail: z.string().trim().email().max(255).optional(),
-});
-const packageCheckoutSchema = z.object({
-  packageKey: z.string().trim().min(1).max(64),
-});
-const invoiceRequestSchema = z.object({
-  paymentId: z.string().trim().min(1).max(255),
-});
-const verifyBanSecretSchema = z.object({
-  secret: z.string().trim().min(1).max(255),
-});
-const setRoleSchema = z.object({
-  userId: z.string().uuid(),
-  role: z.enum(["user", "admin"]),
-});
-const userOnlySchema = z.object({
-  userId: z.string().uuid(),
-});
-const setUserPasswordSchema = z.object({
-  userId: z.string().uuid(),
-  newPassword: z.string().min(1).max(255),
-});
-const discountStatusSchema = z.enum(["active", "inactive", "expired"]);
-const discountTypeSchema = z.literal("percentage");
-const discountListQuerySchema = paginationQuerySchema.extend({
-  search: z.string().trim().min(1).max(255).optional(),
-  status: discountStatusSchema.optional(),
-});
-const generateDiscountCodeSchema = z.object({
-  overridePrefix: z.string().trim().min(2).max(20).regex(/^[A-Z0-9]+$/).optional(),
-});
-const validateDiscountCodeSchema = z.object({
-  code: z.string().trim().min(1).max(50),
-  excludeId: z.string().uuid().optional(),
-});
-const createDiscountSchema = z.object({
-  code: z.string().trim().min(1).max(50).regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/),
-  type: discountTypeSchema,
-  value: z.number().min(0.01).max(100),
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date(),
-  maxUses: z.number().int().min(1).max(100000).nullable().optional(),
-  userIds: z.array(z.string().uuid()).max(500).optional(),
-});
-const updateDiscountSchema = z.object({
-  code: z.string().trim().min(1).max(50).regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/).optional(),
-  type: discountTypeSchema.optional(),
-  value: z.number().min(0.01).max(100).optional(),
-  startDate: z.coerce.date().optional(),
-  endDate: z.coerce.date().optional(),
-  maxUses: z.number().int().min(1).max(100000).nullable().optional(),
-  status: discountStatusSchema.optional(),
-});
-const discountUserAssignmentSchema = z.object({
-  userIds: z.array(z.string().uuid()).max(500),
-});
-const notificationTypeSchema = z.enum(["info", "warning", "success", "error"]);
-const notificationCategorySchema = z.string().trim().min(1).max(100);
-const sendNotificationBaseSchema = z.object({
-  title: z.string().trim().min(1).max(100),
-  message: z.string().trim().min(1).max(1000),
-  type: notificationTypeSchema.optional(),
-  category: notificationCategorySchema.optional(),
-  data: z.record(z.string(), z.unknown()).optional(),
-  showAsBanner: z.boolean().optional(),
-  bannerExpiresAt: z.coerce.date().optional(),
-});
-const sendNotificationToUsersSchema = sendNotificationBaseSchema.extend({
-  userIds: z.array(z.string().uuid()).min(1).max(500),
-});
 
 function validationError(c: JsonContext, message: string) {
   return c.json({ success: false, error: message }, 400);
@@ -238,6 +178,10 @@ const adminService = createAdminService({
 const discountsService = createDiscountsService({
   db,
   env,
+});
+const vouchersService = createVouchersService({
+  db,
+  notifications: notificationsService,
 });
 
 const dodoPaymentsClient = env.DODO_PAYMENTS_API_KEY
@@ -527,15 +471,6 @@ const paymentsModule = createPaymentsModule({
 });
 
 const app = new Hono();
-
-const clientLogSchema = z.object({
-  level: z.enum(["debug", "info", "warn", "error"]).default("error"),
-  message: z.string().min(1),
-  context: z.unknown().optional(),
-  url: z.string().optional(),
-  userAgent: z.string().optional(),
-  timestamp: z.string().optional(),
-});
 
 setupSentry();
 
@@ -1167,7 +1102,7 @@ app.route("/payments", paymentsModule.router);
 
 app.post("/payments/checkout", authModule.requireAuth, async (c) => {
   const body = await c.req.json().catch(() => null);
-  const parsedBody = parseJsonBody(packageCheckoutSchema, body);
+  const parsedBody = parseJsonBody(createCheckoutRequestSchema, body);
 
   if (!parsedBody.success) {
     return validationError(c, "Invalid checkout payload");
@@ -1251,6 +1186,19 @@ meRouter.post("/credits/invoice", async (c) => {
       400,
     );
   }
+});
+
+meRouter.post("/vouchers/redeem", async (c) => {
+  const authUser = (c as any).get("authUser") as { id: string };
+  const body = await c.req.json().catch(() => null);
+  const parsedBody = parseJsonBody(redeemVoucherSchema, body);
+
+  if (!parsedBody.success) {
+    return validationError(c, "Invalid voucher payload");
+  }
+
+  const result = await vouchersService.redeemVoucher(authUser.id, parsedBody.data.code);
+  return c.json(result, result.success ? 200 : 400);
 });
 
 meRouter.get("/notifications", async (c) => {
@@ -1375,14 +1323,7 @@ adminRouter.post("/users/unban", async (c) => {
 
 adminRouter.post("/users/ban", async (c) => {
   const body = await c.req.json().catch(() => null);
-  const parsedBody = parseJsonBody(
-    z.object({
-      userId: z.string().uuid(),
-      banReason: z.string().trim().min(1).max(1000).optional(),
-      banExpiresIn: z.number().int().positive().optional(),
-    }),
-    body,
-  );
+  const parsedBody = parseJsonBody(banUserSchema, body);
 
   if (!parsedBody.success) {
     return validationError(c, "Invalid ban payload");
@@ -1736,6 +1677,112 @@ adminRouter.get("/discounts/search-users", async (c) => {
 
   const users = await discountsService.searchUsersForDiscount(parsedQuery.data.query, parsedQuery.data.limit);
   return c.json({ success: true, data: users });
+});
+
+adminRouter.get("/vouchers", async (c) => {
+  const parsedQuery = parseQuery(voucherListQuerySchema, {
+    limit: c.req.query("limit"),
+    offset: c.req.query("offset"),
+    search: c.req.query("search"),
+    status: c.req.query("status"),
+  });
+
+  if (!parsedQuery.success) {
+    return validationError(c, "Invalid voucher query");
+  }
+
+  const result = await vouchersService.getVouchers(
+    parsedQuery.data.limit,
+    parsedQuery.data.offset,
+    parsedQuery.data.search,
+    parsedQuery.data.status,
+  );
+  return c.json({ success: true, data: result });
+});
+
+adminRouter.get("/vouchers/search-users", async (c) => {
+  const parsedQuery = parseQuery(searchUsersQuerySchema, {
+    query: c.req.query("query"),
+    limit: c.req.query("limit"),
+  });
+
+  if (!parsedQuery.success) {
+    return validationError(c, "Invalid voucher search query");
+  }
+
+  const users = await vouchersService.searchUsers(parsedQuery.data.query, parsedQuery.data.limit);
+  return c.json({ success: true, data: users });
+});
+
+adminRouter.get("/vouchers/:voucherId", async (c) => {
+  const parsedParams = parseParams(voucherIdParamSchema, { voucherId: c.req.param("voucherId") });
+
+  if (!parsedParams.success) {
+    return validationError(c, "Invalid voucher id");
+  }
+
+  const result = await vouchersService.getVoucherById(parsedParams.data.voucherId);
+  return c.json(result, result.success ? 200 : 404);
+});
+
+adminRouter.post("/vouchers", async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsedBody = parseJsonBody(createVoucherSchema, body);
+
+  if (!parsedBody.success) {
+    return validationError(c, "Invalid voucher payload");
+  }
+
+  const result = await vouchersService.createVoucher(parsedBody.data);
+  return c.json(result, result.success ? 200 : 400);
+});
+
+adminRouter.patch("/vouchers/:voucherId", async (c) => {
+  const parsedParams = parseParams(voucherIdParamSchema, { voucherId: c.req.param("voucherId") });
+  const body = await c.req.json().catch(() => null);
+  const parsedBody = parseJsonBody(updateVoucherSchema, body);
+
+  if (!parsedParams.success) {
+    return validationError(c, "Invalid voucher id");
+  }
+
+  if (!parsedBody.success) {
+    return validationError(c, "Invalid voucher update payload");
+  }
+
+  const result = await vouchersService.updateVoucher({
+    id: parsedParams.data.voucherId,
+    ...parsedBody.data,
+  });
+  return c.json(result, result.success ? 200 : 400);
+});
+
+adminRouter.get("/logs/files", async (c) => {
+  const parsedQuery = parseQuery(logFilesQuerySchema, {
+    stream: c.req.query("stream"),
+  });
+
+  if (!parsedQuery.success) {
+    return validationError(c, "Invalid logs query");
+  }
+
+  const files = logger.listLogFiles(parsedQuery.data.stream);
+  return c.json({ success: true, data: files });
+});
+
+adminRouter.get("/logs/entries", async (c) => {
+  const parsedQuery = parseQuery(logEntriesQuerySchema, {
+    stream: c.req.query("stream"),
+    file: c.req.query("file"),
+    limit: c.req.query("limit"),
+  });
+
+  if (!parsedQuery.success) {
+    return validationError(c, "Invalid log entries query");
+  }
+
+  const data = logger.readLogEntries(parsedQuery.data);
+  return c.json({ success: true, data });
 });
 
 adminRouter.get("/notifications", async (c) => {

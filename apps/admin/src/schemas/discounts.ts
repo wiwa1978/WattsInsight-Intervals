@@ -1,71 +1,23 @@
 import { z } from "zod";
+import {
+  createDiscountSchema,
+  discountStatusSchema,
+  discountTypeSchema,
+  discountUserAssignmentSchema,
+  updateDiscountSchema,
+  validateDiscountCodeSchema,
+} from "@platform/contracts";
 
-// ============================================================================
-// Zod Validation Schemas
-// ============================================================================
-
-// Constants for validation
-const DISCOUNT_CODE_MAX_LENGTH = 50;
-const DISCOUNT_DESCRIPTION_MAX_LENGTH = 500;
-
-export const createDiscountSchema = z.object({
-  code: z
-    .string()
-    .min(1, "Discount code is required")
-    .max(50, "Discount code must be less than 50 characters")
-    .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)"),
-  type: z.enum(["fixed", "percentage"]),
-  value: z
-    .number()
-    .min(0.01, "Value must be greater than 0")
-    .max(1000000, "Value is too large"),
-  startDate: z.date(),
-  endDate: z.date(),
-  maxUses: z.number().min(1).optional().nullable(),
-  userIds: z.array(z.string()).min(1, "At least one user must be selected"),
-  sendEmail: z.boolean().optional(),
-  sendNotification: z.boolean().optional(),
-});
-
-export const updateDiscountSchema = z.object({
-  id: z.string().uuid("Invalid discount ID"),
-  code: z
-    .string()
-    .min(1, "Discount code is required")
-    .max(50, "Discount code must be less than 50 characters")
-    .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)")
-    .optional(),
-  type: z.enum(["fixed", "percentage"]).optional(),
-  value: z
-    .number()
-    .min(0.01, "Value must be greater than 0")
-    .max(1000000, "Value is too large")
-    .optional(),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
-  maxUses: z.number().min(1).optional().nullable(),
-  status: z.enum(["active", "inactive", "expired"]).optional(),
-  sendEmail: z.boolean().optional(),
-  sendNotification: z.boolean().optional(),
-});
-
-export const assignDiscountSchema = z.object({
-  discountId: z.string().uuid("Invalid discount ID"),
-  userIds: z.array(z.string().uuid("Invalid user ID")).min(1, "At least one user must be selected"),
-});
-
-export const removeDiscountSchema = z.object({
-  discountId: z.string().uuid("Invalid discount ID"),
-  userIds: z.array(z.string().uuid("Invalid user ID")).min(1, "At least one user must be selected"),
-});
+export { createDiscountSchema, discountUserAssignmentSchema as assignDiscountSchema };
+export { discountUserAssignmentSchema as removeDiscountSchema, updateDiscountSchema, validateDiscountCodeSchema };
 
 // Admin billing schemas
-const discountTypeSchema = z.enum(["fixed", "percentage"]);
+const DISCOUNT_DESCRIPTION_MAX_LENGTH = 500;
 
 export const adminCreateDiscountSchema = z.object({
   code: z.string()
     .min(1, "Code is required")
-    .max(DISCOUNT_CODE_MAX_LENGTH, `Code must be at most ${DISCOUNT_CODE_MAX_LENGTH} characters`)
+    .max(50, "Code must be at most 50 characters")
     .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)"),
   type: discountTypeSchema,
   value: z.number().min(0.01, "Value must be greater than 0"),
@@ -85,7 +37,7 @@ export const adminUpdateDiscountSchema = z.object({
   id: z.string().uuid(),
   code: z.string()
     .min(1, "Code is required")
-    .max(DISCOUNT_CODE_MAX_LENGTH, `Code must be at most ${DISCOUNT_CODE_MAX_LENGTH} characters`)
+    .max(50, "Code must be at most 50 characters")
     .regex(/^[A-Z0-9]+-[A-Z0-9]{3}-[A-Z0-9]{4}$/, "Code must be in format: PREFIX-XXX-XXXX (e.g., DSCT-ABC-1234)")
     .optional(),
   type: discountTypeSchema.optional(),
@@ -110,11 +62,6 @@ export const assignUsersToDiscountSchema = z.object({
 export const removeUsersFromDiscountSchema = z.object({
   discountId: z.string().uuid(),
   userIds: z.array(z.string().uuid()).min(1, "At least one user must be selected"),
-});
-
-export const validateDiscountCodeSchema = z.object({
-  code: z.string(),
-  userId: z.string().optional(),
 });
 
 // ============================================================================

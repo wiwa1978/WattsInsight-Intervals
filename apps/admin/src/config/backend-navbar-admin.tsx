@@ -3,7 +3,9 @@ import {
   CreditCard,
   LayoutDashboard,
   LucideIcon,
+  Logs,
   Percent,
+  Ticket,
   Users
 } from "lucide-react"
 
@@ -38,9 +40,19 @@ export const BackendNavAdminItems: BackendNavAdminItem[] = [
     icon: Percent,
   },
   {
+    title: "admin.nav.vouchers",
+    url: "/admin/vouchers",
+    icon: Ticket,
+  },
+  {
     title: "admin.nav.notifications",
     url: "/admin/notifications",
     icon: Bell,
+  },
+  {
+    title: "admin.nav.logs",
+    url: "/admin/logs",
+    icon: Logs,
   },
   
 ]

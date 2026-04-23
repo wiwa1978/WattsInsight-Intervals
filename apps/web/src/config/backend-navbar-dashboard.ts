@@ -1,4 +1,4 @@
-import { LayoutDashboard, LucideIcon } from "lucide-react";
+import { LayoutDashboard, LucideIcon, Wallet } from "lucide-react";
 
 export interface BackendNavDashboardItem {
   title: string;
@@ -12,5 +12,10 @@ export const BackendNavItems: BackendNavDashboardItem[] = [
     title: "dashboard.nav.overview",
     url: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "dashboard.nav.billing",
+    url: "/billing",
+    icon: Wallet,
   },
 ];

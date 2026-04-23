@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import { Camera, Check, ChevronsUpDown, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
@@ -46,6 +47,7 @@ import { useLocale } from "next-intl";
 import { profileSchema, type ProfileFormValues, type Country } from "@/schemas";
 import { useRouter } from "@/i18n/navigation";
 import { getCountries } from "@/lib/api/me";
+import { webQueryKeys } from "@/lib/query/keys";
 
 // Helper function to get flag emoji from country code
 function getFlagEmoji(countryCode: string): string {
@@ -62,9 +64,12 @@ export function ProfileCard() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [countries, setCountries] = React.useState<Country[]>([]);
-  const [countriesLoading, setCountriesLoading] = React.useState(true);
   const [countryOpen, setCountryOpen] = React.useState(false);
+
+  const countriesQuery = useQuery({
+    queryKey: webQueryKeys.countries(locale),
+    queryFn: () => getCountries(locale as "en" | "fr" | "nl") as Promise<Country[]>,
+  });
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -79,21 +84,6 @@ export function ProfileCard() {
       countryId: "",
     },
   });
-
-  // Fetch countries on mount (with locale for i18n)
-  React.useEffect(() => {
-    async function fetchCountries() {
-      try {
-        const data = await getCountries(locale as "en" | "fr" | "nl");
-        setCountries(data as Country[]);
-      } catch (error) {
-        console.error("Failed to fetch countries:", error);
-      } finally {
-        setCountriesLoading(false);
-      }
-    }
-    fetchCountries();
-  }, [locale]);
 
   // Update form values when session loads
   React.useEffect(() => {
@@ -212,6 +202,9 @@ export function ProfileCard() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const countries = countriesQuery.data ?? [];
+  const countriesLoading = countriesQuery.isLoading;
 
   const selectedCountry = countries.find(
     (c) => c.id === form.watch("countryId")

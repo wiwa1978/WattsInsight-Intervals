@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
   decimal,
   index,
   integer,
@@ -41,11 +42,11 @@ export const creditTransactions = pgTable(
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
     type: text("type")
-      .$type<"purchase" | "usage" | "refund" | "bonus" | "admin_adjustment">()
+      .$type<"purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher">()
       .notNull(),
     amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
     description: text("description").notNull(),
-    referenceType: text("reference_type").$type<"payment" | "feature_usage" | "admin" | "bonus">(),
+    referenceType: text("reference_type").$type<"payment" | "feature_usage" | "admin" | "bonus" | "voucher">(),
     referenceId: text("reference_id"),
     metadata: jsonb("metadata"),
     balanceAfter: decimal("balance_after", { precision: 10, scale: 2 }).notNull(),
@@ -143,6 +144,74 @@ export const userDiscounts = pgTable(
   ],
 );
 
+export const vouchers = pgTable(
+  "vouchers",
+  {
+    id,
+    code: text("code").notNull().unique(),
+    creditAmount: integer("credit_amount").notNull(),
+    status: text("status")
+      .$type<"active" | "inactive" | "redeemed" | "expired">()
+      .default("active")
+      .notNull(),
+    maxRedemptions: integer("max_redemptions").default(1).notNull(),
+    currentRedemptions: integer("current_redemptions").default(0).notNull(),
+    appliesToAllUsers: boolean("applies_to_all_users").default(false).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("vouchers_code_idx").on(table.code),
+    index("vouchers_status_idx").on(table.status),
+    index("vouchers_applies_to_all_users_idx").on(table.appliesToAllUsers),
+    index("vouchers_expires_at_idx").on(table.expiresAt),
+  ],
+);
+
+export const voucherAssignments = pgTable(
+  "voucher_assignments",
+  {
+    id,
+    voucherId: uuid("voucher_id")
+      .references(() => vouchers.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("voucher_assignments_voucher_id_idx").on(table.voucherId),
+    index("voucher_assignments_user_id_idx").on(table.userId),
+    uniqueIndex("voucher_assignments_voucher_user_idx").on(table.voucherId, table.userId),
+  ],
+);
+
+export const voucherRedemptions = pgTable(
+  "voucher_redemptions",
+  {
+    id,
+    voucherId: uuid("voucher_id")
+      .references(() => vouchers.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    creditsGranted: integer("credits_granted").notNull(),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("voucher_redemptions_voucher_id_idx").on(table.voucherId),
+    index("voucher_redemptions_user_id_idx").on(table.userId),
+    uniqueIndex("voucher_redemptions_voucher_user_idx").on(table.voucherId, table.userId),
+  ],
+);
+
 export const userCreditsRelations = relations(userCredits, ({ one, many }) => ({
   user: one(user, {
     fields: [userCredits.userId],
@@ -176,6 +245,33 @@ export const userDiscountsRelations = relations(userDiscounts, ({ one }) => ({
   }),
   user: one(user, {
     fields: [userDiscounts.userId],
+    references: [user.id],
+  }),
+}));
+
+export const vouchersRelations = relations(vouchers, ({ many }) => ({
+  assignments: many(voucherAssignments),
+  redemptions: many(voucherRedemptions),
+}));
+
+export const voucherAssignmentsRelations = relations(voucherAssignments, ({ one }) => ({
+  voucher: one(vouchers, {
+    fields: [voucherAssignments.voucherId],
+    references: [vouchers.id],
+  }),
+  user: one(user, {
+    fields: [voucherAssignments.userId],
+    references: [user.id],
+  }),
+}));
+
+export const voucherRedemptionsRelations = relations(voucherRedemptions, ({ one }) => ({
+  voucher: one(vouchers, {
+    fields: [voucherRedemptions.voucherId],
+    references: [vouchers.id],
+  }),
+  user: one(user, {
+    fields: [voucherRedemptions.userId],
     references: [user.id],
   }),
 }));

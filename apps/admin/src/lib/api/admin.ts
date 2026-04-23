@@ -1,5 +1,8 @@
 import { apiRequest } from "./client";
 
+import type { AdminCreateDiscountInput, AdminUpdateDiscountInput, DiscountStatus } from "@/types/discounts";
+import type { VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
+
 export async function verifyAdminBanSecretApi(secret: string) {
   return apiRequest<{ success: boolean; error?: string }>("/admin/verify-ban-secret", {
     method: "POST",
@@ -141,7 +144,7 @@ export async function getAdminCreditsConsumedDataApi(timeRange: "daily" | "weekl
   return result.data;
 }
 
-export async function getDiscountsApi(limit = 20, offset = 0, search?: string, status?: "active" | "inactive" | "expired") {
+export async function getDiscountsApi(limit = 20, offset = 0, search?: string, status?: DiscountStatus) {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
@@ -175,15 +178,7 @@ export async function validateDiscountCodeApi(code: string, excludeId?: string) 
   return result.data;
 }
 
-export async function createDiscountApi(payload: {
-  code: string;
-  type: "fixed" | "percentage";
-  value: number;
-  startDate: Date;
-  endDate: Date;
-  maxUses?: number | null;
-  userIds?: string[];
-}) {
+export async function createDiscountApi(payload: AdminCreateDiscountInput) {
   return apiRequest<{ success: boolean; discount?: unknown; error?: string }>("/admin/discounts", {
     method: "POST",
     body: JSON.stringify({
@@ -194,16 +189,7 @@ export async function createDiscountApi(payload: {
   });
 }
 
-export async function updateDiscountApi(payload: {
-  id: string;
-  code?: string;
-  type?: "fixed" | "percentage";
-  value?: number;
-  startDate?: Date;
-  endDate?: Date;
-  maxUses?: number | null;
-  status?: "active" | "inactive" | "expired";
-}) {
+export async function updateDiscountApi(payload: AdminUpdateDiscountInput) {
   return apiRequest<{ success: boolean; discount?: unknown; error?: string }>(`/admin/discounts/${payload.id}`, {
     method: "PATCH",
     body: JSON.stringify({
@@ -244,6 +230,80 @@ export async function searchUsersForDiscountApi(query: string, limit = 20) {
   const result = await apiRequest<{ success: boolean; data: Array<{ id: string; name: string; email: string }> }>(
     `/admin/discounts/search-users?query=${encodeURIComponent(query)}&limit=${limit}`,
   );
+  return result.data;
+}
+
+export async function getVouchersApi(limit = 20, offset = 0, search?: string, status?: VoucherStatus) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+  if (search) params.set("search", search);
+  if (status) params.set("status", status);
+
+  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/vouchers?${params.toString()}`);
+  return result.data;
+}
+
+export async function getVoucherByIdApi(voucherId: string) {
+  return apiRequest<{ success: boolean; voucher?: unknown; error?: string }>(`/admin/vouchers/${voucherId}`);
+}
+
+export async function createVoucherApi(payload: {
+  code: string;
+  creditAmount: number;
+  assignmentScope: VoucherAssignmentScope;
+  maxRedemptions?: number;
+  userIds: string[];
+  expiresAt?: Date | null;
+}) {
+  return apiRequest<{ success: boolean; voucher?: unknown; error?: string }>("/admin/vouchers", {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      expiresAt: payload.expiresAt?.toISOString(),
+    }),
+  });
+}
+
+export async function updateVoucherApi(payload: {
+  id: string;
+  code?: string;
+  creditAmount?: number;
+  assignmentScope?: VoucherAssignmentScope;
+  status?: VoucherStatus;
+  maxRedemptions?: number;
+  userIds?: string[];
+  expiresAt?: Date | null;
+}) {
+  return apiRequest<{ success: boolean; voucher?: unknown; error?: string }>(`/admin/vouchers/${payload.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...payload,
+      expiresAt: payload.expiresAt === null ? null : payload.expiresAt?.toISOString(),
+    }),
+  });
+}
+
+export async function searchUsersForVoucherApi(query: string, limit = 20) {
+  const result = await apiRequest<{ success: boolean; data: Array<{ id: string; name: string; email: string }> }>(
+    `/admin/vouchers/search-users?query=${encodeURIComponent(query)}&limit=${limit}`,
+  );
+  return result.data;
+}
+
+export async function getAdminLogFilesApi(stream: "app" | "audit" = "app") {
+  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/logs/files?stream=${stream}`);
+  return result.data;
+}
+
+export async function getAdminLogEntriesApi(payload: { stream?: "app" | "audit"; file?: string; limit?: number }) {
+  const params = new URLSearchParams();
+  if (payload.stream) params.set("stream", payload.stream);
+  if (payload.file) params.set("file", payload.file);
+  if (payload.limit) params.set("limit", String(payload.limit));
+  const query = params.toString();
+  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/logs/entries${query ? `?${query}` : ""}`);
   return result.data;
 }
 

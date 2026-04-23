@@ -26,7 +26,7 @@ export type TimeRange = "daily" | "weekly" | "monthly" | "yearly";
 
 type AdminCreditTransaction = {
   id: string;
-  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment";
+  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
   amount: string;
   balanceAfter: string;
   description: string;

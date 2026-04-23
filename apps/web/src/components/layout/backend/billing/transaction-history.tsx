@@ -23,6 +23,31 @@ export async function TransactionHistory() {
   const transactions = await getCreditHistory();
   const t = await getTranslations("billing.transactions");
 
+  const getTransactionTypePresentation = (type: (typeof transactions)[number]["type"]) => {
+    switch (type) {
+      case "purchase":
+        return { label: t("types.purchase"), variant: "default" as const, className: "" };
+      case "usage":
+        return { label: t("types.usage"), variant: "secondary" as const, className: "" };
+      case "bonus":
+        return {
+          label: t("types.bonus"),
+          variant: "outline" as const,
+          className: "bg-green-100 text-green-800 hover:bg-green-200 border-green-300",
+        };
+      case "admin_adjustment":
+        return { label: t("types.admin_adjustment"), variant: "outline" as const, className: "" };
+      case "voucher":
+        return {
+          label: t("types.voucher"),
+          variant: "outline" as const,
+          className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-emerald-300",
+        };
+      default:
+        return { label: type, variant: "default" as const, className: "" };
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -49,12 +74,17 @@ export async function TransactionHistory() {
               <TableBody>
                 {transactions.map((transaction) => (
                   <TableRow key={transaction.id}>
+                    {(() => {
+                      const typePresentation = getTransactionTypePresentation(transaction.type);
+
+                      return (
+                        <>
                     <TableCell className="w-44">
                       <Badge
-                        variant="default"
-                        className="w-32 justify-center"
+                        variant={typePresentation.variant}
+                        className={`w-32 justify-center ${typePresentation.className}`.trim()}
                       >
-                        <span>{transaction.type.toUpperCase()}</span>
+                        <span>{typePresentation.label}</span>
                       </Badge>
                     </TableCell>
                     <TableCell
@@ -76,6 +106,9 @@ export async function TransactionHistory() {
                     <TableCell className="text-muted-foreground text-sm">
                       {formatDateTime(transaction.createdAt)}
                     </TableCell>
+                        </>
+                      );
+                    })()}
                   </TableRow>
                 ))}
               </TableBody>

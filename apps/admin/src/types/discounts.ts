@@ -1,5 +1,16 @@
+import type { CreateDiscountInput, UpdateDiscountInput } from "@platform/contracts";
+
+export type AdminCreateDiscountInput = CreateDiscountInput & {
+  userIds: string[];
+};
+
+export type AdminUpdateDiscountInput = Omit<UpdateDiscountInput, "id"> & {
+  id: string;
+  userIds: string[];
+};
+
 // Discount type definitions
-export type DiscountType = "fixed" | "percentage";
+export type DiscountType = "percentage";
 export type DiscountStatus = "active" | "inactive" | "expired";
 
 export interface Discount {
@@ -46,36 +57,13 @@ export interface DiscountFormData {
   value: number;
   startDate: Date;
   endDate: Date;
-  maxUses?: number;
+  maxUses?: number | null;
   userIds: string[];
   sendEmail?: boolean;
   sendNotification?: boolean;
 }
 
-export interface CreateDiscountInput {
-  code: string;
-  type: DiscountType;
-  value: number;
-  startDate: Date;
-  endDate: Date;
-  maxUses?: number;
-  userIds?: string[];
-  sendEmail?: boolean;
-  sendNotification?: boolean;
-}
-
-export interface UpdateDiscountInput {
-  id: string;
-  code?: string;
-  type?: DiscountType;
-  value?: number;
-  startDate?: Date;
-  endDate?: Date;
-  maxUses?: number;
-  status?: DiscountStatus;
-  sendEmail?: boolean;
-  sendNotification?: boolean;
-}
+export type { CreateDiscountInput, UpdateDiscountInput };
 
 export interface AssignDiscountInput {
   discountId: string;

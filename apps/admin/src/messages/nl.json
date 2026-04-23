@@ -615,7 +615,9 @@
       "users": "Gebruikers",
       "billing": "Facturatie",
       "notifications": "Meldingen",
-      "discounts": "Kortingscodes"
+      "discounts": "Kortingscodes",
+      "vouchers": "Vouchers",
+      "logs": "Logs"
     },
     "backToPortal": "Terug naar Portaal",
     "impersonation": {
@@ -944,6 +946,29 @@
           "page": "Pagina {current} van {total}",
           "previous": "Vorige",
           "next": "Volgende"
+        },
+        "types": {
+          "purchase": "Aankoop",
+          "usage": "Gebruik",
+          "refund": "Terugbetaling",
+          "bonus": "Bonus",
+          "admin_adjustment": "Admin-aanpassing",
+          "voucher": "Voucher"
+        },
+        "details": {
+          "title": "Transactiedetails",
+          "description": "Bekijk gedetailleerde informatie over deze credittransactie",
+          "transactionId": "Transactie-ID",
+          "userId": "Gebruikers-ID",
+          "referenceId": "Referentie-ID",
+          "date": "Datum",
+          "type": "Type",
+          "amount": "Bedrag",
+          "balanceBefore": "Saldo voor",
+          "balanceAfter": "Saldo na",
+          "descriptionLabel": "Beschrijving",
+          "referenceType": "Referentietype",
+          "metadata": "Metadata"
         }
       },
       "purchases": {
@@ -1050,6 +1075,80 @@
         "percentage": "Percentage",
         "fixed": "Vast"
       }
+    },
+    "vouchers": {
+      "title": "Voucherbeheer",
+      "description": "Maak vouchers die gebruikers kunnen inwisselen voor credits.",
+      "loading": "Vouchers laden...",
+      "empty": "Geen vouchers gevonden.",
+      "filters": {
+        "searchPlaceholder": "Zoek op code of e-mail van toegewezen gebruiker...",
+        "statusPlaceholder": "Filter op status",
+        "statusAll": "Alle statussen"
+      },
+      "table": {
+        "code": "Code",
+        "credits": "Credits",
+        "status": "Status",
+        "redemptions": "Inwisselingen",
+        "assignedTo": "Toegewezen aan",
+        "allUsers": "Alle gebruikers",
+        "selectedUsers": "{count} geselecteerde gebruikers",
+        "expiresAt": "Verloopt op",
+        "actions": "Acties"
+      },
+      "statuses": {
+        "active": "Actief",
+        "inactive": "Inactief",
+        "redeemed": "Ingewisseld",
+        "expired": "Verlopen"
+      },
+      "actions": {
+        "create": "Voucher aanmaken",
+        "edit": "Bewerken",
+        "save": "Wijzigingen opslaan",
+        "activate": "Activeren",
+        "deactivate": "Deactiveren"
+      },
+      "dialog": {
+        "title": "Voucher aanmaken",
+        "description": "Maak een vouchercode die wordt omgezet in gebruikerscredits.",
+        "editTitle": "Voucher bewerken",
+        "editDescription": "Werk voucherdetails, toewijzingsbereik en inwissellimieten bij."
+      },
+      "form": {
+        "code": "Vouchercode",
+        "codePlaceholder": "Voer vouchercode in",
+        "creditAmount": "Aantal credits",
+        "assignmentScope": "Beschikbaarheid",
+        "assignmentScopePlaceholder": "Selecteer wie deze voucher kan inwisselen",
+        "assignmentScopes": {
+          "selected": "Geselecteerde gebruikers",
+          "all": "Alle gebruikers"
+        },
+        "users": "Geschikte gebruikers",
+        "usersDescription": "Selecteer een of meer gebruikers die deze voucher mogen inwisselen.",
+        "usersPlaceholder": "Selecteer gebruikers...",
+        "usersSearchPlaceholder": "Zoek gebruikers op naam of e-mail...",
+        "usersLoading": "Gebruikers zoeken...",
+        "usersEmpty": "Geen gebruikers gevonden",
+        "usersMinSearch": "Typ minimaal 2 tekens om te zoeken",
+        "usersSelected": "{count} gebruikers geselecteerd",
+        "maxRedemptions": "Maximaal aantal inwisselingen",
+        "maxRedemptionsSelectedDescription": "Wordt automatisch gelijk aan het aantal geselecteerde gebruikers: {count}",
+        "maxRedemptionsAllDescription": "Stel in hoeveel gebruikers deze voucher in totaal mogen inwisselen.",
+        "expiresAt": "Verloopt op",
+        "expiresAtPlaceholder": "Kies een vervaldatum",
+        "expiresAtDescription": "Laat leeg om de voucher geldig te houden totdat deze wordt ingewisseld of handmatig wordt gedeactiveerd."
+      },
+      "success": {
+        "created": "Voucher succesvol aangemaakt.",
+        "updated": "Voucher succesvol bijgewerkt."
+      },
+      "errors": {
+        "loadFailed": "Vouchers laden mislukt.",
+        "statusLocked": "Deze voucher kan niet meer worden geactiveerd of gedeactiveerd."
+      }
     }
   },
   "notifications": {
@@ -1148,6 +1247,10 @@
     "creditPurchaseSuccess": {
       "title": "Creditaankoop geslaagd",
       "message": "Succesvol {credits} credits gekocht voor €{amount} (incl BTW). Je credits zijn nu beschikbaar voor gebruik."
+    },
+    "voucherRedeemed": {
+      "title": "Voucher ingewisseld",
+      "message": "Je voucher {code} is succesvol ingewisseld en heeft {credits} credits aan je account toegevoegd."
     },
     "creditsAdded": {
       "title": "Credits toegevoegd aan uw account",
@@ -1300,7 +1403,9 @@
     "users": "Gebruikers",
     "notifications": "Meldingen",
     "projects": "Projecten",
-    "discounts": "Kortingscodes"
+    "discounts": "Kortingscodes",
+    "vouchers": "Vouchers",
+    "logs": "Logs"
   },
   "creditProgressBar": {
     "creditsOf": "{current} van {total} tegoed",

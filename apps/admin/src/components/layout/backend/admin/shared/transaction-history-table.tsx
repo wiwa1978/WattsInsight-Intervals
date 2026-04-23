@@ -20,7 +20,7 @@ import { TransactionDetailsDialog } from "../users/transaction-details-dialog";
 
 export type Transaction = {
   id: string;
-  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment";
+  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
   amount: string;
   balanceBefore?: string;
   balanceAfter: string;
@@ -59,6 +59,34 @@ export function TransactionHistoryTable({
   description,
 }: TransactionHistoryTableProps) {
   const t = useTranslations("admin.billing.transactions");
+
+  const getTransactionTypePresentation = React.useCallback(
+    (type: Transaction["type"]) => {
+      switch (type) {
+        case "purchase":
+          return { label: t("types.purchase"), variant: "default" as const, className: "" };
+        case "usage":
+          return { label: t("types.usage"), variant: "secondary" as const, className: "" };
+        case "bonus":
+          return {
+            label: t("types.bonus"),
+            variant: "outline" as const,
+            className: "bg-green-100 text-green-800 hover:bg-green-200 border-green-300",
+          };
+        case "admin_adjustment":
+          return { label: t("types.admin_adjustment"), variant: "outline" as const, className: "" };
+        case "voucher":
+          return {
+            label: t("types.voucher"),
+            variant: "outline" as const,
+            className: "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border-emerald-300",
+          };
+        default:
+          return { label: type, variant: "destructive" as const, className: "" };
+      }
+    },
+    [t],
+  );
 
   // State
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -104,22 +132,9 @@ export function TransactionHistoryTable({
     setIsDialogOpen(true);
   };
 
-  const getTransactionTypeBadge = (type: string) => {
-    const variant =
-      type === "purchase"
-        ? "default"
-        : type === "usage"
-          ? "secondary"
-          : type === "bonus"
-            ? "outline"
-            : type === "admin_adjustment"
-              ? "outline"
-              : "destructive";
-    const className =
-      type === "bonus"
-        ? "bg-green-100 text-green-800 hover:bg-green-200 border-green-300"
-        : "";
-    return <Badge variant={variant} className={className}>{type}</Badge>;
+  const getTransactionTypeBadge = (type: Transaction["type"]) => {
+    const presentation = getTransactionTypePresentation(type);
+    return <Badge variant={presentation.variant} className={presentation.className}>{presentation.label}</Badge>;
   };
 
   const columns: ColumnDef<Transaction>[] = React.useMemo(() => {
@@ -235,7 +250,7 @@ export function TransactionHistoryTable({
     );
 
     return cols;
-  }, [showUserColumns, t]);
+  }, [getTransactionTypePresentation, showUserColumns, t]);
 
   const from = total > 0 ? (currentPage - 1) * limit + 1 : 0;
   const to = Math.min(currentPage * limit, total);

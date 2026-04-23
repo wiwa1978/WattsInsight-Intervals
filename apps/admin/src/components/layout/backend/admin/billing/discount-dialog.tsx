@@ -16,12 +16,13 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DiscountForm } from "./discount-form";
 import type { DiscountFormData } from "@/types/discounts";
+import type { UserOption } from "./user-multi-select";
 
 interface DiscountDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode?: "create" | "edit";
-  initialData?: Partial<DiscountFormData> & { id?: string };
+  initialData?: Partial<DiscountFormData> & { id?: string; selectedUsers?: UserOption[] };
   onSuccess?: () => void;
 }
 

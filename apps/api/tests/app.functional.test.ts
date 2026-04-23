@@ -53,11 +53,21 @@ const mocks = vi.hoisted(() => {
     searchUsersForDiscount: vi.fn(),
   };
 
+  const vouchersService = {
+    getVouchers: vi.fn(),
+    getVoucherById: vi.fn(),
+    createVoucher: vi.fn(),
+    updateVoucher: vi.fn(),
+    searchUsers: vi.fn(),
+    redeemVoucher: vi.fn(),
+  };
+
   return {
     billingService,
     adminService,
     notificationsService,
     discountsService,
+    vouchersService,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -89,6 +99,10 @@ vi.mock("../src/modules/notifications/service", () => ({
 
 vi.mock("../src/modules/discounts/service", () => ({
   createDiscountsService: () => mocks.discountsService,
+}));
+
+vi.mock("../src/modules/vouchers/service", () => ({
+  createVouchersService: () => mocks.vouchersService,
 }));
 
 vi.mock("@platform/auth-core", () => ({
@@ -639,6 +653,149 @@ describe("API functional routes", () => {
     expect(assignRes.status).toBe(200);
     expect(removeRes.status).toBe(200);
     expect(deleteRes.status).toBe(200);
+  });
+
+  // Verifies voucher list and search endpoints pass validated filters to the service.
+  it("routes voucher listing and user search", async () => {
+    mocks.vouchersService.getVouchers.mockResolvedValueOnce({
+      vouchers: [{ id: "v1", code: "WELCOME10" }],
+      total: 1,
+      hasMore: false,
+    });
+    mocks.vouchersService.searchUsers.mockResolvedValueOnce([
+      { id: "u1", name: "John Doe", email: "john@example.com" },
+    ]);
+
+    const listRes = await app.request("/admin/vouchers?limit=5&offset=10&search=welcome&status=active");
+    const searchRes = await app.request("/admin/vouchers/search-users?query=john&limit=5");
+
+    expect(listRes.status).toBe(200);
+    expect(searchRes.status).toBe(200);
+    expect(mocks.vouchersService.getVouchers).toHaveBeenCalledWith(5, 10, "welcome", "active");
+    expect(mocks.vouchersService.searchUsers).toHaveBeenCalledWith("john", 5);
+    await expect(listRes.json()).resolves.toEqual({
+      success: true,
+      data: {
+        vouchers: [{ id: "v1", code: "WELCOME10" }],
+        total: 1,
+        hasMore: false,
+      },
+    });
+    await expect(searchRes.json()).resolves.toEqual({
+      success: true,
+      data: [{ id: "u1", name: "John Doe", email: "john@example.com" }],
+    });
+  });
+
+  // Verifies voucher CRUD routes delegate payloads to the voucher service.
+  it("routes voucher CRUD operations", async () => {
+    mocks.vouchersService.createVoucher.mockResolvedValueOnce({ success: true, voucher: { id: "v1" } });
+    mocks.vouchersService.getVoucherById.mockResolvedValueOnce({ success: true, voucher: { id: "v1" } });
+    mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: true, voucher: { id: "v1" } });
+
+    const voucherId = "77777777-7777-4777-8777-777777777777";
+    const createRes = await app.request("/admin/vouchers", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "WELCOME10",
+        creditAmount: 10,
+        assignmentScope: "selected",
+        userIds: ["11111111-1111-4111-8111-111111111111"],
+        expiresAt: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const getRes = await app.request(`/admin/vouchers/${voucherId}`);
+    const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "inactive" }),
+    });
+
+    expect(createRes.status).toBe(200);
+    expect(getRes.status).toBe(200);
+    expect(patchRes.status).toBe(200);
+    expect(mocks.vouchersService.createVoucher).toHaveBeenCalledWith({
+      code: "WELCOME10",
+      creditAmount: 10,
+      assignmentScope: "selected",
+      userIds: ["11111111-1111-4111-8111-111111111111"],
+      expiresAt: new Date("2026-12-31T00:00:00.000Z"),
+    });
+    expect(mocks.vouchersService.getVoucherById).toHaveBeenCalledWith(voucherId);
+    expect(mocks.vouchersService.updateVoucher).toHaveBeenCalledWith({
+      id: voucherId,
+      status: "inactive",
+    });
+  });
+
+  // Verifies voucher endpoints reject malformed identifiers, queries, and payloads.
+  it("validates voucher route inputs", async () => {
+    const [listRes, getRes, createRes, patchRes, searchRes] = await Promise.all([
+      app.request("/admin/vouchers?limit=0"),
+      app.request("/admin/vouchers/not-a-uuid"),
+      app.request("/admin/vouchers", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code: "WELCOME10" }),
+      }),
+      app.request("/admin/vouchers/not-a-uuid", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "inactive" }),
+      }),
+      app.request("/admin/vouchers/search-users?query=a&limit=0"),
+    ]);
+
+    expect(listRes.status).toBe(400);
+    expect(getRes.status).toBe(400);
+    expect(createRes.status).toBe(400);
+    expect(patchRes.status).toBe(400);
+    expect(searchRes.status).toBe(400);
+    await expect(listRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher query" });
+    await expect(getRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher id" });
+    await expect(createRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher payload" });
+    await expect(patchRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher id" });
+    await expect(searchRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher search query" });
+  });
+
+  // Verifies voucher lookup and redeem routes map success and failure responses correctly.
+  it("routes voucher lookup miss and voucher redemption", async () => {
+    mocks.vouchersService.getVoucherById.mockResolvedValueOnce({ success: false, error: "Voucher not found" });
+    mocks.vouchersService.redeemVoucher.mockResolvedValueOnce({ success: true, creditsAdded: 25, newBalance: 40 });
+    mocks.vouchersService.redeemVoucher.mockResolvedValueOnce({ success: false, error: "Voucher not found" });
+
+    const missingRes = await app.request("/admin/vouchers/88888888-8888-4888-8888-888888888888");
+    const redeemOkRes = await app.request("/me/vouchers/redeem", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "welcome10" }),
+    });
+    const redeemFailRes = await app.request("/me/vouchers/redeem", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: "missing" }),
+    });
+
+    expect(missingRes.status).toBe(404);
+    expect(redeemOkRes.status).toBe(200);
+    expect(redeemFailRes.status).toBe(400);
+    expect(mocks.vouchersService.redeemVoucher).toHaveBeenNthCalledWith(1, "auth-user", "welcome10");
+    expect(mocks.vouchersService.redeemVoucher).toHaveBeenNthCalledWith(2, "auth-user", "missing");
+    await expect(redeemOkRes.json()).resolves.toEqual({ success: true, creditsAdded: 25, newBalance: 40 });
+    await expect(redeemFailRes.json()).resolves.toEqual({ success: false, error: "Voucher not found" });
+  });
+
+  // Verifies voucher redeem payload validation happens before the service call.
+  it("validates voucher redeem payload", async () => {
+    const res = await app.request("/me/vouchers/redeem", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid voucher payload" });
   });
 
   // Verifies notification list and dispatch routes map to service calls.

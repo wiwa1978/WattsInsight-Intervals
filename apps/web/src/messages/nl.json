@@ -1272,6 +1272,26 @@
         "balance": "Saldo",
         "description": "Beschrijving",
         "date": "Datum"
+      },
+      "types": {
+        "purchase": "Aankoop",
+        "usage": "Gebruik",
+        "refund": "Terugbetaling",
+        "bonus": "Bonus",
+        "admin_adjustment": "Admin-aanpassing",
+        "voucher": "Voucher"
+      }
+    },
+    "vouchers": {
+      "title": "Voucher inwisselen",
+      "description": "Wissel een vouchercode in om credits aan je account toe te voegen.",
+      "success": "Voucher succesvol ingewisseld. {credits} credits zijn toegevoegd.",
+      "error": "Voucher inwisselen mislukt. Probeer het opnieuw.",
+      "form": {
+        "code": "Vouchercode",
+        "codePlaceholder": "Voer je vouchercode in",
+        "submit": "Voucher inwisselen",
+        "redeeming": "Inwisselen..."
       }
     }
   },
@@ -1301,7 +1321,9 @@
     "users": "Gebruikers",
     "notifications": "Meldingen",
     "projects": "Projecten",
-    "discounts": "Kortingscodes"
+    "discounts": "Kortingscodes",
+    "vouchers": "Vouchers",
+    "logs": "Logs"
   },
   "creditProgressBar": {
     "creditsOf": "{current} van {total} tegoed",

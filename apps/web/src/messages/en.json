@@ -1188,6 +1188,26 @@
         "balance": "Balance",
         "description": "Description",
         "date": "Date"
+      },
+      "types": {
+        "purchase": "Purchase",
+        "usage": "Usage",
+        "refund": "Refund",
+        "bonus": "Bonus",
+        "admin_adjustment": "Admin Adjustment",
+        "voucher": "Voucher"
+      }
+    },
+    "vouchers": {
+      "title": "Redeem Voucher",
+      "description": "Redeem a voucher code to add credits to your account.",
+      "success": "Voucher redeemed successfully. {credits} credits were added.",
+      "error": "Failed to redeem voucher. Please try again.",
+      "form": {
+        "code": "Voucher Code",
+        "codePlaceholder": "Enter your voucher code",
+        "submit": "Redeem Voucher",
+        "redeeming": "Redeeming..."
       }
     }
   },
@@ -1217,7 +1237,9 @@
     "users": "Users",
     "notifications": "Notifications",
     "projects": "Projects",
-    "discounts": "Discounts"
+    "discounts": "Discounts",
+    "vouchers": "Vouchers",
+    "logs": "Logs"
   },
   "creditProgressBar": {
     "creditsOf": "{current} of {total} credits",

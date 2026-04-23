@@ -1205,6 +1205,26 @@
         "balance": "Solde",
         "description": "Description",
         "date": "Date"
+      },
+      "types": {
+        "purchase": "Achat",
+        "usage": "Utilisation",
+        "refund": "Remboursement",
+        "bonus": "Bonus",
+        "admin_adjustment": "Ajustement admin",
+        "voucher": "Bon"
+      }
+    },
+    "vouchers": {
+      "title": "Utiliser un bon",
+      "description": "Utilisez un code bon pour ajouter des crédits à votre compte.",
+      "success": "Bon utilisé avec succès. {credits} crédits ont été ajoutés.",
+      "error": "Échec de l'utilisation du bon. Veuillez réessayer.",
+      "form": {
+        "code": "Code du bon",
+        "codePlaceholder": "Entrez votre code bon",
+        "submit": "Utiliser le bon",
+        "redeeming": "Utilisation..."
       }
     }
   },
@@ -1234,7 +1254,9 @@
     "users": "Utilisateurs",
     "notifications": "Notifications",
     "projects": "Projets",
-    "discounts": "Codes de réduction"
+    "discounts": "Codes de réduction",
+    "vouchers": "Bons",
+    "logs": "Journaux"
   },
   "creditProgressBar": {
     "creditsOf": "{current} sur {total} crédits",

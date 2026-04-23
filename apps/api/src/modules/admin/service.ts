@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { and, desc, eq, gte, inArray, like, lt, sql } from "drizzle-orm";
 
-import { creditPurchases, creditTransactions, user, userCredits } from "@platform/platform-db";
+import { creditPurchases, creditTransactions, user, userCredits, vouchers } from "@platform/platform-db";
 
 type AdminServiceDeps = {
   db: any;
@@ -171,6 +171,24 @@ export function createAdminService(deps: AdminServiceDeps) {
       totalPurchaseTransactions: purchaseTransactionsResult[0]?.count || 0,
       lastMonthPurchaseTransactions: lastMonthPurchaseTransactionsResult[0]?.count || 0,
       totalRefundTransactions: refundTransactionsResult[0]?.count || 0,
+    };
+  }
+
+  async function getVoucherStats() {
+    const [voucherTotals] = await deps.db
+      .select({
+        totalVouchers: sql<number>`COUNT(*)`,
+        activeVouchers: sql<number>`COALESCE(SUM(CASE WHEN ${vouchers.status} = 'active' THEN 1 ELSE 0 END), 0)`,
+        redeemedVouchers: sql<number>`COALESCE(SUM(CASE WHEN ${vouchers.status} = 'redeemed' THEN 1 ELSE 0 END), 0)`,
+        totalVoucherCredits: sql<number>`COALESCE(SUM(${vouchers.creditAmount} * ${vouchers.currentRedemptions}), 0)`,
+      })
+      .from(vouchers);
+
+    return {
+      totalVouchers: voucherTotals?.totalVouchers || 0,
+      activeVouchers: voucherTotals?.activeVouchers || 0,
+      redeemedVouchers: voucherTotals?.redeemedVouchers || 0,
+      totalVoucherCredits: voucherTotals?.totalVoucherCredits || 0,
     };
   }
 
@@ -519,6 +537,7 @@ export function createAdminService(deps: AdminServiceDeps) {
   return {
     verifyAdminBanSecret,
     getDashboardStats,
+    getVoucherStats,
     getUsers,
     getUserStats,
     getUserById,

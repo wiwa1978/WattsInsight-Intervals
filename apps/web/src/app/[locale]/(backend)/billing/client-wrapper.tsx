@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, createContext, useContext } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
@@ -29,6 +30,10 @@ export function BillingClientWrapper({ children }: BillingClientWrapperProps) {
   const t = useTranslations("creditPricing");
   const { data: session } = authClient.useSession();
 
+  const checkoutMutation = useMutation({
+    mutationFn: createCheckoutSession,
+  });
+
   const handlePurchase = async (packageKey: string) => {
     if (!session?.user) {
       toast.error("Please login to purchase credits");
@@ -43,7 +48,7 @@ export function BillingClientWrapper({ children }: BillingClientWrapperProps) {
     }
 
     try {
-      const checkoutSession = await createCheckoutSession(packageKey);
+      const checkoutSession = await checkoutMutation.mutateAsync(packageKey);
       if (checkoutSession.data.checkoutUrl) {
         window.location.href = checkoutSession.data.checkoutUrl;
       } else {

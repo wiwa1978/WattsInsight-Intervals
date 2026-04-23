@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { MoreHorizontal, Edit, Trash2, Users, Calendar, Percent, DollarSign } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { MoreHorizontal, Edit, Trash2, Users, Calendar, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -55,9 +54,6 @@ export function DiscountsTable({
 
   const formatValue = (discount: DiscountWithUsers) => {
     const value = parseFloat(discount.value);
-    if (discount.type === "fixed") {
-      return `€${(value / 100).toFixed(2)}`;
-    }
     return `${value}%`;
   };
 
@@ -108,11 +104,7 @@ export function DiscountsTable({
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">
-                  {discount.type === "fixed" ? (
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Percent className="h-4 w-4 text-muted-foreground" />
-                  )}
+                  <Percent className="h-4 w-4 text-muted-foreground" />
                   <span className="capitalize">{discount.type}</span>
                 </div>
               </TableCell>

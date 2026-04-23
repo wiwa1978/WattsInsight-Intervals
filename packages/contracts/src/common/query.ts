@@ -1,0 +1,11 @@
+import { z } from "zod";
+
+export const optionalLimitQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const timeRangeSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
+
+export const countriesQuerySchema = z.object({
+  lang: z.enum(["en", "fr", "nl"]).default("en"),
+});

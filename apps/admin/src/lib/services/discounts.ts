@@ -12,6 +12,8 @@ import {
 } from "@/lib/api/admin";
 
 import type {
+  AdminCreateDiscountInput,
+  AdminUpdateDiscountInput,
   AssignDiscountInput,
   CreateDiscountInput,
   Discount,
@@ -65,7 +67,7 @@ export async function validateDiscountCodeAction(
   }
 }
 
-export async function createDiscount(input: CreateDiscountInput): Promise<DiscountActionResult> {
+export async function createDiscount(input: AdminCreateDiscountInput): Promise<DiscountActionResult> {
   try {
     const result = await createDiscountApi(input);
     if (!result.success) {
@@ -98,7 +100,7 @@ export async function getDiscountById(id: string): Promise<DiscountResponse> {
   return response as DiscountResponse;
 }
 
-export async function updateDiscount(input: UpdateDiscountInput): Promise<DiscountActionResult> {
+export async function updateDiscount(input: AdminUpdateDiscountInput): Promise<DiscountActionResult> {
   const result = await updateDiscountApi(input);
 
   if (!result.success) {

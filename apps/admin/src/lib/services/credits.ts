@@ -3,13 +3,14 @@ import {
   getMyCreditBalance,
   getMyCreditHistory,
   getMyCreditPurchases,
+  redeemMyVoucher,
 } from "@/lib/api/me";
 
 import { billingConfig } from "@/config/billing";
 
 type CreditHistoryItem = {
   id: string;
-  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment";
+  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
   amount: string;
   balanceAfter: string;
   description: string;
@@ -53,6 +54,10 @@ export async function getCreditPurchases(limit: number = 50) {
 
 export async function downloadInvoice(paymentId: string) {
   return downloadMyInvoice(paymentId);
+}
+
+export async function redeemVoucher(code: string) {
+  return redeemMyVoucher(code);
 }
 
 export async function canUseFeature(feature: keyof typeof billingConfig.features) {

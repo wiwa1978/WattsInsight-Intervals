@@ -20,7 +20,7 @@ export type UserCredits = {
 export type CreditTransaction = {
   id: string;
   userId: string;
-  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment";
+  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
   amount: string;
   description: string;
   referenceType?: "payment" | "feature_usage" | "admin" | "bonus";
