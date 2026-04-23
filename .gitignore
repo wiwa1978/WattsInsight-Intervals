@@ -1,4 +1,10 @@
 node_modules
+logs/
+reports/
+apps/*/tests/.reports/
+apps/*/playwright-report/
+apps/*/test-results/
+apps/*/test-results/**
 
 # Environment files (secrets)
 .env

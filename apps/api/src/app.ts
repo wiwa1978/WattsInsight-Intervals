@@ -11,6 +11,7 @@ import { requestId } from "hono/request-id";
 import { z } from "zod";
 
 import { authAdditionalUserFields, createAuthModule } from "@platform/auth-core";
+import { mobileRefreshRequestSchema, mobileTokenRequestSchema } from "@platform/contracts";
 import { createEmailModule, createResendProvider } from "@platform/email-core";
 import { createPaymentsModule } from "@platform/payments-core";
 import { country, createPlatformDb, mobileRefreshToken, user } from "@platform/platform-db";
@@ -191,6 +192,10 @@ function jsonProxyResponse(payload: unknown, status: number, headers?: Headers) 
 
 function buildErrorCode(requestId: string) {
   return `API-${requestId}`;
+}
+
+function schemaFromZod(schema: z.ZodTypeAny) {
+  return z.toJSONSchema(schema, { target: "draft-7" });
 }
 
 const adminAllowlist = new Set(
@@ -620,14 +625,7 @@ const openApiSpec = {
       },
     },
     schemas: {
-      ErrorResponse: {
-        type: "object",
-        properties: {
-          success: { type: "boolean", const: false },
-          error: { type: "string" },
-        },
-        required: ["success", "error"],
-      },
+      ErrorResponse: schemaFromZod(z.object({ success: z.literal(false), error: z.string() })),
       AuthUser: {
         type: "object",
         properties: {
@@ -645,14 +643,7 @@ const openApiSpec = {
         },
         required: ["success", "data"],
       },
-      MobileTokenRequest: {
-        type: "object",
-        properties: {
-          email: { type: "string", format: "email" },
-          password: { type: "string" },
-        },
-        required: ["email", "password"],
-      },
+      MobileTokenRequest: schemaFromZod(mobileTokenRequestSchema),
       MobileTokenResponse: {
         type: "object",
         properties: {
@@ -670,13 +661,7 @@ const openApiSpec = {
         },
         required: ["success", "data"],
       },
-      MobileRefreshRequest: {
-        type: "object",
-        properties: {
-          refreshToken: { type: "string" },
-        },
-        required: ["refreshToken"],
-      },
+      MobileRefreshRequest: schemaFromZod(mobileRefreshRequestSchema),
       MobileRevokeResponse: {
         type: "object",
         properties: {
@@ -718,11 +703,7 @@ const openApiSpec = {
           {
             name: "lang",
             in: "query",
-            schema: {
-              type: "string",
-              enum: ["en", "fr", "nl"],
-              default: "en",
-            },
+            schema: schemaFromZod(countriesQuerySchema.shape.lang),
           },
         ],
         responses: {
