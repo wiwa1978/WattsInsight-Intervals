@@ -144,7 +144,7 @@ const customPaths: Record<string, OpenApiPathItem> = {
       },
     },
   },
-  "/webhooks/dodo-payments": {
+  "/payments/webhooks/dodo": {
     post: {
       summary: "Receive Dodo webhook events",
       responses: {

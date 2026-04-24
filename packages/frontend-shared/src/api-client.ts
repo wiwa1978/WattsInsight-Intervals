@@ -38,10 +38,12 @@ export function createApiRequest(options: {
   getHeaders?: RequestHeadersResolver;
 }) {
   return async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-    const requestHeaders = new Headers({
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    });
+    const requestHeaders = new Headers(init?.headers ?? {});
+    const hasBody = init?.body !== undefined && init?.body !== null;
+
+    if (hasBody && !requestHeaders.has("Content-Type")) {
+      requestHeaders.set("Content-Type", "application/json");
+    }
 
     if (options.getHeaders) {
       const extraHeaders = await options.getHeaders();

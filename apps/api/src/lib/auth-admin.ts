@@ -29,6 +29,17 @@ export function resolveAdminAuthApi(authModule: { auth?: { api?: unknown } }) {
 }
 
 export function copySetCookieHeader(source: Response, target: Response) {
+  const getSetCookie = (source.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  const setCookies = typeof getSetCookie === "function" ? getSetCookie.call(source.headers) : [];
+
+  if (setCookies.length > 0) {
+    for (const value of setCookies) {
+      target.headers.append("set-cookie", value);
+    }
+
+    return;
+  }
+
   const setCookie = source.headers.get("set-cookie");
   if (setCookie) {
     target.headers.set("set-cookie", setCookie);

@@ -340,7 +340,7 @@ describe("API functional routes", () => {
     expect(rootSpec.paths?.["/auth/mobile/refresh"]?.post).toBeTruthy();
     expect(rootSpec.paths?.["/auth/mobile/revoke"]?.post).toBeTruthy();
     expect(rootSpec.paths?.["/admin/dashboard/stats"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/webhooks/dodo-payments"]?.post).toBeTruthy();
+    expect(rootSpec.paths?.["/payments/webhooks/dodo"]?.post).toBeTruthy();
     expect(apiSpec).toEqual(rootSpec);
 
     const openApiPaths = Object.keys(rootSpec.paths || {});
@@ -355,7 +355,7 @@ describe("API functional routes", () => {
       "/health",
       "/me/credits/balance",
       "/me/session",
-      "/webhooks/dodo-payments",
+      "/payments/webhooks/dodo",
     ]);
   });
 
