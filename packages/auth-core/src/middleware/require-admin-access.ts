@@ -1,6 +1,6 @@
-import type { MiddlewareHandler } from "hono";
-
 import { hasAdminAccess, normalizeAuthEmail } from "@platform/auth-shared";
+
+import type { AuthMiddleware } from "../types";
 
 type AuthUser = {
   role?: string | null;
@@ -11,9 +11,9 @@ type RequireAdminAccessOptions = {
   allowlist: Set<string>;
 };
 
-export function createRequireAdminAccess(options: RequireAdminAccessOptions): MiddlewareHandler {
+export function createRequireAdminAccess(options: RequireAdminAccessOptions): AuthMiddleware {
   return async (c, next) => {
-    const user = (c as any).get("authUser") as AuthUser | undefined;
+    const user = c.get("authUser") as AuthUser | undefined;
     const email = normalizeAuthEmail(user?.email);
     const isAllowedEmail = options.allowlist.has(email);
 

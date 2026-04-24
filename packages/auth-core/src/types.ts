@@ -1,4 +1,5 @@
 import type { BetterAuthOptions } from "better-auth";
+import type { MiddlewareHandler } from "hono";
 
 import type { AuthRole } from "@platform/auth-shared";
 
@@ -42,3 +43,18 @@ export type AuthModuleOptions = {
     cleanupExpired: () => Promise<void>;
   };
 };
+
+export type AuthenticatedUser = {
+  id: string;
+  role?: AuthRole | null;
+  email?: string | null;
+};
+
+export type AuthContextVariables = {
+  authUser?: AuthenticatedUser;
+  authSession?: unknown;
+};
+
+export type AuthMiddleware = MiddlewareHandler<{
+  Variables: AuthContextVariables;
+}>;

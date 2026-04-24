@@ -13,11 +13,27 @@ import { createRequireAuth } from "./middleware/require-auth";
 import { requireAdmin } from "./middleware/require-admin";
 import { createRequireAdminAccess } from "./middleware/require-admin-access";
 import { createTokenService } from "./token-service";
-import type { AuthModuleOptions } from "./types";
+import type { AuthContextVariables, AuthModuleOptions } from "./types";
+
+function redactAuthLogBody(body: string) {
+  try {
+    const parsed = JSON.parse(body) as Record<string, unknown>;
+
+    for (const key of ["email", "password", "newPassword", "token", "refreshToken", "accessToken"]) {
+      if (key in parsed) {
+        parsed[key] = "[redacted]";
+      }
+    }
+
+    return JSON.stringify(parsed).slice(0, 200);
+  } catch {
+    return body.slice(0, 200);
+  }
+}
 
 export function createAuthModule(options: AuthModuleOptions) {
   const auth = betterAuth(options.betterAuthOptions);
-  const router = new Hono();
+  const router = new Hono<{ Variables: AuthContextVariables }>();
   const tokenService = createTokenService({
     secret: options.jwt.secret,
     issuer: options.jwt.issuer,
@@ -65,17 +81,17 @@ export function createAuthModule(options: AuthModuleOptions) {
         method: c.req.method,
         path: c.req.path,
         status: response.status,
-        body: responseBody.slice(0, 1000),
+        body: redactAuthLogBody(responseBody),
       });
     }
 
     return response;
   });
 
-  const sessionRouter = new Hono();
+  const sessionRouter = new Hono<{ Variables: AuthContextVariables }>();
   sessionRouter.use("/*", requireAuth);
   sessionRouter.get("/me", (c) => {
-    const authUser = (c as any).get("authUser") as { id: string; role?: string | null; email?: string | null };
+    const authUser = c.get("authUser") as { id: string; role?: string | null; email?: string | null };
     return c.json({
       success: true,
       data: {
@@ -85,7 +101,7 @@ export function createAuthModule(options: AuthModuleOptions) {
     });
   });
   sessionRouter.get("/admin/me", requireAdminAccess, (c) => {
-    const authUser = (c as any).get("authUser") as { id: string; role?: string | null; email?: string | null };
+    const authUser = c.get("authUser") as { id: string; role?: string | null; email?: string | null };
     return c.json({
       success: true,
       data: {
@@ -95,7 +111,7 @@ export function createAuthModule(options: AuthModuleOptions) {
     });
   });
 
-  const mobileRouter = new Hono();
+  const mobileRouter = new Hono<{ Variables: AuthContextVariables }>();
   mobileRouter.post("/token", zValidator("json", mobileTokenRequestSchema), async (c) => {
     const body = c.req.valid("json");
 

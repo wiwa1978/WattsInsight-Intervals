@@ -5,7 +5,10 @@ export const optionalLimitQuerySchema = z.object({
 });
 
 export const timeRangeSchema = z.enum(["daily", "weekly", "monthly", "yearly"]);
+export const supportedLocaleSchema = z.enum(["en", "fr", "nl"]);
 
 export const countriesQuerySchema = z.object({
-  lang: z.enum(["en", "fr", "nl"]).default("en"),
+  lang: supportedLocaleSchema.default("en"),
 });
+
+export type SupportedLocale = z.infer<typeof supportedLocaleSchema>;

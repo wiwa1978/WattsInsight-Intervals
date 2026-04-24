@@ -1,18 +1,11 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
-const webDir = path.dirname(fileURLToPath(import.meta.url));
-const monorepoRoot = path.resolve(webDir, "../..");
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.1.223", "localhost"],
-  turbopack: {
-    root: monorepoRoot,
-  },
   experimental: {
     authInterrupts: true,
   },

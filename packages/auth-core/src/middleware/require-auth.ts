@@ -1,6 +1,6 @@
-import type { MiddlewareHandler } from "hono";
-
 import { normalizeAuthRole } from "@platform/auth-shared";
+
+import type { AuthMiddleware } from "../types";
 
 type SessionShape = {
   user?: {
@@ -19,7 +19,7 @@ type TokenUser = {
 
 type GetAuthContext = (headers: Headers) => Promise<SessionShape | { user: TokenUser; session: null } | null>;
 
-export function createRequireAuth(getAuthContext: GetAuthContext): MiddlewareHandler {
+export function createRequireAuth(getAuthContext: GetAuthContext): AuthMiddleware {
   return async (c, next) => {
     const session = await getAuthContext(c.req.raw.headers);
 
@@ -27,14 +27,12 @@ export function createRequireAuth(getAuthContext: GetAuthContext): MiddlewareHan
       return c.json({ success: false, error: "Unauthorized" }, 401);
     }
 
-    const ctx = c as any;
-
-    ctx.set("authUser", {
+    c.set("authUser", {
       id: session.user.id,
       role: normalizeAuthRole(session.user.role),
       email: session.user.email ?? null,
     });
-    ctx.set("authSession", session.session ?? null);
+    c.set("authSession", session.session ?? null);
     await next();
   };
 }

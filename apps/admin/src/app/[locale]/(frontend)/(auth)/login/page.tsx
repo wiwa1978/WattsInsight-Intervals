@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Mail, CheckCircle2 } from "lucide-react";
@@ -50,7 +51,7 @@ const getDefaultMode = (): "password" | "magicLink" => {
   return "password";
 };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const t = useTranslations("auth.login");
   const tErrors = useTranslations("auth.errors");
   const router = useRouter();
@@ -460,5 +461,13 @@ export default function LoginPage() {
         </div>
       </Container>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

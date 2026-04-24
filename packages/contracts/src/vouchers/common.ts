@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { successResultSchema } from "../common/result";
 import { paginationQuerySchema } from "../common/pagination";
 
 export const voucherStatusSchema = z.enum(["active", "inactive", "redeemed", "expired"]);
@@ -62,6 +63,13 @@ export const voucherIdParamSchema = z.object({
 export const redeemVoucherSchema = z.object({
   code: z.string().trim().min(3).max(64),
 });
+
+export const redeemVoucherDataSchema = z.object({
+  creditsAdded: z.number().int().positive(),
+  newBalance: z.number().nonnegative(),
+});
+
+export const redeemVoucherResponseSchema = successResultSchema(redeemVoucherDataSchema);
 
 export type CreateVoucherInput = z.infer<typeof createVoucherSchema>;
 export type UpdateVoucherInput = z.infer<typeof updateVoucherSchema>;

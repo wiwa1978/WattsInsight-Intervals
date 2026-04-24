@@ -17,6 +17,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   APP_URL: z.string().url(),
   API_URL: z.string().url(),
+  COOKIE_DOMAIN: emptyToUndefined(z.string()),
+  COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
   BETTER_AUTH_SECRET: z.string().min(16),
   BETTER_AUTH_ALLOWED_ORIGINS: z.string().optional(),
   ADMIN_ALLOWLIST: z.string().optional(),

@@ -6,6 +6,8 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@better-auth/passkey": "^1.4.9",
+    "@dodopayments/better-auth": "^1.4.2",
     "better-auth": "^1.4.9"
   }
 }

@@ -1,20 +1,12 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 
+import { apiRoutes, sessionResponseSchema } from "@platform/contracts";
+import { normalizeBaseUrl } from "@platform/frontend-shared";
+
 import { env } from "@/env";
 
-type SessionUser = {
-  id: string;
-  role?: string | null;
-  email?: string | null;
-};
-
-type SessionResponse = {
-  success: boolean;
-  data?: SessionUser;
-};
-
-const apiBaseUrl = (env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_APP_URL).replace(/\/$/, "");
+const apiBaseUrl = normalizeBaseUrl(env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_APP_URL);
 
 export const getServerSession = cache(async () => {
   try {
@@ -23,7 +15,7 @@ export const getServerSession = cache(async () => {
       return null;
     }
 
-    const response = await fetch(`${apiBaseUrl}/me/session`, {
+    const response = await fetch(`${apiBaseUrl}${apiRoutes.me.session}`, {
       method: "GET",
       headers: {
         cookie: cookieHeader,
@@ -35,12 +27,12 @@ export const getServerSession = cache(async () => {
       return null;
     }
 
-    const payload = (await response.json()) as SessionResponse;
-    if (!payload.success || !payload.data?.id) {
+    const parsed = sessionResponseSchema.safeParse(await response.json());
+    if (!parsed.success) {
       return null;
     }
 
-    return { user: payload.data };
+    return { user: parsed.data.data };
   } catch {
     return null;
   }

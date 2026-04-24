@@ -1,41 +1,29 @@
 import { env } from "@/env";
+import { createApiRequest, normalizeBaseUrl } from "@platform/frontend-shared";
 
-const API_BASE_URL = env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_APP_URL;
+const API_BASE_URL = normalizeBaseUrl(env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_APP_URL);
 
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const requestHeaders = new Headers({
-    "Content-Type": "application/json",
-    ...(init?.headers ?? {}),
-  });
-
-  if (typeof window === "undefined") {
-    try {
-      const mod = await import("next/headers");
-      const cookieStore = await mod.cookies();
-      const cookieHeader = cookieStore
-        .getAll()
-        .map((cookie) => `${cookie.name}=${cookie.value}`)
-        .join("; ");
-
-      if (cookieHeader.length > 0) {
-        requestHeaders.set("cookie", cookieHeader);
-      }
-    } catch {
-      // Non-Next runtimes do not expose next/headers.
-    }
+async function getServerCookieHeaders() {
+  if (typeof window !== "undefined") {
+    return undefined;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: "include",
-    cache: "no-store",
-    ...init,
-    headers: requestHeaders,
-  });
+  try {
+    const mod = await import("next/headers");
+    const cookieStore = await mod.cookies();
+    const cookieHeader = cookieStore
+      .getAll()
+      .map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join("; ");
 
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`API request failed (${response.status}): ${body}`);
+    return cookieHeader.length > 0 ? { cookie: cookieHeader } : undefined;
+  } catch {
+    return undefined;
   }
-
-  return response.json() as Promise<T>;
 }
+
+export const apiRequest = createApiRequest({
+  baseURL: API_BASE_URL,
+  getHeaders: getServerCookieHeaders,
+  nodeEnv: env.NODE_ENV,
+});

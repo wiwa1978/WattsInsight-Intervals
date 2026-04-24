@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@platform/auth-shared": "*",
+    "@platform/frontend-shared": "*",
     "@sentry/nextjs": "^10.11.0",
     "@better-auth/passkey": "^1.4.9",
     "@dodopayments/better-auth": "^1.4.2",

@@ -132,11 +132,6 @@ export function TransactionHistoryTable({
     setIsDialogOpen(true);
   };
 
-  const getTransactionTypeBadge = (type: Transaction["type"]) => {
-    const presentation = getTransactionTypePresentation(type);
-    return <Badge variant={presentation.variant} className={presentation.className}>{presentation.label}</Badge>;
-  };
-
   const columns: ColumnDef<Transaction>[] = React.useMemo(() => {
     const cols: ColumnDef<Transaction>[] = [];
 
@@ -177,7 +172,14 @@ export function TransactionHistoryTable({
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: ({ row }) => getTransactionTypeBadge(row.original.type),
+        cell: ({ row }) => {
+          const presentation = getTransactionTypePresentation(row.original.type);
+          return (
+            <Badge variant={presentation.variant} className={presentation.className}>
+              {presentation.label}
+            </Badge>
+          );
+        },
       },
       {
         accessorKey: "amount",
