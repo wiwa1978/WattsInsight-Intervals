@@ -1,8 +1,8 @@
-import type { SupportedLocale } from "../common/query";
-import type { VoucherStatus } from "../vouchers/common";
+import type { SupportedLocale } from "../../wire/common/query";
+import type { VoucherStatus } from "../../wire/vouchers/common";
 import type { z } from "zod";
 
-import { discountStatusSchema } from "../discounts/common";
+import { discountStatusSchema } from "../../wire/discounts/common";
 
 type DiscountStatus = z.infer<typeof discountStatusSchema>;
 
