@@ -254,6 +254,10 @@ const authModule = createAuthModule({
           id: user.id,
           role: user.role,
           email: user.email,
+          emailVerified: user.emailVerified,
+          twoFactorEnabled: user.twoFactorEnabled,
+          banned: user.banned,
+          banExpires: user.banExpires,
         })
         .from(user)
         .where(eq(user.id, userId))

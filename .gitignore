@@ -1,7 +1,9 @@
 node_modules
 logs/
 reports/
+apps/*/runtime-logs/
 apps/*/tests/.reports/
+apps/*/tests/.tmp-vitest-report.json
 apps/*/playwright-report/
 apps/*/test-results/
 apps/*/test-results/**

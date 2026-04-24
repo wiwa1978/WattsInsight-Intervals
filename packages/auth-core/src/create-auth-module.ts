@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 
 import {
+  errorCode,
   mobileRefreshRequestSchema,
   mobileRevokeRequestSchema,
   mobileTokenRequestSchema,
@@ -12,6 +13,7 @@ import { normalizeAuthRole } from "@platform/auth-shared";
 import { createRequireAuth } from "./middleware/require-auth";
 import { requireAdmin } from "./middleware/require-admin";
 import { createRequireAdminAccess } from "./middleware/require-admin-access";
+import { enforceMobileSignInGate } from "./mobile-sign-in-gate";
 import { createTokenService } from "./token-service";
 import type { AuthContextVariables, AuthModuleOptions } from "./types";
 
@@ -125,7 +127,48 @@ export function createAuthModule(options: AuthModuleOptions) {
 
     const userId = signInResult?.user?.id;
     if (!userId) {
-      return c.json({ success: false, error: "Invalid credentials" }, 401);
+      return c.json(
+        {
+          success: false,
+          error: "Invalid credentials",
+          errorCode: errorCode.invalidCredentials,
+        },
+        401,
+      );
+    }
+
+    // Re-load the persisted user so the gate evaluates the authoritative
+    // emailVerified / twoFactorEnabled / banned flags rather than whatever
+    // shape better-auth returned. Same gate is used for the future social
+    // login mobile path (see enforceMobileSignInGate).
+    const persistedUser = await options.users.findById(userId);
+    if (!persistedUser) {
+      return c.json(
+        {
+          success: false,
+          error: "Invalid credentials",
+          errorCode: errorCode.invalidCredentials,
+        },
+        401,
+      );
+    }
+
+    const gate = enforceMobileSignInGate({
+      emailVerified: persistedUser.emailVerified ?? false,
+      twoFactorEnabled: persistedUser.twoFactorEnabled ?? false,
+      banned: persistedUser.banned ?? false,
+      banExpires: persistedUser.banExpires ?? null,
+    });
+
+    if (!gate.ok) {
+      return c.json(
+        {
+          success: false,
+          error: gate.error,
+          errorCode: gate.errorCode,
+        },
+        gate.status,
+      );
     }
 
     await options.refreshTokens.cleanupExpired();
