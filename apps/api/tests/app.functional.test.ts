@@ -375,8 +375,11 @@ describe("API functional routes", () => {
     await expect(res.json()).resolves.toEqual({ success: true, data: { totalUsers: 99 } });
   });
 
-  // Verifies checkout endpoint returns package-specific dodo checkout URL.
-  it("returns checkout URL for known package", async () => {
+  // Verifies checkout endpoint returns package-specific dodo checkout URL
+  // with userId firmly bound into the metadata query params (see PR 0.3 —
+  // metadata.userId is the authoritative tie-back used by the webhook
+  // handler to credit the correct account).
+  it("returns checkout URL with userId metadata bound for known package", async () => {
     const res = await app.request("/payments/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -384,12 +387,14 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      success: true,
-      data: {
-        checkoutUrl: "https://test.checkout.dodopayments.com/buy/pdt_0NUzkvLtA4UmSIekBVTcX",
-      },
-    });
+    const payload = (await res.json()) as { success: boolean; data: { checkoutUrl: string } };
+    expect(payload.success).toBe(true);
+    const url = new URL(payload.data.checkoutUrl);
+    expect(url.origin + url.pathname).toBe(
+      "https://test.checkout.dodopayments.com/buy/pdt_0NUzkvLtA4UmSIekBVTcX",
+    );
+    expect(url.searchParams.get("metadata_userId")).toBe("auth-user");
+    expect(url.searchParams.get("metadata_packageKey")).toBe("silver");
   });
 
   // Verifies user detail endpoint returns 404 for unknown users.

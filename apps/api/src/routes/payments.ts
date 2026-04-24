@@ -6,7 +6,10 @@ import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { creditPackages } from "../config/billing";
 import { env } from "../env";
+import { DODO_CHECKOUT_BASE_URL, buildDodoCheckoutUrl } from "../lib/dodo-checkout";
 import { parseJsonBody, validationError } from "../lib/http";
+
+export { buildDodoCheckoutUrl } from "../lib/dodo-checkout";
 
 export function createPaymentsRouter() {
   const router = new Hono<AppEnv>();
@@ -27,12 +30,27 @@ export function createPaymentsRouter() {
       return c.json({ success: false, error: "Unknown package" }, 400);
     }
 
-    const checkoutBaseUrl =
-      env.DODO_PAYMENTS_ENVIRONMENT === "live_mode"
-        ? "https://checkout.dodopayments.com"
-        : "https://test.checkout.dodopayments.com";
+    const authUser = c.get("authUser");
+    if (!authUser) {
+      // requireAuth middleware should have prevented this, but be defensive.
+      return c.json({ success: false, error: "Unauthenticated" }, 401);
+    }
 
-    const checkoutUrl = `${checkoutBaseUrl}/buy/${selectedPackage.productId}`;
+    const baseUrl =
+      env.DODO_PAYMENTS_ENVIRONMENT === "live_mode"
+        ? DODO_CHECKOUT_BASE_URL.live_mode
+        : DODO_CHECKOUT_BASE_URL.test_mode;
+
+    const checkoutUrl = buildDodoCheckoutUrl({
+      baseUrl,
+      productId: selectedPackage.productId,
+      userId: authUser.id,
+      packageKey,
+      customerEmail: authUser.email ?? null,
+      successUrl: parsedBody.data.successUrl,
+      cancelUrl: parsedBody.data.cancelUrl,
+    });
+
     return c.json({ success: true, data: { checkoutUrl } });
   });
 
