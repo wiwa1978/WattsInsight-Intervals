@@ -382,6 +382,10 @@ export function createVouchersService(deps: VouchersServiceDeps) {
       input.maxRedemptions ?? existing.maxRedemptions,
     );
     const nextMaxRedemptions = assignmentState.maxRedemptions;
+    if (nextMaxRedemptions < existing.currentRedemptions) {
+      return voucherFailure("Max redemptions cannot be lower than current redemptions");
+    }
+
     const nextExpiresAt = input.expiresAt === undefined ? existing.expiresAt : input.expiresAt;
     const nextStatus = inferVoucherStatus({
       status: input.status ?? existing.status,
