@@ -51,17 +51,19 @@ describe("createDiscountsService", () => {
   // Verifies discount creation performs remote sync and stores an inferred active status.
   it("creates discount and infers active status", async () => {
     const now = Date.now();
+    const insert = vi.fn().mockImplementation(() => ({
+      values: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: "d1", status: "active" }]),
+      }),
+    }));
+    const tx = { insert };
     const db = {
       query: {
         discounts: {
           findFirst: vi.fn().mockResolvedValueOnce(null),
         },
       },
-      insert: vi.fn().mockImplementation(() => ({
-        values: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue([{ id: "d1", status: "active" }]),
-        }),
-      })),
+      transaction: vi.fn(async (callback) => callback(tx)),
     };
 
     (fetch as any).mockResolvedValueOnce({
@@ -100,6 +102,104 @@ describe("createDiscountsService", () => {
     expect((fetch as any).mock.calls[1][0]).toContain("https://test.dodopayments.com/discounts");
     expect((fetch as any).mock.calls[1][1].body).toContain("SAVE-ABC-1234");
     expect((fetch as any).mock.calls[1][1].signal).toBeInstanceOf(AbortSignal);
+    expect(db.transaction).toHaveBeenCalledOnce();
+  });
+
+  // Verifies a remote discount is deleted when local persistence fails after provider creation.
+  it("cleans up dodo discount when local creation fails", async () => {
+    const localError = new Error("local insert failed");
+    const db = {
+      query: {
+        discounts: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+      },
+      transaction: vi.fn().mockRejectedValue(localError),
+    };
+
+    (fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue([]),
+    });
+    (fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        discount_id: "dodo_1",
+        code: "SAVE-ABC-1234",
+        amount: 1000,
+        type: "percentage",
+      }),
+    });
+    (fetch as any).mockResolvedValueOnce({ ok: true, status: 204, text: vi.fn().mockResolvedValue("") });
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+    });
+
+    await expect(service.createDiscount({
+      code: "save-abc-1234",
+      type: "percentage",
+      value: 10,
+      startDate: new Date("2026-01-01"),
+      endDate: new Date("2026-02-01"),
+    })).rejects.toThrow("local insert failed");
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect((fetch as any).mock.calls[2][0]).toContain("/discounts/dodo_1");
+    expect((fetch as any).mock.calls[2][1]).toEqual(expect.objectContaining({ method: "DELETE" }));
+  });
+
+  // Verifies cleanup errors do not hide the original local persistence failure.
+  it("preserves local creation failure when dodo cleanup fails", async () => {
+    const localError = new Error("assignment insert failed");
+    const db = {
+      query: {
+        discounts: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+      },
+      transaction: vi.fn().mockRejectedValue(localError),
+    };
+
+    (fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue([]),
+    });
+    (fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        discount_id: "dodo_1",
+        code: "SAVE-ABC-1234",
+        amount: 1000,
+        type: "percentage",
+      }),
+    });
+    (fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue("provider details"),
+    });
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+    });
+
+    await expect(service.createDiscount({
+      code: "save-abc-1234",
+      type: "percentage",
+      value: 10,
+      startDate: new Date("2026-01-01"),
+      endDate: new Date("2026-02-01"),
+      userIds: ["11111111-1111-4111-8111-111111111111"],
+    })).rejects.toThrow("assignment insert failed");
+
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   // Verifies remote validation failures do not fail open anymore.
