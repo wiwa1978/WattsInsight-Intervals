@@ -94,17 +94,20 @@ describe("createPaymentEventHandler", () => {
     findUser?: (id: string) => Promise<{ id: string } | null>;
   }) {
     const processCreditPurchase = vi.fn(async () => ({ ok: true }));
+    const processCreditRefund = vi.fn(async () => ({ ok: true }));
     const getUserById = vi.fn(
       overrides?.findUser ?? (async (id: string) => ({ id })),
     );
     return {
       processCreditPurchase,
+      processCreditRefund,
       getUserById,
       handler: createPaymentEventHandler({
         creditPackages,
         billing: {
           getUserById,
           processCreditPurchase,
+          processCreditRefund,
         },
       }),
     };
@@ -285,5 +288,39 @@ describe("createPaymentEventHandler", () => {
     await expect(handler(validFailedPaymentEvent({ metadata: {} }))).rejects.toThrow(/metadata\.userId missing/);
 
     expect(processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("records full refunds by payment id", async () => {
+    const { handler, processCreditPurchase, processCreditRefund, getUserById } = makeDeps();
+
+    await handler({
+      provider: "dodo",
+      eventType: "refund.succeeded",
+      paymentId: "pay_refunded",
+      refundId: "rfnd_123",
+      refundIsPartial: false,
+      raw: {},
+    });
+
+    expect(processCreditRefund).toHaveBeenCalledWith("pay_refunded", "rfnd_123");
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+    expect(getUserById).not.toHaveBeenCalled();
+  });
+
+  it("rejects partial refunds pending manual reconciliation", async () => {
+    const { handler, processCreditRefund } = makeDeps();
+
+    await expect(
+      handler({
+        provider: "dodo",
+        eventType: "refund.succeeded",
+        paymentId: "pay_partial_refund",
+        refundId: "rfnd_partial",
+        refundIsPartial: true,
+        raw: {},
+      }),
+    ).rejects.toThrow(/partial refunds require manual reconciliation/);
+
+    expect(processCreditRefund).not.toHaveBeenCalled();
   });
 });

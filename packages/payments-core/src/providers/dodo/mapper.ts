@@ -58,6 +58,26 @@ const paymentFailedSchema = z.object({
   }),
 });
 
+const refundSucceededSchema = z.object({
+  id: z.string().min(1).optional(),
+  event_id: z.string().min(1).optional(),
+  type: z.literal("refund.succeeded"),
+  data: z.object({
+    payment_id: z.string().min(1),
+    refund_id: z.string().min(1).optional(),
+    is_partial: z.boolean().optional(),
+    metadata: z.record(z.string(), z.string()).optional(),
+    customer: z
+      .object({
+        email: z.string().email().optional(),
+        customer_id: z.string().min(1).optional(),
+      })
+      .optional(),
+    amount: z.number().nullable().optional(),
+    currency: z.string().nullable().optional(),
+  }),
+});
+
 const baseSchema = z.object({
   id: z.string().min(1).optional(),
   event_id: z.string().min(1).optional(),
@@ -113,6 +133,29 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
       currency: data.settlement_currency,
       totalAmount: data.settlement_amount ?? data.total_amount,
       taxAmount: data.settlement_tax ?? data.tax,
+      raw: payload,
+    };
+  }
+
+  if (parsed.data.type === "refund.succeeded") {
+    const refund = refundSucceededSchema.safeParse(payload);
+    if (!refund.success) {
+      return null;
+    }
+
+    const data = refund.data.data;
+    return {
+      provider: "dodo",
+      providerEventId: refund.data.id ?? refund.data.event_id,
+      eventType: "refund.succeeded",
+      paymentId: data.payment_id,
+      refundId: data.refund_id,
+      refundIsPartial: data.is_partial,
+      customerEmail: data.customer?.email,
+      customerId: data.customer?.customer_id,
+      metadata: data.metadata,
+      currency: data.currency ?? undefined,
+      totalAmount: data.amount ?? undefined,
       raw: payload,
     };
   }

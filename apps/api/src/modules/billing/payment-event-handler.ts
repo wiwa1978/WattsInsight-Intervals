@@ -23,6 +23,7 @@ export type PaymentEventHandlerDeps = {
         currency: string;
       },
     ) => Promise<unknown>;
+    processCreditRefund: (paymentId: string, refundId?: string) => Promise<unknown>;
   };
 };
 
@@ -39,6 +40,15 @@ export type PaymentEventHandlerDeps = {
  */
 export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): PaymentEventHandler {
   return async (event: NormalizedPaymentEvent) => {
+    if (event.eventType === "refund.succeeded") {
+      if (event.refundIsPartial) {
+        throw new Error(`Refusing payment ${event.paymentId}: partial refunds require manual reconciliation.`);
+      }
+
+      await deps.billing.processCreditRefund(event.paymentId, event.refundId);
+      return;
+    }
+
     if (event.eventType !== "payment.succeeded" && event.eventType !== "payment.failed") {
       return;
     }

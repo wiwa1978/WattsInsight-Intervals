@@ -253,6 +253,48 @@ describe("POST /webhooks/dodo response codes", () => {
     );
   });
 
+  it("200 normalizes full refund payloads", async () => {
+    const refundPayload = JSON.stringify({
+      id: "evt_refund_123",
+      type: "refund.succeeded",
+      data: {
+        payload_type: "Refund",
+        payment_id: "pay_refunded_123",
+        refund_id: "rfnd_123",
+        is_partial: false,
+        customer: { email: "buyer@example.com", customer_id: "cus_refund" },
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+        amount: 1000,
+        currency: "EUR",
+      },
+    });
+    const { app, onPaymentEvent } = build();
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(refundPayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: refundPayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(onPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "dodo",
+        providerEventId: "evt_refund_123",
+        eventType: "refund.succeeded",
+        paymentId: "pay_refunded_123",
+        refundId: "rfnd_123",
+        refundIsPartial: false,
+        customerId: "cus_refund",
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+        currency: "EUR",
+        totalAmount: 1000,
+      }),
+    );
+  });
+
   it("200 skips duplicate events already recorded as processed", async () => {
     const store = {
       claim: vi.fn(async () => ({ claimed: false as const, status: "processed" as const })),
