@@ -166,7 +166,7 @@ export const userDiscounts = pgTable(
   (table) => [
     index("user_discounts_discount_id_idx").on(table.discountId),
     index("user_discounts_user_id_idx").on(table.userId),
-    index("user_discounts_discount_user_idx").on(table.discountId, table.userId),
+    uniqueIndex("user_discounts_discount_user_idx").on(table.discountId, table.userId),
   ],
 );
 

@@ -218,7 +218,8 @@ describe("createDiscountsService", () => {
 
   // Verifies assignment deduplicates duplicate user ids before insert.
   it("deduplicates user ids during assignment", async () => {
-    const insertValues = vi.fn().mockResolvedValue(undefined);
+    const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const insertValues = vi.fn().mockReturnValue({ onConflictDoNothing });
     const db = {
       query: {
         discounts: {
@@ -249,6 +250,7 @@ describe("createDiscountsService", () => {
       { discountId: "d1", userId: "u1" },
       { discountId: "d1", userId: "u2" },
     ]);
+    expect(onConflictDoNothing).toHaveBeenCalledOnce();
     expect(db.update).not.toHaveBeenCalled();
   });
 
