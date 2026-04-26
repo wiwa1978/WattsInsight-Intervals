@@ -18,6 +18,7 @@ import { createAdminService } from "./modules/admin/service";
 import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
+import { createPaymentWebhookEventStore } from "./modules/payments/webhook-event-store";
 import { createNotificationsService } from "./modules/notifications/service";
 import { createVouchersService } from "./modules/vouchers/service";
 
@@ -66,6 +67,7 @@ const vouchersService = createVouchersService({
   db,
   notifications: notificationsService,
 });
+const paymentWebhookEventStore = createPaymentWebhookEventStore({ db });
 
 const dodoPaymentsClient = env.DODO_PAYMENTS_API_KEY
   ? new DodoPayments({
@@ -330,6 +332,7 @@ const authModule = createAuthModule({
 
 const paymentsModule = createPaymentsModule({
   dodoWebhookSecret: env.DODO_PAYMENTS_WEBHOOK_SECRET,
+  webhookEventStore: paymentWebhookEventStore,
   onPaymentEvent: createPaymentEventHandler({
     creditPackages,
     billing: billingService,

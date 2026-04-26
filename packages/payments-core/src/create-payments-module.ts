@@ -54,6 +54,25 @@ function failureToResponse(reason: Exclude<WebhookVerifyResult, { ok: true }>["r
   }
 }
 
+function signatureTimestamp(signatureHeader: string | null) {
+  const timestamp = signatureHeader
+    ?.split(",")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("t="))
+    ?.slice(2);
+
+  if (!timestamp) {
+    return undefined;
+  }
+
+  const timestampSeconds = Number.parseInt(timestamp, 10);
+  if (!Number.isFinite(timestampSeconds)) {
+    return undefined;
+  }
+
+  return new Date(timestampSeconds * 1000);
+}
+
 export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
   const router = new Hono();
 
@@ -94,6 +113,34 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     const event = mapDodoEvent(payload);
     if (!event) {
       return c.json({ success: false, error: "Unsupported webhook payload" }, 400);
+    }
+
+    if (options.webhookEventStore) {
+      const providerEventId = event.providerEventId;
+      if (!providerEventId) {
+        return c.json({ success: false, error: "Missing webhook event id" }, 400);
+      }
+
+      const claim = await options.webhookEventStore.claim({
+        provider: event.provider,
+        providerEventId,
+        eventType: event.eventType,
+        paymentId: event.paymentId,
+        signatureTimestamp: signatureTimestamp(signatureHeader),
+      });
+
+      if (!claim.claimed) {
+        return c.json({ success: true, data: { processed: false, duplicate: true, status: claim.status } }, 200);
+      }
+
+      try {
+        await options.onPaymentEvent(event);
+        await options.webhookEventStore.markProcessed({ provider: event.provider, providerEventId });
+        return c.json({ success: true, data: { processed: true } }, 200);
+      } catch (error) {
+        await options.webhookEventStore.markFailed({ provider: event.provider, providerEventId, error });
+        throw error;
+      }
     }
 
     await options.onPaymentEvent(event);

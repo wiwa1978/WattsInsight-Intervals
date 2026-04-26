@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { NormalizedPaymentEvent } from "../../types";
 
 const paymentSucceededSchema = z.object({
+  id: z.string().min(1).optional(),
+  event_id: z.string().min(1).optional(),
   type: z.literal("payment.succeeded"),
   data: z.object({
     payment_id: z.string().min(1),
@@ -29,6 +31,8 @@ const paymentSucceededSchema = z.object({
 });
 
 const paymentFailedSchema = z.object({
+  id: z.string().min(1).optional(),
+  event_id: z.string().min(1).optional(),
   type: z.literal("payment.failed"),
   data: z
     .object({
@@ -38,6 +42,8 @@ const paymentFailedSchema = z.object({
 });
 
 const baseSchema = z.object({
+  id: z.string().min(1).optional(),
+  event_id: z.string().min(1).optional(),
   type: z.string(),
   data: z.unknown().optional(),
 });
@@ -57,6 +63,7 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     const data = succeeded.data.data;
     return {
       provider: "dodo",
+      providerEventId: succeeded.data.id ?? succeeded.data.event_id,
       eventType: "payment.succeeded",
       paymentId: data.payment_id,
       customerEmail: data.customer?.email,
@@ -78,6 +85,7 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
 
     return {
       provider: "dodo",
+      providerEventId: failed.data.id ?? failed.data.event_id,
       eventType: "payment.failed",
       paymentId: failed.data.data?.payment_id ?? "unknown",
       raw: payload,

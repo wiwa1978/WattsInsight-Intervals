@@ -95,6 +95,30 @@ export const creditPurchases = pgTable(
   ],
 );
 
+export const paymentWebhookEvents = pgTable(
+  "payment_webhook_events",
+  {
+    id,
+    provider: text("provider").default("dodo").notNull(),
+    providerEventId: text("provider_event_id").notNull(),
+    eventType: text("event_type").notNull(),
+    paymentId: text("payment_id"),
+    signatureTimestamp: timestamp("signature_timestamp", { withTimezone: true }),
+    processingStatus: text("processing_status").$type<"processing" | "processed" | "failed">().default("processing").notNull(),
+    errorDetails: jsonb("error_details"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("payment_webhook_events_provider_event_id_idx").on(table.provider, table.providerEventId),
+    index("payment_webhook_events_payment_id_idx").on(table.paymentId),
+    index("payment_webhook_events_event_type_idx").on(table.eventType),
+    index("payment_webhook_events_processing_status_idx").on(table.processingStatus),
+  ],
+);
+
 export const discounts = pgTable(
   "discounts",
   {

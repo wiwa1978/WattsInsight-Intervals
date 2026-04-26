@@ -2,6 +2,7 @@ import type { WebhookVerifyResult } from "./providers/dodo/webhook-verify";
 
 export type NormalizedPaymentEvent = {
   provider: "dodo";
+  providerEventId?: string;
   eventType: "payment.succeeded" | "payment.failed";
   paymentId: string;
   customerEmail?: string;
@@ -16,6 +17,20 @@ export type NormalizedPaymentEvent = {
 
 export type PaymentEventHandler = (event: NormalizedPaymentEvent) => Promise<void>;
 
+export type WebhookEventProcessingStatus = "processing" | "processed" | "failed";
+
+export type WebhookEventStore = {
+  claim: (event: {
+    provider: "dodo";
+    providerEventId: string;
+    eventType: string;
+    paymentId?: string;
+    signatureTimestamp?: Date;
+  }) => Promise<{ claimed: true } | { claimed: false; status: WebhookEventProcessingStatus }>;
+  markProcessed: (event: { provider: "dodo"; providerEventId: string }) => Promise<void>;
+  markFailed: (event: { provider: "dodo"; providerEventId: string; error: unknown }) => Promise<void>;
+};
+
 export type CreatePaymentsModuleOptions = {
   /**
    * Optional override of the default Dodo signature verifier. May return a
@@ -28,5 +43,6 @@ export type CreatePaymentsModuleOptions = {
   dodoWebhookSecret?: string;
   /** Replay-protection window in seconds. Default 300 (±5 minutes). */
   dodoWebhookToleranceSeconds?: number;
+  webhookEventStore?: WebhookEventStore;
   onPaymentEvent: PaymentEventHandler;
 };
