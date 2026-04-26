@@ -510,6 +510,7 @@ describe("createBillingService", () => {
     expect(result.invoiceUrl).toBe("https://invoices.test/file.pdf");
     expect(result).not.toHaveProperty("invoiceData");
     expect(fetch).toHaveBeenCalledOnce();
+    expect((fetch as any).mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
   // Verifies provider failures are sanitized before surfacing to callers.
@@ -547,6 +548,39 @@ describe("createBillingService", () => {
     });
 
     await expect(service.downloadInvoice("u1", "pay_1")).rejects.toThrow("Invoice provider request failed");
+  });
+
+  // Verifies provider timeout details are sanitized before surfacing to callers.
+  it("sanitizes invoice provider timeouts", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("The operation timed out", "TimeoutError")),
+    );
+
+    const service = createBillingService({
+      db: {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  id: "cp_1",
+                  userId: "u1",
+                  paymentStatus: "completed",
+                },
+              ]),
+            }),
+          }),
+        }),
+      } as any,
+      env: {
+        DODO_PAYMENTS_API_KEY: "api-key",
+        DODO_PAYMENTS_ENVIRONMENT: "test_mode",
+      },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    await expect(service.downloadInvoice("u1", "pay_1")).rejects.toThrow("Invoice provider request timed out");
   });
 
   // Verifies invoice download is blocked for non-owner users.

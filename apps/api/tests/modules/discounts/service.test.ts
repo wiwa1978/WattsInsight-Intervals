@@ -99,6 +99,7 @@ describe("createDiscountsService", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect((fetch as any).mock.calls[1][0]).toContain("https://test.dodopayments.com/discounts");
     expect((fetch as any).mock.calls[1][1].body).toContain("SAVE-ABC-1234");
+    expect((fetch as any).mock.calls[1][1].signal).toBeInstanceOf(AbortSignal);
   });
 
   // Verifies remote validation failures do not fail open anymore.
@@ -110,7 +111,44 @@ describe("createDiscountsService", () => {
       env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
     });
 
-    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("network failure");
+    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Dodo provider request failed");
+  });
+
+  // Verifies provider response bodies are never leaked through errors.
+  it("sanitizes dodo provider response failures", async () => {
+    (fetch as any).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue("provider secret details"),
+    });
+
+    const service = createDiscountsService({
+      db: { query: { discounts: { findFirst: vi.fn().mockResolvedValue(null) } } } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+    });
+
+    let error: unknown;
+    try {
+      await service.validateDiscountCode("SAVE-ABC-1234");
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("Dodo provider request failed");
+    expect((error as Error).message).not.toContain("provider secret details");
+  });
+
+  // Verifies provider timeouts have a stable sanitized error.
+  it("sanitizes dodo provider timeouts", async () => {
+    (fetch as any).mockRejectedValueOnce(new DOMException("The operation timed out", "TimeoutError"));
+
+    const service = createDiscountsService({
+      db: { query: { discounts: { findFirst: vi.fn().mockResolvedValue(null) } } } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+    });
+
+    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Dodo provider request timed out");
   });
 
   // Verifies assignment fails when requested user links would exceed the configured max uses.
