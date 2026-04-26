@@ -1,22 +1,15 @@
-export * from "./common/result";
-export * from "./common/error-codes";
-export * from "./common/pagination";
-export * from "./common/query";
-export * from "./common/ids";
-export * from "./api/routes";
-export * from "./logs/common";
-export * from "./auth/forms";
-export * from "./auth/requests";
-export * from "./auth/responses";
-export * from "./admin/responses";
-export * from "./billing/responses";
-export * from "./users/forms";
-export * from "./users/responses";
-export * from "./notifications/common";
-export * from "./notifications/admin";
-export * from "./admin/requests";
-export * from "./discounts/common";
-export * from "./vouchers/common";
-export * from "./payments/requests";
-export * from "./payments/responses";
-export * from "./email/requests";
+// Legacy aggregate barrel — re-exports both the wire contract and the
+// TS ergonomics layer so existing importers (`import { ... } from
+// "@platform/contracts"`) continue to work unchanged.
+//
+// New code should import from the explicit subpaths instead:
+//   - `@platform/contracts/wire` for zod schemas, error codes, payload shapes
+//   - `@platform/contracts/ts`   for route URL builders and form helpers
+//
+// This split prepares the codebase for PR 1.2 (OpenAPI generated solely from
+// the wire layer) and for swapping the API implementation language without
+// dragging TS-only helpers into the contract surface. A later PR migrates
+// every importer to the explicit subpaths and drops this aggregate barrel.
+
+export * from "./wire";
+export * from "./ts";

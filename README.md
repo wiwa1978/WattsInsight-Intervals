@@ -190,6 +190,14 @@ The API serves its own documentation:
 - Swagger UI: `/api/swagger`
 - Scalar docs: `/api/docs`
 
+API versioning policy:
+
+- current runtime routes remain unversioned while contract hardening continues
+- `/api/v1` is reserved as the canonical stable prefix for generated SDKs and
+  native clients
+- unversioned routes should become temporary compatibility aliases once `/api/v1`
+  is mounted
+
 ## Logging and Observability
 
 - API logs can be written to a shared file via `LOG_FILE_PATH`

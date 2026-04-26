@@ -17,6 +17,7 @@ import { env } from "./env";
 import { createAdminService } from "./modules/admin/service";
 import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
+import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
 import { createNotificationsService } from "./modules/notifications/service";
 import { createVouchersService } from "./modules/vouchers/service";
 
@@ -329,45 +330,10 @@ const authModule = createAuthModule({
 
 const paymentsModule = createPaymentsModule({
   dodoWebhookSecret: env.DODO_PAYMENTS_WEBHOOK_SECRET,
-  onPaymentEvent: async (event) => {
-    if (event.eventType !== "payment.succeeded") {
-      return;
-    }
-
-    if (!event.productId) {
-      throw new Error("Missing product id");
-    }
-
-    const metadataUserId = typeof event.metadata?.userId === "string" ? event.metadata.userId : undefined;
-    const foundUser = metadataUserId
-      ? await billingService.getUserById(metadataUserId)
-      : event.customerEmail
-        ? await billingService.getUserByEmail(event.customerEmail)
-        : null;
-
-    if (!foundUser) {
-      throw new Error(`User not found for payment ${event.paymentId}`);
-    }
-
-    const matchedPackage = creditPackages.find((item) => item.productId === event.productId);
-    if (!matchedPackage) {
-      throw new Error(`Unknown product id: ${event.productId}`);
-    }
-
-    await billingService.processCreditPurchase(
-      foundUser.id,
-      matchedPackage.key,
-      event.paymentId,
-      "completed",
-      event.customerId,
-      {
-        priceExclVat: (event.totalAmount ?? 0) - (event.taxAmount ?? 0),
-        priceInclVat: event.totalAmount ?? 0,
-        vatAmount: event.taxAmount ?? 0,
-        currency: event.currency ?? "EUR",
-      },
-    );
-  },
+  onPaymentEvent: createPaymentEventHandler({
+    creditPackages,
+    billing: billingService,
+  }),
 });
 
 export const bootstrap = {

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -61,6 +62,24 @@ const mocks = vi.hoisted(() => {
     searchUsers: vi.fn(),
     redeemVoucher: vi.fn(),
   };
+  const countries = [
+    { id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" },
+    { id: "country-be-en", name: "Belgium", code: "BE", language: "en" },
+  ];
+  const db = {
+    select: vi.fn(() => {
+      let selectedLanguage = "en";
+      const builder = {
+        from: vi.fn(() => builder),
+        where: vi.fn((condition?: { value?: string }) => {
+          selectedLanguage = condition?.value ?? "en";
+          return builder;
+        }),
+        orderBy: vi.fn(() => countries.filter((country) => country.language === selectedLanguage)),
+      };
+      return builder;
+    }),
+  };
 
   return {
     billingService,
@@ -68,6 +87,7 @@ const mocks = vi.hoisted(() => {
     notificationsService,
     discountsService,
     vouchersService,
+    db,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -84,6 +104,11 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("../src/env", () => ({ env: mocks.env }));
+
+vi.mock("drizzle-orm", () => ({
+  asc: vi.fn((column) => column),
+  eq: vi.fn((column, value) => ({ column, value })),
+}));
 
 vi.mock("../src/modules/billing/service", () => ({
   createBillingService: () => mocks.billingService,
@@ -170,8 +195,14 @@ vi.mock("@platform/payments-core", () => ({
 }));
 
 vi.mock("@platform/platform-db", () => ({
-  createPlatformDb: () => ({ db: {} }),
+  createPlatformDb: () => ({ db: mocks.db }),
   mobileRefreshToken: {},
+  country: {
+    id: "id",
+    name: "name",
+    code: "code",
+    language: "language",
+  },
 }));
 
 vi.mock("@platform/email-core", () => ({
@@ -186,7 +217,74 @@ vi.mock("../src/observability/sentry", () => ({
   },
 }));
 
-const { app } = await import("../src/app");
+const [{ app }, { API_VERSION_POLICY, APP_OWNED_API_ROUTES }] = await Promise.all([
+  import("../src/app"),
+  import("../src/openapi"),
+]);
+
+type RouteSignature = `${string} ${string}`;
+
+function normalizeRoutePath(path: string) {
+  return path.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}");
+}
+
+function joinRoutePath(prefix: string, path: string) {
+  const joined = `${prefix}${path}`.replace(/\/+/g, "/");
+  return joined === "" ? "/" : normalizeRoutePath(joined);
+}
+
+function routeSignature(method: string, path: string): RouteSignature {
+  return `${method.toUpperCase()} ${path}`;
+}
+
+async function expectValidationError(res: Response, error: string) {
+  await expect(res.json()).resolves.toMatchObject({
+    success: false,
+    error,
+    errorCode: "VALIDATION_FAILED",
+    requestId: expect.any(String),
+  });
+}
+
+function readRouteSource(fileName: string) {
+  return readFileSync(new URL(`../src/routes/${fileName}`, import.meta.url), "utf8");
+}
+
+function extractRouterRoutes(fileName: string, prefix = "") {
+  const source = readRouteSource(fileName);
+  const routes: RouteSignature[] = [];
+  const directRoutePattern = /router\.(get|post|patch|put|delete)\("([^"]+)"/g;
+  const adminAuthActionPattern = /registerAdminAuth(?:Json|Response)Action\(\s*"([^"]+)"/g;
+
+  for (const match of source.matchAll(directRoutePattern)) {
+    const [, method, path] = match;
+    routes.push(routeSignature(method, joinRoutePath(prefix, path)));
+  }
+
+  for (const match of source.matchAll(adminAuthActionPattern)) {
+    const [, path] = match;
+    routes.push(routeSignature("post", joinRoutePath(prefix, path)));
+  }
+
+  return routes;
+}
+
+function getSourceDefinedAppRoutes() {
+  return [
+    ...extractRouterRoutes("system.ts"),
+    ...extractRouterRoutes("logs.ts"),
+    ...extractRouterRoutes("payments.ts"),
+    ...extractRouterRoutes("auth.ts", "/auth"),
+    ...extractRouterRoutes("me.ts", "/me"),
+    ...extractRouterRoutes("admin.ts", "/admin"),
+    routeSignature("post", "/payments/webhooks/dodo"),
+    routeSignature("post", "/auth/mobile/token"),
+    routeSignature("post", "/auth/mobile/refresh"),
+    routeSignature("post", "/auth/mobile/revoke"),
+    routeSignature("get", "/session/me"),
+    routeSignature("get", "/session/admin/me"),
+  ].sort();
+}
 
 describe("API functional routes", () => {
   beforeEach(() => {
@@ -200,6 +298,31 @@ describe("API functional routes", () => {
     await expect(res.json()).resolves.toEqual({
       success: true,
       data: { status: "ok" },
+    });
+  });
+
+  // Verifies validation errors produced by API helpers include machine-readable
+  // metadata for generated clients while preserving the human-readable message.
+  it("returns canonical validation error metadata", async () => {
+    const res = await app.request("/countries?lang=de");
+    expect(res.status).toBe(400);
+    expect(res.headers.get("x-request-id")).toBeTruthy();
+    expect(res.headers.get("x-error-code")).toBe("VALIDATION_FAILED");
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: "Invalid countries query",
+      errorCode: "VALIDATION_FAILED",
+      requestId: expect.any(String),
+    });
+  });
+
+  // Verifies countries now use the same success envelope as other API routes.
+  it("returns enveloped localized countries", async () => {
+    const res = await app.request("/countries?lang=nl");
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [{ id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" }],
     });
   });
 
@@ -310,10 +433,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({
-      success: false,
-      error: "Invalid checkout payload",
-    });
+    await expectValidationError(res, "Invalid checkout payload");
   });
 
   // Verifies OpenAPI endpoints are equivalent and contain all declared contract paths.
@@ -331,32 +451,26 @@ describe("API functional routes", () => {
 
     expect(rootSpec.openapi).toBe("3.1.0");
     expect(rootSpec.info?.title).toBe("SaaS Platform API");
-    expect(rootSpec.paths?.["/me/credits/balance"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/me/session"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/admin/session"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/health"]?.get).toBeTruthy();
+    expect(rootSpec.servers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ url: "http://localhost:8787" }),
+        expect.objectContaining({ url: `http://localhost:8787${API_VERSION_POLICY.nextStablePrefix}` }),
+      ]),
+    );
     expect(rootSpec.paths?.["/auth/sign-in/email"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/auth/mobile/token"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/auth/mobile/refresh"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/auth/mobile/revoke"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/admin/dashboard/stats"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/payments/webhooks/dodo"]?.post).toBeTruthy();
     expect(apiSpec).toEqual(rootSpec);
 
-    const openApiPaths = Object.keys(rootSpec.paths || {});
-    expect(openApiPaths.sort()).toEqual([
-      "/admin/dashboard/stats",
-      "/admin/session",
-      "/auth/mobile/refresh",
-      "/auth/mobile/revoke",
-      "/auth/mobile/token",
-      "/auth/sign-in/email",
-      "/countries",
-      "/health",
-      "/me/credits/balance",
-      "/me/session",
-      "/payments/webhooks/dodo",
-    ]);
+    for (const route of APP_OWNED_API_ROUTES) {
+      const operation = rootSpec.paths?.[route.path]?.[route.method];
+      expect(operation).toBeTruthy();
+      expect(operation?.operationId).toBe(route.operation.operationId);
+      expect(operation?.tags).toEqual(route.operation.tags);
+      expect(operation?.responses?.["200"]).toBeTruthy();
+    }
+
+    const documentedAppRoutes = APP_OWNED_API_ROUTES.map((route) => `${route.method.toUpperCase()} ${route.path}`);
+    expect(new Set(documentedAppRoutes).size).toBe(documentedAppRoutes.length);
+    expect(documentedAppRoutes.sort()).toEqual(getSourceDefinedAppRoutes());
   });
 
   // Verifies admin dashboard endpoint returns delegated stats payload.
@@ -375,8 +489,11 @@ describe("API functional routes", () => {
     await expect(res.json()).resolves.toEqual({ success: true, data: { totalUsers: 99 } });
   });
 
-  // Verifies checkout endpoint returns package-specific dodo checkout URL.
-  it("returns checkout URL for known package", async () => {
+  // Verifies checkout endpoint returns package-specific dodo checkout URL
+  // with userId firmly bound into the metadata query params (see PR 0.3 —
+  // metadata.userId is the authoritative tie-back used by the webhook
+  // handler to credit the correct account).
+  it("returns checkout URL with userId metadata bound for known package", async () => {
     const res = await app.request("/payments/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -384,12 +501,14 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      success: true,
-      data: {
-        checkoutUrl: "https://test.checkout.dodopayments.com/buy/pdt_0NUzkvLtA4UmSIekBVTcX",
-      },
-    });
+    const payload = (await res.json()) as { success: boolean; data: { checkoutUrl: string } };
+    expect(payload.success).toBe(true);
+    const url = new URL(payload.data.checkoutUrl);
+    expect(url.origin + url.pathname).toBe(
+      "https://test.checkout.dodopayments.com/buy/pdt_0NUzkvLtA4UmSIekBVTcX",
+    );
+    expect(url.searchParams.get("metadata_userId")).toBe("auth-user");
+    expect(url.searchParams.get("metadata_packageKey")).toBe("silver");
   });
 
   // Verifies user detail endpoint returns 404 for unknown users.
@@ -468,7 +587,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/billing/transactions?limit=1000&offset=-1");
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid transactions query" });
+    await expectValidationError(res, "Invalid transactions query");
   });
 
   // Verifies purchases endpoint forwards limit, offset and search filters.
@@ -555,7 +674,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/users/not-a-uuid");
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid user id" });
+    await expectValidationError(res, "Invalid user id");
   });
 
   // Verifies verify-ban-secret maps service success/failure to HTTP status.
@@ -587,7 +706,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid secret payload" });
+    await expectValidationError(res, "Invalid secret payload");
   });
 
   // Verifies discount code validation endpoint rejects malformed input.
@@ -599,7 +718,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid discount validation payload" });
+    await expectValidationError(res, "Invalid discount validation payload");
   });
 
   // Verifies discount CRUD and assignment routes are all wired and callable.
@@ -752,11 +871,11 @@ describe("API functional routes", () => {
     expect(createRes.status).toBe(400);
     expect(patchRes.status).toBe(400);
     expect(searchRes.status).toBe(400);
-    await expect(listRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher query" });
-    await expect(getRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher id" });
-    await expect(createRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher payload" });
-    await expect(patchRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher id" });
-    await expect(searchRes.json()).resolves.toEqual({ success: false, error: "Invalid voucher search query" });
+    await expectValidationError(listRes, "Invalid voucher query");
+    await expectValidationError(getRes, "Invalid voucher id");
+    await expectValidationError(createRes, "Invalid voucher payload");
+    await expectValidationError(patchRes, "Invalid voucher id");
+    await expectValidationError(searchRes, "Invalid voucher search query");
   });
 
   // Verifies voucher lookup and redeem routes map success and failure responses correctly.
@@ -795,7 +914,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid voucher payload" });
+    await expectValidationError(res, "Invalid voucher payload");
   });
 
   // Verifies notification list and dispatch routes map to service calls.
@@ -833,7 +952,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid notification payload" });
+    await expectValidationError(res, "Invalid notification payload");
   });
 
   // Verifies invoice endpoint rejects malformed payloads.
@@ -845,10 +964,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({
-      success: false,
-      error: "Invalid invoice payload",
-    });
+    await expectValidationError(res, "Invalid invoice payload");
   });
 
   // Verifies invoice endpoint normalizes thrown service errors into 400 responses.
@@ -955,7 +1071,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/discounts/missing");
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid discount id" });
+    await expectValidationError(res, "Invalid discount id");
   });
 
   // Verifies discount lookup endpoint returns 404 when service reports missing discount.
@@ -977,7 +1093,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid discount id" });
+    await expectValidationError(res, "Invalid discount id");
   });
 
   // Verifies discount removal validates identifiers before payload fallback logic.
@@ -989,7 +1105,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid discount id" });
+    await expectValidationError(res, "Invalid discount id");
   });
 
   // Verifies discount validation endpoint passes excludeId and code to service.

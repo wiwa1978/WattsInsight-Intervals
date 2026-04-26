@@ -5,11 +5,20 @@ import { z } from "zod";
  * `errorResultSchema` envelope. Native and non-TS clients switch on these
  * values; never embed user-facing English strings in `errorCode`.
  *
- * NOTE: PR 1.7 will sweep the full codebase and lock this enum down. For now,
- * only codes used by Phase-0 security fixes are listed. Add new codes here
- * before emitting them from the API.
+ * Add new codes here before emitting them from the API. Keep generic HTTP/API
+ * codes separate from domain-specific auth, billing, and provider codes.
  */
 export const errorCode = {
+  // generic HTTP/API errors
+  badRequest: "BAD_REQUEST",
+  validationFailed: "VALIDATION_FAILED",
+  unauthorized: "UNAUTHORIZED",
+  forbidden: "FORBIDDEN",
+  notFound: "NOT_FOUND",
+  conflict: "CONFLICT",
+  payloadTooLarge: "PAYLOAD_TOO_LARGE",
+  rateLimited: "RATE_LIMITED",
+  internalServerError: "INTERNAL_SERVER_ERROR",
   // auth
   invalidCredentials: "INVALID_CREDENTIALS",
   emailNotVerified: "EMAIL_NOT_VERIFIED",

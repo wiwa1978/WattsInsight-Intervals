@@ -19,10 +19,12 @@
     "test:e2e:web": "bun run --cwd apps/web test:e2e",
     "test:e2e:admin": "bun run --cwd apps/admin test:e2e",
     "test:e2e:all": "bun run test:e2e:web && bun run test:e2e:admin",
-    "test:ci": "bun run typecheck:api && bun run typecheck:web && bun run typecheck:admin && bun run test:api && bun run test:web && bun run test:admin",
+    "test:ci": "bun run typecheck:all && bun run test:api && bun run test:web && bun run test:admin",
     "typecheck:api": "bun run --cwd apps/api typecheck",
     "typecheck:web": "bun run --cwd apps/web typecheck",
-    "typecheck:admin": "bun run --cwd apps/admin typecheck"
+    "typecheck:admin": "bun run --cwd apps/admin typecheck",
+    "typecheck:packages": "bun run --filter './packages/*' typecheck",
+    "typecheck:all": "bun run typecheck:packages && bun run typecheck:api && bun run typecheck:web && bun run typecheck:admin"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
