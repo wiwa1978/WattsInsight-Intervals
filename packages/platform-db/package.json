@@ -6,6 +6,9 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
+    "db:generate": "bun run --cwd ../.. db:generate",
+    "db:migrate": "bun run --cwd ../.. db:migrate",
+    "db:check": "bun run --cwd ../.. db:check",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
