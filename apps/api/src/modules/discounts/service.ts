@@ -460,14 +460,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       })),
     );
 
-    await deps.db
-      .update(discounts)
-      .set({
-        currentUses: sql`${discounts.currentUses} + ${newIds.length}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(discounts.id, discountId));
-
     return discountSuccess({ assignedCount: newIds.length });
   }
 
@@ -487,14 +479,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     await deps.db
       .delete(userDiscounts)
       .where(and(eq(userDiscounts.discountId, discountId), inArray(userDiscounts.userId, dedupedUserIds)));
-
-    await deps.db
-      .update(discounts)
-      .set({
-        currentUses: sql`GREATEST(${discounts.currentUses} - ${dedupedUserIds.length}, 0)`,
-        updatedAt: new Date(),
-      })
-      .where(eq(discounts.id, discountId));
 
     return discountSuccess({ removedCount: dedupedUserIds.length });
   }

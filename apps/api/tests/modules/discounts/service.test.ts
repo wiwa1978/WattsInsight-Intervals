@@ -234,9 +234,7 @@ describe("createDiscountsService", () => {
         }),
       }),
       insert: vi.fn().mockReturnValue({ values: insertValues }),
-      update: vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-      }),
+      update: vi.fn(),
     };
 
     const service = createDiscountsService({
@@ -251,6 +249,33 @@ describe("createDiscountsService", () => {
       { discountId: "d1", userId: "u1" },
       { discountId: "d1", userId: "u2" },
     ]);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  // Verifies removing assignments does not decrement actual redemption counters.
+  it("does not mutate currentUses when removing discount assignments", async () => {
+    const dbDeleteWhere = vi.fn().mockResolvedValue(undefined);
+    const dbDelete = vi.fn().mockReturnValue({ where: dbDeleteWhere });
+    const db = {
+      query: {
+        discounts: {
+          findFirst: vi.fn().mockResolvedValue({ id: "d1", maxUses: 5, currentUses: 2 }),
+        },
+      },
+      delete: dbDelete,
+      update: vi.fn(),
+    };
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+    });
+
+    const result = await service.removeDiscountFromUsers("d1", ["u1", "u2"]);
+
+    expect(result).toEqual({ success: true, removedCount: 2 });
+    expect(dbDelete).toHaveBeenCalled();
+    expect(db.update).not.toHaveBeenCalled();
   });
 
   // Verifies code generation retries when a generated code already exists.
