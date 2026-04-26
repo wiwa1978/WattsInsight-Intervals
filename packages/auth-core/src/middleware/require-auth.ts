@@ -1,6 +1,6 @@
 import { normalizeAuthRole } from "@platform/auth-shared";
 
-import type { AuthMiddleware } from "../types";
+import type { AuthFailure, AuthMiddleware } from "../types";
 
 type SessionShape = {
   user?: {
@@ -17,11 +17,26 @@ type TokenUser = {
   email?: string | null;
 };
 
-type GetAuthContext = (headers: Headers) => Promise<SessionShape | { user: TokenUser; session: null } | null>;
+type GetAuthContext = (headers: Headers) => Promise<SessionShape | { user: TokenUser; session: null } | AuthFailure | null>;
+
+function isAuthFailure(value: Awaited<ReturnType<GetAuthContext>>): value is AuthFailure {
+  return Boolean(value && "ok" in value && value.ok === false);
+}
 
 export function createRequireAuth(getAuthContext: GetAuthContext): AuthMiddleware {
   return async (c, next) => {
     const session = await getAuthContext(c.req.raw.headers);
+
+    if (isAuthFailure(session)) {
+      return c.json(
+        {
+          success: false,
+          error: session.error,
+          ...(session.errorCode ? { errorCode: session.errorCode } : {}),
+        },
+        session.status,
+      );
+    }
 
     if (!session?.user?.id) {
       return c.json({ success: false, error: "Unauthorized" }, 401);

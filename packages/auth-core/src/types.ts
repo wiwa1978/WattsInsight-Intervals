@@ -2,6 +2,7 @@ import type { BetterAuthOptions } from "better-auth";
 import type { MiddlewareHandler } from "hono";
 
 import type { AuthRole } from "@platform/auth-shared";
+import type { ErrorCode } from "@platform/contracts/wire";
 
 export type AuthGuardContext = {
   auth: {
@@ -65,6 +66,13 @@ export type AuthenticatedUser = {
 export type AuthContextVariables = {
   authUser?: AuthenticatedUser;
   authSession?: unknown;
+};
+
+export type AuthFailure = {
+  ok: false;
+  status: 401 | 403;
+  error: string;
+  errorCode?: ErrorCode;
 };
 
 export type AuthMiddleware = MiddlewareHandler<{
