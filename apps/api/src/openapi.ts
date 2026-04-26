@@ -5,6 +5,7 @@ import {
   billingListQuerySchema,
   billingRangeQuerySchema,
   clientLogSchema,
+  countriesResponseSchema,
   countriesQuerySchema,
   createCheckoutRequestSchema,
   discountIdParamSchema,
@@ -197,10 +198,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/countries", ["System"], "List countries for a locale", {
     parameters: [queryParameter("lang", countriesQuerySchema.shape.lang)],
     responses: {
-      "200": jsonResponse(
-        "Localized countries",
-        z.array(z.object({ id: z.string(), name: z.string(), code: z.string(), language: z.string() })),
-      ),
+      "200": jsonResponse("Localized countries", countriesResponseSchema),
       "400": jsonResponse("Bad request", genericErrorSchema),
     },
   }),

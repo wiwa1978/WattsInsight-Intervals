@@ -1,12 +1,12 @@
 import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 
-import { countriesQuerySchema } from "@platform/contracts";
+import { countriesQuerySchema } from "@platform/contracts/wire";
 import { country } from "@platform/platform-db";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
-import { parseQuery, validationError } from "../lib/http";
+import { ok, parseQuery, validationError } from "../lib/http";
 
 export function createSystemRouter() {
   const router = new Hono<AppEnv>();
@@ -36,7 +36,7 @@ export function createSystemRouter() {
       .orderBy(asc(country.name));
 
     if (localizedCountries.length > 0) {
-      return c.json(localizedCountries);
+      return ok(c, localizedCountries);
     }
 
     const fallbackCountries = await bootstrap.db
@@ -50,7 +50,7 @@ export function createSystemRouter() {
       .where(eq(country.language, "en"))
       .orderBy(asc(country.name));
 
-    return c.json(fallbackCountries);
+    return ok(c, fallbackCountries);
   });
 
   return router;

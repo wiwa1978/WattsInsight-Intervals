@@ -62,6 +62,24 @@ const mocks = vi.hoisted(() => {
     searchUsers: vi.fn(),
     redeemVoucher: vi.fn(),
   };
+  const countries = [
+    { id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" },
+    { id: "country-be-en", name: "Belgium", code: "BE", language: "en" },
+  ];
+  const db = {
+    select: vi.fn(() => {
+      let selectedLanguage = "en";
+      const builder = {
+        from: vi.fn(() => builder),
+        where: vi.fn((condition?: { value?: string }) => {
+          selectedLanguage = condition?.value ?? "en";
+          return builder;
+        }),
+        orderBy: vi.fn(() => countries.filter((country) => country.language === selectedLanguage)),
+      };
+      return builder;
+    }),
+  };
 
   return {
     billingService,
@@ -69,6 +87,7 @@ const mocks = vi.hoisted(() => {
     notificationsService,
     discountsService,
     vouchersService,
+    db,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -85,6 +104,11 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("../src/env", () => ({ env: mocks.env }));
+
+vi.mock("drizzle-orm", () => ({
+  asc: vi.fn((column) => column),
+  eq: vi.fn((column, value) => ({ column, value })),
+}));
 
 vi.mock("../src/modules/billing/service", () => ({
   createBillingService: () => mocks.billingService,
@@ -171,8 +195,14 @@ vi.mock("@platform/payments-core", () => ({
 }));
 
 vi.mock("@platform/platform-db", () => ({
-  createPlatformDb: () => ({ db: {} }),
+  createPlatformDb: () => ({ db: mocks.db }),
   mobileRefreshToken: {},
+  country: {
+    id: "id",
+    name: "name",
+    code: "code",
+    language: "language",
+  },
 }));
 
 vi.mock("@platform/email-core", () => ({
@@ -259,6 +289,16 @@ describe("API functional routes", () => {
     await expect(res.json()).resolves.toEqual({
       success: true,
       data: { status: "ok" },
+    });
+  });
+
+  // Verifies countries now use the same success envelope as other API routes.
+  it("returns enveloped localized countries", async () => {
+    const res = await app.request("/countries?lang=nl");
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [{ id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" }],
     });
   });
 

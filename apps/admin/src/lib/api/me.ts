@@ -70,7 +70,8 @@ export async function deleteMyNotification(notificationId: string) {
 }
 
 export async function getCountries(lang: "en" | "fr" | "nl") {
-  return apiRequest<CountryRecord[]>(`/countries?lang=${lang}`);
+  const result = await apiRequest<{ success: boolean; data: CountryRecord[] }>(`/countries?lang=${lang}`);
+  return result.data;
 }
 
 export async function createCheckoutSession(packageKey: string) {

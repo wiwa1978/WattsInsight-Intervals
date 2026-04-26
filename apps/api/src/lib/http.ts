@@ -35,3 +35,19 @@ export function ok<T>(c: JsonContext, data: T, status = 200) {
 export function fail(c: JsonContext, error: string, status = 400, extra?: Record<string, unknown>) {
   return c.json({ success: false, error, ...(extra ?? {}) }, status);
 }
+
+export function badRequest(c: JsonContext, error: string, extra?: Record<string, unknown>) {
+  return fail(c, error, 400, extra);
+}
+
+export function unauthorized(c: JsonContext, error = "Unauthorized", extra?: Record<string, unknown>) {
+  return fail(c, error, 401, extra);
+}
+
+export function forbidden(c: JsonContext, error = "Forbidden", extra?: Record<string, unknown>) {
+  return fail(c, error, 403, extra);
+}
+
+export function notFound(c: JsonContext, error = "Not found", extra?: Record<string, unknown>) {
+  return fail(c, error, 404, extra);
+}
