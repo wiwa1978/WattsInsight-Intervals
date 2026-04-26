@@ -253,6 +253,47 @@ describe("POST /webhooks/dodo response codes", () => {
     );
   });
 
+  it("200 normalizes processing payment payloads with checkout metadata", async () => {
+    const processingPayload = JSON.stringify({
+      id: "evt_processing_123",
+      type: "payment.processing",
+      data: {
+        payment_id: "pay_processing_123",
+        customer: { email: "buyer@example.com", customer_id: "cus_processing" },
+        product_cart: [{ product_id: "prod_credits_100" }],
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+        settlement_amount: 1000,
+        settlement_tax: 100,
+        settlement_currency: "EUR",
+      },
+    });
+    const { app, onPaymentEvent } = build();
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(processingPayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: processingPayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(onPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "dodo",
+        providerEventId: "evt_processing_123",
+        eventType: "payment.processing",
+        paymentId: "pay_processing_123",
+        customerId: "cus_processing",
+        productId: "prod_credits_100",
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+        currency: "EUR",
+        totalAmount: 1000,
+        taxAmount: 100,
+      }),
+    );
+  });
+
   it("200 normalizes full refund payloads", async () => {
     const refundPayload = JSON.stringify({
       id: "evt_refund_123",

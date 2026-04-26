@@ -90,6 +90,13 @@ describe("createPaymentEventHandler", () => {
       ...overrides,
     });
 
+  const validProcessingPaymentEvent = (overrides: Partial<NormalizedPaymentEvent> = {}): NormalizedPaymentEvent =>
+    validPaymentEvent({
+      eventType: "payment.processing",
+      paymentId: "pay_processing",
+      ...overrides,
+    });
+
   function makeDeps(overrides?: {
     findUser?: (id: string) => Promise<{ id: string } | null>;
   }) {
@@ -273,6 +280,27 @@ describe("createPaymentEventHandler", () => {
       "pay_failed",
       "failed",
       "cus_failed",
+      {
+        priceExclVat: samplePackage.price - 200,
+        priceInclVat: samplePackage.price,
+        vatAmount: 200,
+        currency: "EUR",
+      },
+    );
+  });
+
+  it("records payment.processing as pending without granting credits", async () => {
+    const { handler, getUserById, processCreditPurchase } = makeDeps();
+
+    await handler(validProcessingPaymentEvent({ paymentId: "pay_processing", customerId: "cus_processing" }));
+
+    expect(getUserById).toHaveBeenCalledWith("real-user-id");
+    expect(processCreditPurchase).toHaveBeenCalledWith(
+      "real-user-id",
+      samplePackage.key,
+      "pay_processing",
+      "pending",
+      "cus_processing",
       {
         priceExclVat: samplePackage.price - 200,
         priceInclVat: samplePackage.price,

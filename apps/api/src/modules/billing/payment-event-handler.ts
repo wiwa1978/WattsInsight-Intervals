@@ -14,7 +14,7 @@ export type PaymentEventHandlerDeps = {
       userId: string,
       packageKey: string,
       paymentId: string,
-      status: "completed" | "failed",
+      status: "completed" | "pending" | "failed",
       customerId: string | undefined,
       pricing: {
         priceExclVat: number;
@@ -49,7 +49,11 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       return;
     }
 
-    if (event.eventType !== "payment.succeeded" && event.eventType !== "payment.failed") {
+    if (
+      event.eventType !== "payment.succeeded" &&
+      event.eventType !== "payment.processing" &&
+      event.eventType !== "payment.failed"
+    ) {
       return;
     }
 
@@ -105,7 +109,11 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       throw new Error(`Refusing payment ${event.paymentId}: tax amount exceeds total amount.`);
     }
 
-    const paymentStatus = event.eventType === "payment.succeeded" ? "completed" : "failed";
+    const paymentStatus = event.eventType === "payment.succeeded"
+      ? "completed"
+      : event.eventType === "payment.processing"
+        ? "pending"
+        : "failed";
 
     await deps.billing.processCreditPurchase(
       foundUser.id,
