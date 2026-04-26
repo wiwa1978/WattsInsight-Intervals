@@ -54,6 +54,12 @@ type OpenApiOperation = {
 type OpenApiMethod = "get" | "post" | "patch" | "put" | "delete";
 type OpenApiPathItem = Partial<Record<"get" | "post" | "patch" | "put" | "delete", OpenApiOperation>>;
 
+export const API_VERSION_POLICY = {
+  current: "unversioned",
+  nextStablePrefix: "/api/v1",
+  unversionedCompatibility: "temporary-aliases",
+} as const;
+
 export type AppOwnedApiRoute = {
   method: OpenApiMethod;
   path: string;
@@ -420,7 +426,16 @@ export function mergeOpenApiSpecs(authSpec: Record<string, any>) {
       description:
         "Standalone API for authentication, billing, notifications, discounts, and admin operations shared by the web, admin, and future native clients.",
     },
-    servers: [{ url: env.API_URL }],
+    servers: [
+      {
+        url: env.API_URL,
+        description: "Current unversioned compatibility routes",
+      },
+      {
+        url: `${env.API_URL}${API_VERSION_POLICY.nextStablePrefix}`,
+        description: "Planned stable v1 API prefix for generated and native clients",
+      },
+    ],
     components: {
       ...(authSpec.components ?? {}),
       securitySchemes: {
@@ -453,7 +468,16 @@ export function createFallbackOpenApiSpec() {
       description:
         "Standalone API for authentication, billing, notifications, discounts, and admin operations shared by the web, admin, and future native clients.",
     },
-    servers: [{ url: env.API_URL }],
+    servers: [
+      {
+        url: env.API_URL,
+        description: "Current unversioned compatibility routes",
+      },
+      {
+        url: `${env.API_URL}${API_VERSION_POLICY.nextStablePrefix}`,
+        description: "Planned stable v1 API prefix for generated and native clients",
+      },
+    ],
     components: {
       securitySchemes: {
         cookieAuth: {

@@ -217,7 +217,7 @@ vi.mock("../src/observability/sentry", () => ({
   },
 }));
 
-const [{ app }, { APP_OWNED_API_ROUTES }] = await Promise.all([
+const [{ app }, { API_VERSION_POLICY, APP_OWNED_API_ROUTES }] = await Promise.all([
   import("../src/app"),
   import("../src/openapi"),
 ]);
@@ -451,6 +451,12 @@ describe("API functional routes", () => {
 
     expect(rootSpec.openapi).toBe("3.1.0");
     expect(rootSpec.info?.title).toBe("SaaS Platform API");
+    expect(rootSpec.servers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ url: "http://localhost:8787" }),
+        expect.objectContaining({ url: `http://localhost:8787${API_VERSION_POLICY.nextStablePrefix}` }),
+      ]),
+    );
     expect(rootSpec.paths?.["/auth/sign-in/email"]?.post).toBeTruthy();
     expect(apiSpec).toEqual(rootSpec);
 

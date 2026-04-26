@@ -353,6 +353,17 @@ Goal: avoid locking mobile clients into unstable unversioned URLs.
 - Decide whether unversioned routes remain as compatibility aliases.
 - Document the versioning policy in this plan and README/API docs.
 
+Decision:
+
+- Introduce `/api/v1` as the canonical stable external prefix after the response
+  and auth contract baseline is sufficiently hardened for native clients.
+- Keep existing unversioned app-owned routes as temporary compatibility aliases
+  when `/api/v1` is mounted.
+- Do not point generated/native clients at unversioned routes. They should target
+  `/api/v1` once aliases are available.
+- Runtime aliases are intentionally deferred from this work package; this slice
+  documents the policy and updates OpenAPI server strategy only.
+
 Definition of done:
 
 - Versioning decision is documented.
