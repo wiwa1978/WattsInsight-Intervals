@@ -8,12 +8,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // mock was hiding.
 const mocks = vi.hoisted(() => ({
   signInEmail: vi.fn(),
+  getSession: vi.fn(async () => null),
   authHandler: vi.fn(async () => new Response(null, { status: 200 })),
 }));
 
 vi.mock("better-auth", () => ({
   betterAuth: () => ({
-    api: { signInEmail: mocks.signInEmail },
+    api: { getSession: mocks.getSession, signInEmail: mocks.signInEmail },
     handler: mocks.authHandler,
   }),
 }));
@@ -21,12 +22,17 @@ vi.mock("better-auth", () => ({
 import { createAuthModule } from "@platform/auth-core";
 
 type FindByIdResult = Awaited<ReturnType<Parameters<typeof createAuthModule>[0]["users"]["findById"]>>;
+type RefreshTokenRecord = Awaited<ReturnType<Parameters<typeof createAuthModule>[0]["refreshTokens"]["findActiveByHash"]>>;
 
-function buildApp(opts: { findById: () => FindByIdResult }) {
+function buildApp(opts: {
+  findById: () => FindByIdResult;
+  findActiveRefreshToken?: () => RefreshTokenRecord;
+  rotateRefreshToken?: () => boolean | Promise<boolean>;
+}) {
   const refreshTokens = {
     create: vi.fn(async () => {}),
-    findActiveByHash: vi.fn(async () => null),
-    rotate: vi.fn(async () => true),
+    findActiveByHash: vi.fn(async () => opts.findActiveRefreshToken?.() ?? null),
+    rotate: vi.fn(async () => opts.rotateRefreshToken?.() ?? true),
     revokeByHash: vi.fn(async () => {}),
     cleanupExpired: vi.fn(async () => {}),
   };
@@ -49,6 +55,7 @@ function buildApp(opts: { findById: () => FindByIdResult }) {
 
   const app = new Hono();
   app.route("/auth/mobile", module.mobileRouter);
+  app.route("/session", module.sessionRouter);
   return { app, refreshTokens };
 }
 
@@ -64,6 +71,8 @@ const baseUser = {
 
 describe("POST /auth/mobile/token gate", () => {
   beforeEach(() => {
+    mocks.getSession.mockReset();
+    mocks.getSession.mockResolvedValue(null);
     mocks.signInEmail.mockReset();
     mocks.signInEmail.mockResolvedValue({ user: { id: baseUser.id } });
   });
@@ -152,5 +161,171 @@ describe("POST /auth/mobile/token gate", () => {
     expect(body.data.accessToken.length).toBeGreaterThan(16);
     expect(body.data.refreshToken.length).toBeGreaterThan(16);
     expect(refreshTokens.create).toHaveBeenCalledOnce();
+  });
+});
+
+describe("bearer-token auth lifecycle gate", () => {
+  beforeEach(() => {
+    mocks.getSession.mockReset();
+    mocks.getSession.mockResolvedValue(null);
+    mocks.signInEmail.mockReset();
+    mocks.signInEmail.mockResolvedValue({ user: { id: baseUser.id } });
+  });
+
+  async function issueAccessToken(findById: () => FindByIdResult = () => baseUser) {
+    const { app } = buildApp({ findById });
+    const res = await callMobileToken(app);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { accessToken: string } };
+    return body.data.accessToken;
+  }
+
+  async function callSession(app: Hono, accessToken: string) {
+    return app.request("/session/me", {
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+  }
+
+  async function callMobileToken(app: Hono) {
+    return app.request("/auth/mobile/token", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "user@example.com", password: "password123" }),
+    });
+  }
+
+  it("401 UNAUTHORIZED for malformed bearer token instead of throwing", async () => {
+    const { app } = buildApp({ findById: () => baseUser });
+
+    const res = await callSession(app, "not-a-jwt");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "UNAUTHORIZED",
+    });
+    expect(mocks.getSession).not.toHaveBeenCalled();
+  });
+
+  it("401 UNAUTHORIZED when bearer user was deleted after token issuance", async () => {
+    const accessToken = await issueAccessToken();
+    const { app } = buildApp({ findById: () => null });
+
+    const res = await callSession(app, accessToken);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "UNAUTHORIZED",
+    });
+  });
+
+  it("403 ACCOUNT_BANNED when bearer user was banned after token issuance", async () => {
+    const accessToken = await issueAccessToken();
+    const { app } = buildApp({ findById: () => ({ ...baseUser, banned: true }) });
+
+    const res = await callSession(app, accessToken);
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "ACCOUNT_BANNED",
+    });
+  });
+});
+
+describe("POST /auth/mobile/refresh lifecycle gate", () => {
+  beforeEach(() => {
+    mocks.getSession.mockReset();
+    mocks.getSession.mockResolvedValue(null);
+    mocks.signInEmail.mockReset();
+    mocks.signInEmail.mockResolvedValue({ user: { id: baseUser.id } });
+  });
+
+  async function callRefresh(app: Hono) {
+    return app.request("/auth/mobile/refresh", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken: "r".repeat(32) }),
+    });
+  }
+
+  it("401 INVALID_REFRESH_TOKEN when refresh token is missing or inactive", async () => {
+    const { app, refreshTokens } = buildApp({ findById: () => baseUser });
+
+    const res = await callRefresh(app);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "INVALID_REFRESH_TOKEN",
+    });
+    expect(refreshTokens.rotate).not.toHaveBeenCalled();
+  });
+
+  it("401 INVALID_REFRESH_TOKEN when refresh token user was deleted", async () => {
+    const { app, refreshTokens } = buildApp({
+      findById: () => null,
+      findActiveRefreshToken: () => ({ userId: baseUser.id }),
+    });
+
+    const res = await callRefresh(app);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "INVALID_REFRESH_TOKEN",
+    });
+    expect(refreshTokens.rotate).not.toHaveBeenCalled();
+  });
+
+  it("403 ACCOUNT_BANNED when refresh token user is banned", async () => {
+    const { app, refreshTokens } = buildApp({
+      findById: () => ({ ...baseUser, banned: true }),
+      findActiveRefreshToken: () => ({ userId: baseUser.id }),
+    });
+
+    const res = await callRefresh(app);
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "ACCOUNT_BANNED",
+    });
+    expect(refreshTokens.rotate).not.toHaveBeenCalled();
+  });
+
+  it("401 REFRESH_TOKEN_REUSED when rotation loses the race", async () => {
+    const { app } = buildApp({
+      findById: () => baseUser,
+      findActiveRefreshToken: () => ({ userId: baseUser.id }),
+      rotateRefreshToken: () => false,
+    });
+
+    const res = await callRefresh(app);
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "REFRESH_TOKEN_REUSED",
+    });
+  });
+
+  it("200 rotates refresh token for eligible users", async () => {
+    const { app, refreshTokens } = buildApp({
+      findById: () => baseUser,
+      findActiveRefreshToken: () => ({ userId: baseUser.id }),
+    });
+
+    const res = await callRefresh(app);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: {
+        tokenType: "Bearer",
+      },
+    });
+    expect(refreshTokens.rotate).toHaveBeenCalledOnce();
   });
 });

@@ -33,6 +33,37 @@ function redactAuthLogBody(body: string) {
   }
 }
 
+function invalidRefreshTokenResponse(c: { json: (body: unknown, status?: number) => Response }) {
+  return c.json(
+    {
+      success: false,
+      error: "Invalid refresh token",
+      errorCode: errorCode.invalidRefreshToken,
+    },
+    401,
+  );
+}
+
+function reusedRefreshTokenResponse(c: { json: (body: unknown, status?: number) => Response }) {
+  return c.json(
+    {
+      success: false,
+      error: "Refresh token has already been used",
+      errorCode: errorCode.refreshTokenReused,
+    },
+    401,
+  );
+}
+
+function gateInputForUser(user: NonNullable<Awaited<ReturnType<AuthModuleOptions["users"]["findById"]>>>) {
+  return {
+    emailVerified: user.emailVerified ?? false,
+    twoFactorEnabled: user.twoFactorEnabled ?? false,
+    banned: user.banned ?? false,
+    banExpires: user.banExpires ?? null,
+  };
+}
+
 export function createAuthModule(options: AuthModuleOptions) {
   const auth = betterAuth(options.betterAuthOptions);
   const router = new Hono<{ Variables: AuthContextVariables }>();
@@ -49,15 +80,42 @@ export function createAuthModule(options: AuthModuleOptions) {
       const token = authorization.slice("Bearer ".length).trim();
 
       if (token) {
-        const { userId } = await tokenService.verifyAccessToken(token);
-        const tokenUser = await options.users.findById(userId);
-
-        if (tokenUser) {
+        const verified = await tokenService.verifyAccessToken(token).catch(() => null);
+        if (!verified) {
           return {
-            user: tokenUser,
-            session: null,
+            ok: false,
+            status: 401,
+            error: "Invalid access token",
+            errorCode: errorCode.unauthorized,
           };
         }
+
+        const { userId } = verified;
+        const tokenUser = await options.users.findById(userId);
+
+        if (!tokenUser) {
+          return {
+            ok: false,
+            status: 401,
+            error: "Invalid access token",
+            errorCode: errorCode.unauthorized,
+          };
+        }
+
+        const gate = enforceMobileSignInGate(gateInputForUser(tokenUser));
+        if (!gate.ok) {
+          return {
+            ok: false,
+            status: gate.status,
+            error: gate.error,
+            errorCode: gate.errorCode,
+          };
+        }
+
+        return {
+          user: tokenUser,
+          session: null,
+        };
       }
     }
 
@@ -153,12 +211,7 @@ export function createAuthModule(options: AuthModuleOptions) {
       );
     }
 
-    const gate = enforceMobileSignInGate({
-      emailVerified: persistedUser.emailVerified ?? false,
-      twoFactorEnabled: persistedUser.twoFactorEnabled ?? false,
-      banned: persistedUser.banned ?? false,
-      banExpires: persistedUser.banExpires ?? null,
-    });
+    const gate = enforceMobileSignInGate(gateInputForUser(persistedUser));
 
     if (!gate.ok) {
       return c.json(
@@ -201,10 +254,26 @@ export function createAuthModule(options: AuthModuleOptions) {
     const existing = await options.refreshTokens.findActiveByHash(currentTokenHash);
 
     if (!existing) {
-      return c.json({ success: false, error: "Invalid refresh token" }, 401);
+      return invalidRefreshTokenResponse(c);
     }
 
-    const accessToken = await tokenService.signAccessToken(existing.userId);
+    const persistedUser = await options.users.findById(existing.userId);
+    if (!persistedUser) {
+      return invalidRefreshTokenResponse(c);
+    }
+
+    const gate = enforceMobileSignInGate(gateInputForUser(persistedUser));
+    if (!gate.ok) {
+      return c.json(
+        {
+          success: false,
+          error: gate.error,
+          errorCode: gate.errorCode,
+        },
+        gate.status,
+      );
+    }
+
     const nextRefreshToken = tokenService.createRefreshToken();
     const nextRefreshTokenHash = tokenService.hashRefreshToken(nextRefreshToken);
 
@@ -216,8 +285,10 @@ export function createAuthModule(options: AuthModuleOptions) {
     });
 
     if (!rotated) {
-      return c.json({ success: false, error: "Refresh token has already been used" }, 401);
+      return reusedRefreshTokenResponse(c);
     }
+
+    const accessToken = await tokenService.signAccessToken(existing.userId);
 
     return c.json({
       success: true,
