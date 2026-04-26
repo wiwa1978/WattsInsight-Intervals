@@ -449,6 +449,7 @@ export function createAdminRouter() {
           startDate: bodyData.startDate,
           endDate: bodyData.endDate,
           maxUses: bodyData.maxUses,
+          userIds: bodyData.userIds,
           status: bodyData.status,
         });
 
