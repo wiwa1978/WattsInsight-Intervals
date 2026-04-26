@@ -55,6 +55,8 @@ type VouchersServiceDeps = {
 
 type DbTransaction = any;
 
+const DEFAULT_ALL_USER_VOUCHER_MAX_REDEMPTIONS = 100_000;
+
 function getVoucherFailureMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
@@ -91,7 +93,7 @@ function getVoucherAssignmentState(
   const normalizedUserIds = getUniqueVoucherUserIds(userIds);
   const appliesToAllUsers = assignmentScope === "all";
   const nextMaxRedemptions = appliesToAllUsers
-    ? maxRedemptions ?? 1
+    ? maxRedemptions ?? DEFAULT_ALL_USER_VOUCHER_MAX_REDEMPTIONS
     : normalizedUserIds.length;
 
   return {
