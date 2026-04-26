@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { creditTransactions, userCredits, voucherRedemptions, vouchers } from "@platform/platform-db";
+
 import { createVouchersService } from "../../../src/modules/vouchers/service";
 
 describe("createVouchersService", () => {
@@ -77,5 +79,71 @@ describe("createVouchersService", () => {
 
     expect(result).toEqual({ success: true, voucher: updatedVoucher });
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ maxRedemptions: 3, status: "redeemed" }));
+  });
+
+  // Verifies committed redemptions are not reported as failed when only notification delivery fails.
+  it("treats post-redemption notification failures as non-fatal", async () => {
+    const voucher = {
+      id: "22222222-2222-4222-8222-222222222222",
+      code: "WELCOME",
+      creditAmount: 10,
+      status: "active",
+      currentRedemptions: 0,
+      maxRedemptions: 2,
+      appliesToAllUsers: true,
+      expiresAt: null,
+      redeemedAt: null,
+    };
+    const execute = vi.fn().mockResolvedValue([voucher]);
+    const findCredits = vi.fn().mockResolvedValueOnce({
+      userId: "33333333-3333-4333-8333-333333333333",
+      balance: "5",
+      totalPurchased: "0",
+      totalSpent: "0",
+    });
+    const insert = vi.fn().mockImplementation((table: unknown) => ({
+      values: vi.fn(() => {
+        if (table === voucherRedemptions) {
+          return {
+            onConflictDoNothing: vi.fn(() => ({
+              returning: vi.fn().mockResolvedValue([{ id: "redemption-1" }]),
+            })),
+          };
+        }
+
+        return Promise.resolve(undefined);
+      }),
+    }));
+    const update = vi.fn().mockImplementation((table: unknown) => ({
+      set: vi.fn(() => ({
+        where: vi.fn().mockResolvedValue(undefined),
+      })),
+    }));
+    const tx = {
+      execute,
+      query: {
+        userCredits: { findFirst: findCredits },
+      },
+      insert,
+      update,
+    };
+    const createNotification = vi.fn().mockRejectedValue(new Error("notification unavailable"));
+    const db = {
+      transaction: vi.fn(async (cb: (trx: unknown) => unknown) => cb(tx)),
+    };
+
+    const service = createVouchersService({
+      db,
+      notifications: { createNotification },
+    });
+
+    const result = await service.redeemVoucher("33333333-3333-4333-8333-333333333333", "welcome");
+
+    expect(result).toEqual({ success: true, creditsAdded: 10, newBalance: 15 });
+    expect(createNotification).toHaveBeenCalledOnce();
+    expect(insert).toHaveBeenCalledWith(voucherRedemptions);
+    expect(insert).toHaveBeenCalledWith(creditTransactions);
+    expect(update).toHaveBeenCalledWith(userCredits);
+    expect(update).toHaveBeenCalledWith(vouchers);
   });
 });
