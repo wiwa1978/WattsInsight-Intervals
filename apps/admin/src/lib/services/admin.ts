@@ -220,7 +220,7 @@ export async function unbanAdminUser(userId: string) {
   return unbanAdminUserApi(userId);
 }
 
-export async function banAdminUser(payload: { userId: string; banReason?: string; banExpiresIn?: number }) {
+export async function banAdminUser(payload: { userId: string; secret: string; banReason?: string; banExpiresIn?: number }) {
   return banAdminUserApi(payload);
 }
 

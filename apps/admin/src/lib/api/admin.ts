@@ -36,7 +36,7 @@ export async function unbanAdminUserApi(userId: string) {
   });
 }
 
-export async function banAdminUserApi(payload: { userId: string; banReason?: string; banExpiresIn?: number }) {
+export async function banAdminUserApi(payload: { userId: string; secret: string; banReason?: string; banExpiresIn?: number }) {
   return apiRequest<{ user?: unknown; error?: { message?: string } | string }>("/admin/users/ban", {
     method: "POST",
     body: JSON.stringify(payload),

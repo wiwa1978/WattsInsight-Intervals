@@ -62,6 +62,27 @@ const mocks = vi.hoisted(() => {
     searchUsers: vi.fn(),
     redeemVoucher: vi.fn(),
   };
+  const adminAuthApi = {
+    setRole: vi.fn(),
+    banUser: vi.fn(),
+    unbanUser: vi.fn(),
+    impersonateUser: vi.fn(),
+    revokeUserSessions: vi.fn(),
+    setUserPassword: vi.fn(),
+    stopImpersonating: vi.fn(),
+    generateOpenAPISchema: vi.fn(async () => ({
+      openapi: "3.1.0",
+      paths: {
+        "/auth/sign-in/email": {
+          post: {
+            summary: "Sign in with email and password",
+            responses: { "200": { description: "Signed in" } },
+          },
+        },
+      },
+      components: {},
+    })),
+  };
   const countries = [
     { id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" },
     { id: "country-be-en", name: "Belgium", code: "BE", language: "en" },
@@ -87,6 +108,7 @@ const mocks = vi.hoisted(() => {
     notificationsService,
     discountsService,
     vouchersService,
+    adminAuthApi,
     db,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
@@ -174,6 +196,7 @@ vi.mock("@platform/auth-core", () => ({
       router,
       sessionRouter: new Hono(),
       mobileRouter,
+      auth: { api: mocks.adminAuthApi },
       requireAuth: passThrough,
       requireAdmin: passThrough,
       requireAdminAccess: passThrough,
@@ -512,6 +535,27 @@ describe("API functional routes", () => {
     );
     expect(url.searchParams.get("metadata_userId")).toBe("auth-user");
     expect(url.searchParams.get("metadata_packageKey")).toBe("silver");
+    expect(url.searchParams.get("redirect_url")).toBe("http://localhost:3100/billing?success=true");
+    expect(url.searchParams.get("cancel_url")).toBe("http://localhost:3100/billing?cancel=true");
+  });
+
+  // Verifies checkout cannot be used as an open redirect to a third-party origin.
+  it("rejects checkout return URLs outside first-party origins", async () => {
+    const res = await app.request("/payments/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        packageKey: "silver",
+        successUrl: "https://evil.example/capture",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: "Invalid checkout return URL",
+      errorCode: "BAD_REQUEST",
+    });
   });
 
   // Verifies user detail endpoint returns 404 for unknown users.
@@ -710,6 +754,43 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(400);
     await expectValidationError(res, "Invalid secret payload");
+  });
+
+  // Verifies direct ban API calls cannot bypass the admin ban secret step-up.
+  it("requires a valid ban secret on the admin ban mutation", async () => {
+    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: false, error: "Invalid secret key provided." });
+
+    const res = await app.request("/admin/users/ban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: "11111111-1111-4111-8111-111111111111",
+        secret: "wrong-secret",
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "FORBIDDEN",
+    });
+    expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
+  });
+
+  // Verifies admin-set passwords follow the same minimum policy as normal password flows.
+  it("rejects weak admin-set passwords", async () => {
+    const res = await app.request("/admin/users/set-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId: "11111111-1111-4111-8111-111111111111",
+        newPassword: "short",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid password payload");
+    expect(mocks.adminAuthApi.setUserPassword).not.toHaveBeenCalled();
   });
 
   // Verifies discount code validation endpoint rejects malformed input.

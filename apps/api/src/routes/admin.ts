@@ -35,7 +35,7 @@ import {
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
-import { parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
+import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 import { logger } from "../observability/logger";
 
 function getAuthUser(c: Context<AppEnv>) {
@@ -208,8 +208,17 @@ export function createAdminRouter() {
     return requireAdminAuthApi().unbanUser({ body, headers });
   });
 
-  registerAdminAuthJsonAction("/users/ban", banUserSchema, "Invalid ban payload", (body, headers) => {
-    return requireAdminAuthApi().banUser({ body, headers });
+  router.post("/users/ban", (c) => {
+    return withJsonBody(c, banUserSchema, "Invalid ban payload", async (body) => {
+      const secretResult = await bootstrap.adminService.verifyAdminBanSecret(body.secret);
+      if (!secretResult.success) {
+        return forbidden(c, secretResult.error ?? "Invalid admin ban secret");
+      }
+
+      const { secret: _secret, ...banBody } = body;
+      const result = await requireAdminAuthApi().banUser({ body: banBody, headers: c.req.raw.headers });
+      return c.json(result);
+    });
   });
 
   registerAdminAuthResponseAction(
