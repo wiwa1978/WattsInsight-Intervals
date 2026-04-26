@@ -49,6 +49,34 @@ bun run dev
 - Swagger UI: `/api/swagger`
 - Scalar docs: `/api/docs`
 
+## Response Envelopes
+
+App-owned JSON endpoints use a small language-neutral envelope so web, admin,
+native, and future non-TypeScript API implementations can share one contract.
+
+Successful data responses:
+
+```json
+{ "success": true, "data": {} }
+```
+
+Error responses:
+
+```json
+{
+  "success": false,
+  "error": "Human-readable diagnostic message",
+  "errorCode": "STABLE_MACHINE_CODE",
+  "details": {},
+  "requestId": "request-id"
+}
+```
+
+`errorCode`, `details`, and `requestId` are optional in the wire schema while
+legacy unversioned routes are migrated. New app-owned errors should include a
+stable `errorCode`; API helpers also attach `requestId` when available and mirror
+it through the `x-request-id` response header.
+
 ## Environment
 
 Use `apps/api/.env.example` as the template.

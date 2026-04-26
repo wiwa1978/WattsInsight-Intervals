@@ -12,7 +12,7 @@ export function createSystemRouter() {
   const router = new Hono<AppEnv>();
 
   router.get("/health", (c) => {
-    return c.json({ success: true, data: { status: "ok" } });
+    return ok(c, { status: "ok" });
   });
 
   router.get("/countries", async (c) => {
