@@ -32,6 +32,28 @@ type BillingServiceDeps = {
 
 type PaymentStatus = "completed" | "pending" | "failed" | "refunded";
 
+type PaymentSnapshot = {
+  provider: "dodo";
+  customerId?: string;
+  packageKey: string;
+  priceExclVat: number;
+  priceInclVat: number;
+  vatAmount: number;
+  currency: string;
+};
+
+function buildPaymentSnapshot(args: PaymentSnapshot): PaymentSnapshot {
+  return {
+    provider: args.provider,
+    ...(args.customerId ? { customerId: args.customerId } : {}),
+    packageKey: args.packageKey,
+    priceExclVat: args.priceExclVat,
+    priceInclVat: args.priceInclVat,
+    vatAmount: args.vatAmount,
+    currency: args.currency,
+  };
+}
+
 async function getOrInitializeCredits(db: any, userId: string) {
   const existing = await db.query.userCredits.findFirst({
     where: (table: any, operators: any) => operators.eq(table.userId, userId),
@@ -96,6 +118,7 @@ export function createBillingService(deps: BillingServiceDeps) {
         bonusCredits: creditPurchases.bonusCredits,
         priceExclVat: creditPurchases.priceExclVat,
         priceInclVat: creditPurchases.priceInclVat,
+        paymentSnapshot: creditPurchases.paymentSnapshot,
         paymentStatus: creditPurchases.paymentStatus,
         paymentId: creditPurchases.paymentId,
         createdAt: creditPurchases.createdAt,
@@ -118,6 +141,10 @@ export function createBillingService(deps: BillingServiceDeps) {
       vatAmount: number;
       currency: string;
     },
+    snapshotData?: {
+      provider?: "dodo";
+      customerId?: string;
+    },
   ) {
     const pkg = creditPackages.find((item) => item.key === packageKey);
     if (!pkg) {
@@ -129,6 +156,15 @@ export function createBillingService(deps: BillingServiceDeps) {
     const priceInclVat = pricingData?.priceInclVat ?? creditPackage.price;
     const vatAmount = pricingData?.vatAmount ?? 0;
     const currency = pricingData?.currency ?? "EUR";
+    const paymentSnapshot = buildPaymentSnapshot({
+      provider: snapshotData?.provider ?? "dodo",
+      customerId: snapshotData?.customerId ?? dodoCustomerId,
+      packageKey,
+      priceExclVat,
+      priceInclVat,
+      vatAmount,
+      currency,
+    });
 
     return deps.db.transaction(async (tx: any) => {
       async function grantCredits(grantedAt: Date) {
@@ -211,6 +247,7 @@ export function createBillingService(deps: BillingServiceDeps) {
               vatAmount,
               currency,
               creditsGrantedAt,
+              paymentSnapshot,
               updatedAt: new Date(),
             })
             .where(eq(creditPurchases.id, existingPurchase.id));
@@ -225,6 +262,7 @@ export function createBillingService(deps: BillingServiceDeps) {
           paymentStatus,
           dodoCustomerId: nextDodoCustomerId,
           creditsGrantedAt,
+          paymentSnapshot,
         };
       }
 
@@ -246,6 +284,7 @@ export function createBillingService(deps: BillingServiceDeps) {
           dodoCustomerId,
           paymentStatus,
           creditsGrantedAt,
+          paymentSnapshot,
         })
         .returning();
 

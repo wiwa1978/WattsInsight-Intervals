@@ -22,6 +22,10 @@ export type PaymentEventHandlerDeps = {
         vatAmount: number;
         currency: string;
       },
+      snapshot: {
+        provider: "dodo";
+        customerId?: string;
+      },
     ) => Promise<unknown>;
     processCreditRefund: (paymentId: string, refundId?: string) => Promise<unknown>;
     processCreditDisputeLoss: (paymentId: string, disputeId?: string, disputeStatus?: string) => Promise<unknown>;
@@ -137,6 +141,10 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         priceInclVat: event.totalAmount,
         vatAmount: event.taxAmount,
         currency: event.currency,
+      },
+      {
+        provider: event.provider,
+        customerId: event.customerId,
       },
     );
   };

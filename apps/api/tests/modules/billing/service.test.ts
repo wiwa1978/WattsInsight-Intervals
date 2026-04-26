@@ -142,6 +142,16 @@ describe("createBillingService", () => {
     expect(purchase).toMatchObject({ id: "purchase-1", paymentStatus: "completed" });
     expect(inserts[0]?.values).toMatchObject({ paymentStatus: "completed" });
     expect((inserts[0]?.values as { creditsGrantedAt?: unknown }).creditsGrantedAt).toBeInstanceOf(Date);
+    expect(inserts[0]?.values).toMatchObject({
+      paymentSnapshot: {
+        provider: "dodo",
+        packageKey: "silver",
+        priceExclVat: 5000,
+        priceInclVat: 5000,
+        vatAmount: 0,
+        currency: "EUR",
+      },
+    });
     expect(updates).toHaveLength(1);
     expect(updates[0]?.table).toBe(userCredits);
     expect(notifications.createNotification).toHaveBeenCalledOnce();
@@ -190,6 +200,68 @@ describe("createBillingService", () => {
     expect(tx.update).not.toHaveBeenCalled();
     expect(tx.query.userCredits.findFirst).not.toHaveBeenCalled();
     expect(notifications.createNotification).not.toHaveBeenCalled();
+  });
+
+  // Verifies provider/customer/pricing snapshots are stored for accounting and support.
+  it("stores payment snapshots from provider data", async () => {
+    const purchaseValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: "purchase-snapshot", paymentStatus: "pending" }]),
+    });
+
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+        userCredits: {
+          findFirst: vi.fn(),
+        },
+      },
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: table === creditPurchases ? purchaseValues : vi.fn().mockResolvedValue(undefined),
+      })),
+      update: vi.fn(),
+    };
+
+    const service = createBillingService({
+      db: {
+        transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)),
+      } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    await service.processCreditPurchase(
+      "u1",
+      "silver",
+      "pay_snapshot",
+      "pending",
+      "cus_snapshot",
+      {
+        priceExclVat: 4000,
+        priceInclVat: 5000,
+        vatAmount: 1000,
+        currency: "EUR",
+      },
+      {
+        provider: "dodo",
+        customerId: "cus_snapshot",
+      },
+    );
+
+    expect(purchaseValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentSnapshot: {
+          provider: "dodo",
+          customerId: "cus_snapshot",
+          packageKey: "silver",
+          priceExclVat: 4000,
+          priceInclVat: 5000,
+          vatAmount: 1000,
+          currency: "EUR",
+        },
+      }),
+    );
   });
 
   // Verifies repeated payment events with the same paymentId are safely deduplicated.

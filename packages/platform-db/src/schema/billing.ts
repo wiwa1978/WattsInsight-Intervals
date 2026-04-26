@@ -84,6 +84,7 @@ export const creditPurchases = pgTable(
       .default("pending")
       .notNull(),
     creditsGrantedAt: timestamp("credits_granted_at", { withTimezone: true }),
+    paymentSnapshot: jsonb("payment_snapshot"),
     createdAt,
     updatedAt,
   },

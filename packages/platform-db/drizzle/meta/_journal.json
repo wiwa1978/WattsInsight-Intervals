@@ -22,6 +22,13 @@
       "when": 1777211840464,
       "tag": "0002_add_credits_granted_marker",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777225629953,
+      "tag": "0003_add_payment_snapshot",
+      "breakpoints": true
     }
   ]
 }
