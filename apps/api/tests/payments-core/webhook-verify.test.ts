@@ -212,6 +212,47 @@ describe("POST /webhooks/dodo response codes", () => {
     });
   });
 
+  it("200 normalizes failed payment payloads with checkout metadata", async () => {
+    const failedPayload = JSON.stringify({
+      id: "evt_failed_123",
+      type: "payment.failed",
+      data: {
+        payment_id: "pay_failed_123",
+        customer: { email: "buyer@example.com", customer_id: "cus_failed" },
+        product_cart: [{ product_id: "prod_credits_100" }],
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+        settlement_amount: 1000,
+        settlement_tax: 100,
+        settlement_currency: "EUR",
+      },
+    });
+    const { app, onPaymentEvent } = build();
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(failedPayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: failedPayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(onPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "dodo",
+        providerEventId: "evt_failed_123",
+        eventType: "payment.failed",
+        paymentId: "pay_failed_123",
+        customerId: "cus_failed",
+        productId: "prod_credits_100",
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+        currency: "EUR",
+        totalAmount: 1000,
+        taxAmount: 100,
+      }),
+    );
+  });
+
   it("200 skips duplicate events already recorded as processed", async () => {
     const store = {
       claim: vi.fn(async () => ({ claimed: false as const, status: "processed" as const })),

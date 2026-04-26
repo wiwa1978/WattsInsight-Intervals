@@ -232,6 +232,47 @@ describe("createBillingService", () => {
     expect(notifications.createNotification).not.toHaveBeenCalled();
   });
 
+  // Verifies later failed events cannot downgrade a purchase that already granted credits.
+  it("does not mark credited completed purchases as failed", async () => {
+    const alreadyGrantedAt = new Date("2026-01-01T00:00:00Z");
+    const existingPurchase = {
+      id: "existing-completed",
+      userId: "u1",
+      paymentId: "pay_completed",
+      paymentStatus: "completed",
+      creditsGrantedAt: alreadyGrantedAt,
+    };
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce(existingPurchase),
+        },
+        userCredits: {
+          findFirst: vi.fn(),
+        },
+      },
+      insert: vi.fn(),
+      update: vi.fn(),
+    };
+
+    const notifications = { createNotification: vi.fn() };
+    const service = createBillingService({
+      db: {
+        transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)),
+      } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications,
+    });
+
+    const result = await service.processCreditPurchase("u1", "silver", "pay_completed", "failed");
+
+    expect(result).toBe(existingPurchase);
+    expect(tx.insert).not.toHaveBeenCalled();
+    expect(tx.update).not.toHaveBeenCalled();
+    expect(tx.query.userCredits.findFirst).not.toHaveBeenCalled();
+    expect(notifications.createNotification).not.toHaveBeenCalled();
+  });
+
   // Verifies a pending purchase receives credits on its first completed transition only.
   it("grants credits once when an existing pending purchase completes", async () => {
     const notifications = { createNotification: vi.fn().mockResolvedValue(undefined) };

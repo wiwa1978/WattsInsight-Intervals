@@ -34,11 +34,28 @@ const paymentFailedSchema = z.object({
   id: z.string().min(1).optional(),
   event_id: z.string().min(1).optional(),
   type: z.literal("payment.failed"),
-  data: z
-    .object({
-      payment_id: z.string().min(1).optional(),
-    })
-    .optional(),
+  data: z.object({
+    payment_id: z.string().min(1),
+    metadata: z.record(z.string(), z.string()).optional(),
+    customer: z
+      .object({
+        email: z.string().email().optional(),
+        customer_id: z.string().min(1).optional(),
+      })
+      .optional(),
+    product_cart: z
+      .array(
+        z.object({
+          product_id: z.string().min(1),
+        }),
+      )
+      .optional(),
+    settlement_amount: z.number().optional(),
+    total_amount: z.number().optional(),
+    settlement_tax: z.number().optional(),
+    tax: z.number().optional(),
+    settlement_currency: z.string().optional(),
+  }),
 });
 
 const baseSchema = z.object({
@@ -83,11 +100,19 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
       return null;
     }
 
+    const data = failed.data.data;
     return {
       provider: "dodo",
       providerEventId: failed.data.id ?? failed.data.event_id,
       eventType: "payment.failed",
-      paymentId: failed.data.data?.payment_id ?? "unknown",
+      paymentId: data.payment_id,
+      customerEmail: data.customer?.email,
+      customerId: data.customer?.customer_id,
+      productId: data.product_cart?.[0]?.product_id,
+      metadata: data.metadata,
+      currency: data.settlement_currency,
+      totalAmount: data.settlement_amount ?? data.total_amount,
+      taxAmount: data.settlement_tax ?? data.tax,
       raw: payload,
     };
   }
