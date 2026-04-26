@@ -453,12 +453,15 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       return discountSuccess({ message: "All selected users already have this discount" });
     }
 
-    await deps.db.insert(userDiscounts).values(
-      newIds.map((userId) => ({
-        discountId,
-        userId,
-      })),
-    );
+    await deps.db
+      .insert(userDiscounts)
+      .values(
+        newIds.map((userId) => ({
+          discountId,
+          userId,
+        })),
+      )
+      .onConflictDoNothing();
 
     return discountSuccess({ assignedCount: newIds.length });
   }
