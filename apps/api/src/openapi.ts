@@ -218,25 +218,25 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("post", "/payments/checkout", ["Payments"], "Create a checkout session for credit purchase", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(createCheckoutRequestSchema),
-    responses: defaultResponses("Checkout session created", ["400", "401"]),
+    responses: defaultResponses("Checkout session created", ["400", "401", "413", "429"]),
   }),
   route("post", "/payments/webhooks/dodo", ["Payments"], "Receive Dodo webhook events", {
     parameters: [headerParameter("x-dodo-signature", z.string(), true)],
     requestBody: requestBody(genericObjectSchema),
-    responses: defaultResponses("Webhook processed", ["400", "401"]),
+    responses: defaultResponses("Webhook processed", ["400", "401", "413"]),
   }),
 
   route("post", "/auth/mobile/token", ["Auth"], "Create native-client access and refresh tokens", {
     requestBody: requestBody(mobileTokenRequestSchema),
-    responses: defaultResponses("Tokens issued", ["400", "401", "403"]),
+    responses: defaultResponses("Tokens issued", ["400", "401", "403", "413", "429"]),
   }),
   route("post", "/auth/mobile/refresh", ["Auth"], "Rotate mobile refresh token and issue new access token", {
     requestBody: requestBody(mobileRefreshRequestSchema),
-    responses: defaultResponses("Token rotated", ["400", "401"]),
+    responses: defaultResponses("Token rotated", ["400", "401", "413", "429"]),
   }),
   route("post", "/auth/mobile/revoke", ["Auth"], "Revoke a mobile refresh token", {
     requestBody: requestBody(mobileRevokeRequestSchema),
-    responses: defaultResponses("Token revoked", ["400"]),
+    responses: defaultResponses("Token revoked", ["400", "413", "429"]),
   }),
   route("post", "/auth/admin/stop-impersonating", ["Auth"], "Stop admin impersonation", {
     security: cookieOrBearerAuth,
@@ -281,7 +281,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("post", "/me/vouchers/redeem", ["Me"], "Redeem a voucher", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(redeemVoucherSchema),
-    responses: defaultResponses("Voucher redeemed", ["400", "401"]),
+    responses: defaultResponses("Voucher redeemed", ["400", "401", "413", "429"]),
   }),
   route("get", "/me/notifications", ["Me"], "List current user notifications", {
     security: cookieOrBearerAuth,
@@ -318,7 +318,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("post", "/admin/verify-ban-secret", ["Admin"], "Verify admin ban secret", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(verifyBanSecretSchema),
-    responses: defaultResponses("Ban secret verified", ["400", "401", "403"]),
+    responses: defaultResponses("Ban secret verified", ["400", "401", "403", "413"]),
   }),
   route("get", "/admin/dashboard/stats", ["Admin"], "Get admin dashboard statistics", {
     security: cookieOrBearerAuth,

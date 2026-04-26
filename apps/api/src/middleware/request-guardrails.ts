@@ -1,0 +1,164 @@
+import type { MiddlewareHandler } from "hono";
+
+import { errorCode } from "@platform/contracts/wire";
+
+import type { AppEnv } from "../context";
+
+type RateLimitRule = {
+  windowMs: number;
+  max: number;
+};
+
+type RouteGuardrail = {
+  method: string;
+  pattern: RegExp;
+  maxBodyBytes?: number;
+  rateLimit?: RateLimitRule;
+};
+
+const KIB = 1024;
+const DEFAULT_JSON_BODY_BYTES = 64 * KIB;
+const DEFAULT_WEBHOOK_BODY_BYTES = 256 * KIB;
+
+const routeGuardrails: RouteGuardrail[] = [
+  { method: "POST", pattern: /^\/auth\/sign-in\/email$/, maxBodyBytes: 8 * KIB, rateLimit: { windowMs: 60_000, max: 20 } },
+  { method: "POST", pattern: /^\/auth\/mobile\/token$/, maxBodyBytes: 8 * KIB, rateLimit: { windowMs: 60_000, max: 20 } },
+  { method: "POST", pattern: /^\/auth\/mobile\/refresh$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 60 } },
+  { method: "POST", pattern: /^\/auth\/mobile\/revoke$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 60 } },
+  { method: "POST", pattern: /^\/payments\/checkout$/, maxBodyBytes: 8 * KIB, rateLimit: { windowMs: 60_000, max: 30 } },
+  { method: "POST", pattern: /^\/payments\/webhooks\/dodo$/, maxBodyBytes: DEFAULT_WEBHOOK_BODY_BYTES },
+  { method: "POST", pattern: /^\/me\/vouchers\/redeem$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 20 } },
+  { method: "POST", pattern: /^\/logs\/client$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 30 } },
+];
+
+const buckets = new Map<string, { count: number; resetAt: number }>();
+
+function getClientIp(c: Parameters<MiddlewareHandler<AppEnv>>[0]) {
+  const forwardedFor = c.req.header("x-forwarded-for");
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  }
+
+  return c.req.header("x-real-ip") ?? "unknown";
+}
+
+function findGuardrail(method: string, path: string) {
+  return routeGuardrails.find((guardrail) => guardrail.method === method && guardrail.pattern.test(path));
+}
+
+function checkRateLimit(key: string, rule: RateLimitRule) {
+  const now = Date.now();
+  const bucket = buckets.get(key);
+
+  if (!bucket || bucket.resetAt <= now) {
+    buckets.set(key, { count: 1, resetAt: now + rule.windowMs });
+    return { allowed: true, remaining: rule.max - 1, retryAfterSeconds: Math.ceil(rule.windowMs / 1000) };
+  }
+
+  if (bucket.count >= rule.max) {
+    return { allowed: false, remaining: 0, retryAfterSeconds: Math.ceil((bucket.resetAt - now) / 1000) };
+  }
+
+  bucket.count += 1;
+  return { allowed: true, remaining: rule.max - bucket.count, retryAfterSeconds: Math.ceil((bucket.resetAt - now) / 1000) };
+}
+
+function tooLarge(c: Parameters<MiddlewareHandler<AppEnv>>[0]) {
+  return c.json(
+    {
+      success: false,
+      error: "Payload too large",
+      errorCode: errorCode.payloadTooLarge,
+    },
+    413,
+  );
+}
+
+function rateLimited(c: Parameters<MiddlewareHandler<AppEnv>>[0], retryAfterSeconds: number) {
+  c.header("retry-after", String(retryAfterSeconds));
+  return c.json(
+    {
+      success: false,
+      error: "Too many requests",
+      errorCode: errorCode.rateLimited,
+    },
+    429,
+  );
+}
+
+async function checkBodyLimit(request: Request, maxBodyBytes: number) {
+  if (!request.body) {
+    return false;
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytesRead = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      bytesRead += value.byteLength;
+      if (bytesRead > maxBodyBytes) {
+        return true;
+      }
+
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(bytesRead) as Uint8Array<ArrayBuffer>;
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return new Request(request, { body, duplex: "half" } as RequestInit & { duplex: "half" });
+}
+
+export const requestGuardrails: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const method = c.req.method.toUpperCase();
+  const contentType = c.req.header("content-type") ?? "";
+  const guardrail = findGuardrail(method, c.req.path);
+  const maxBodyBytes = guardrail?.maxBodyBytes ?? (method === "POST" && contentType.includes("application/json") ? DEFAULT_JSON_BODY_BYTES : undefined);
+
+  if (maxBodyBytes !== undefined && method !== "GET" && method !== "HEAD") {
+    const contentLengthHeader = c.req.header("content-length");
+    if (contentLengthHeader) {
+      const contentLength = Number(contentLengthHeader);
+      if (Number.isFinite(contentLength) && contentLength > maxBodyBytes) {
+        return tooLarge(c);
+      }
+    } else if (c.req.raw.body) {
+      const checkedRequest = await checkBodyLimit(c.req.raw, maxBodyBytes);
+      if (checkedRequest === true) {
+        return tooLarge(c);
+      }
+
+      if (checkedRequest) {
+        c.req.raw = checkedRequest;
+      }
+    }
+  }
+
+  if (guardrail?.rateLimit) {
+    const key = `${method}:${c.req.path}:${getClientIp(c)}`;
+    const rateLimit = checkRateLimit(key, guardrail.rateLimit);
+    c.header("x-ratelimit-remaining", String(rateLimit.remaining));
+
+    if (!rateLimit.allowed) {
+      return rateLimited(c, rateLimit.retryAfterSeconds);
+    }
+  }
+
+  await next();
+};
+
+export function clearRequestGuardrailStateForTests() {
+  buckets.clear();
+}

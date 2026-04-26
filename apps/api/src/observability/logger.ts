@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { env } from "../env";
+import { redactLogValue } from "./redaction";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogStream = "app" | "audit";
@@ -33,8 +34,8 @@ function serialize(value: unknown): unknown {
   if (value instanceof Error) {
     return {
       name: value.name,
-      message: value.message,
-      stack: value.stack,
+      message: redactLogValue(value.message),
+      stack: value.stack ? redactLogValue(value.stack) : undefined,
       cause: serialize(value.cause),
     };
   }
@@ -44,30 +45,34 @@ function serialize(value: unknown): unknown {
   }
 
   if (isRecord(value)) {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, serialize(entry)]));
+    return redactLogValue(Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, serialize(entry)])));
   }
 
-  return String(value);
+  return redactLogValue(String(value));
 }
 
 function normalizeArgs(arg1?: unknown, arg2?: unknown) {
   if (typeof arg1 === "string") {
     return {
-      message: arg1,
-      metadata: isRecord(arg2) ? arg2 : arg2 === undefined ? {} : { value: serialize(arg2) },
+      message: redactLogValue(arg1) as string,
+      metadata: isRecord(arg2)
+        ? (redactLogValue(serialize(arg2)) as LogMetadata)
+        : arg2 === undefined
+          ? {}
+          : { value: redactLogValue(serialize(arg2)) },
     };
   }
 
   if (isRecord(arg1)) {
     return {
-      message: typeof arg2 === "string" ? arg2 : "log",
-      metadata: serialize(arg1) as LogMetadata,
+      message: typeof arg2 === "string" ? (redactLogValue(arg2) as string) : "log",
+      metadata: redactLogValue(serialize(arg1)) as LogMetadata,
     };
   }
 
   return {
-    message: typeof arg2 === "string" ? arg2 : "log",
-    metadata: arg1 === undefined ? {} : { value: serialize(arg1) },
+    message: typeof arg2 === "string" ? (redactLogValue(arg2) as string) : "log",
+    metadata: arg1 === undefined ? {} : { value: redactLogValue(serialize(arg1)) },
   };
 }
 
