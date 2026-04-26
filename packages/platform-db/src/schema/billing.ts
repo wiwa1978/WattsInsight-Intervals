@@ -83,6 +83,7 @@ export const creditPurchases = pgTable(
       .$type<"pending" | "completed" | "failed" | "refunded">()
       .default("pending")
       .notNull(),
+    creditsGrantedAt: timestamp("credits_granted_at", { withTimezone: true }),
     createdAt,
     updatedAt,
   },

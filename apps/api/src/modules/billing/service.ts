@@ -29,6 +29,8 @@ type BillingServiceDeps = {
   };
 };
 
+type PaymentStatus = "completed" | "pending" | "failed" | "refunded";
+
 async function getOrInitializeCredits(db: any, userId: string) {
   const existing = await db.query.userCredits.findFirst({
     where: (table: any, operators: any) => operators.eq(table.userId, userId),
@@ -107,7 +109,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     userId: string,
     packageKey: string,
     paymentId: string,
-    paymentStatus: "completed" | "pending" | "failed",
+    paymentStatus: PaymentStatus,
     dodoCustomerId?: string,
     pricingData?: {
       priceExclVat: number;
@@ -120,57 +122,17 @@ export function createBillingService(deps: BillingServiceDeps) {
     if (!pkg) {
       throw new Error(`Credit package not found: ${packageKey}`);
     }
+    const creditPackage = pkg;
 
-    const priceExclVat = pricingData?.priceExclVat ?? pkg.price;
-    const priceInclVat = pricingData?.priceInclVat ?? pkg.price;
+    const priceExclVat = pricingData?.priceExclVat ?? creditPackage.price;
+    const priceInclVat = pricingData?.priceInclVat ?? creditPackage.price;
     const vatAmount = pricingData?.vatAmount ?? 0;
     const currency = pricingData?.currency ?? "EUR";
 
     return deps.db.transaction(async (tx: any) => {
-      const existingPurchase = await tx.query.creditPurchases.findFirst({
-        where: eq(creditPurchases.paymentId, paymentId),
-      });
-
-      if (existingPurchase) {
-        if (existingPurchase.userId !== userId) {
-          throw new Error(`Payment ${paymentId} is already associated with another user`);
-        }
-
-        if (existingPurchase.paymentStatus !== paymentStatus || dodoCustomerId) {
-          await tx
-            .update(creditPurchases)
-            .set({
-              paymentStatus,
-              dodoCustomerId: dodoCustomerId ?? existingPurchase.dodoCustomerId,
-              updatedAt: new Date(),
-            })
-            .where(eq(creditPurchases.id, existingPurchase.id));
-        }
-
-        return existingPurchase;
-      }
-
-      const [purchase] = await tx
-        .insert(creditPurchases)
-        .values({
-          userId,
-          packageKey,
-          credits: pkg.credits,
-          bonusCredits: "bonus" in pkg ? pkg.bonus : 0,
-          price: priceInclVat,
-          priceExclVat,
-          priceInclVat,
-          vatAmount,
-          currency,
-          paymentId,
-          dodoCustomerId,
-          paymentStatus,
-        })
-        .returning();
-
-      if (paymentStatus === "completed") {
-        const baseCredits = pkg.credits;
-        const bonusCredits = "bonus" in pkg ? pkg.bonus : 0;
+      async function grantCredits(grantedAt: Date) {
+        const baseCredits = creditPackage.credits;
+        const bonusCredits = "bonus" in creditPackage ? creditPackage.bonus : 0;
         const totalCredits = baseCredits + bonusCredits;
         const current = await getOrInitializeCredits(tx, userId);
         const newBalance = Number(current.balance) + totalCredits;
@@ -180,7 +142,7 @@ export function createBillingService(deps: BillingServiceDeps) {
           .set({
             balance: newBalance.toString(),
             totalPurchased: (Number(current.totalPurchased) + baseCredits).toString(),
-            updatedAt: new Date(),
+            updatedAt: grantedAt,
           })
           .where(eq(userCredits.userId, userId));
 
@@ -201,7 +163,7 @@ export function createBillingService(deps: BillingServiceDeps) {
             description: `Bonus credits for ${packageKey.charAt(0).toUpperCase() + packageKey.slice(1)}`,
             referenceId: paymentId,
             balanceAfter: newBalance.toString(),
-            createdAt: new Date(Date.now() + 1),
+            createdAt: new Date(grantedAt.getTime() + 1),
           });
         }
 
@@ -217,6 +179,73 @@ export function createBillingService(deps: BillingServiceDeps) {
             currency,
           },
         });
+      }
+
+      const existingPurchase = await tx.query.creditPurchases.findFirst({
+        where: eq(creditPurchases.paymentId, paymentId),
+      });
+
+      if (existingPurchase) {
+        if (existingPurchase.userId !== userId) {
+          throw new Error(`Payment ${paymentId} is already associated with another user`);
+        }
+
+        const shouldGrantCredits = paymentStatus === "completed" && !existingPurchase.creditsGrantedAt;
+        const creditsGrantedAt = shouldGrantCredits ? new Date() : existingPurchase.creditsGrantedAt;
+        const nextDodoCustomerId = dodoCustomerId ?? existingPurchase.dodoCustomerId;
+
+        if (existingPurchase.paymentStatus !== paymentStatus || dodoCustomerId || shouldGrantCredits || pricingData) {
+          await tx
+            .update(creditPurchases)
+            .set({
+              paymentStatus,
+              dodoCustomerId: nextDodoCustomerId,
+              price: priceInclVat,
+              priceExclVat,
+              priceInclVat,
+              vatAmount,
+              currency,
+              creditsGrantedAt,
+              updatedAt: new Date(),
+            })
+            .where(eq(creditPurchases.id, existingPurchase.id));
+        }
+
+        if (shouldGrantCredits) {
+          await grantCredits(creditsGrantedAt);
+        }
+
+        return {
+          ...existingPurchase,
+          paymentStatus,
+          dodoCustomerId: nextDodoCustomerId,
+          creditsGrantedAt,
+        };
+      }
+
+      const creditsGrantedAt = paymentStatus === "completed" ? new Date() : null;
+
+      const [purchase] = await tx
+        .insert(creditPurchases)
+        .values({
+          userId,
+          packageKey,
+          credits: creditPackage.credits,
+          bonusCredits: "bonus" in creditPackage ? creditPackage.bonus : 0,
+          price: priceInclVat,
+          priceExclVat,
+          priceInclVat,
+          vatAmount,
+          currency,
+          paymentId,
+          dodoCustomerId,
+          paymentStatus,
+          creditsGrantedAt,
+        })
+        .returning();
+
+      if (creditsGrantedAt) {
+        await grantCredits(creditsGrantedAt);
       }
 
       return purchase;

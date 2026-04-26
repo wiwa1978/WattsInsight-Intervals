@@ -140,6 +140,8 @@ describe("createBillingService", () => {
     const purchase = await service.processCreditPurchase("u1", "silver", "pay_1", "completed");
 
     expect(purchase).toMatchObject({ id: "purchase-1", paymentStatus: "completed" });
+    expect(inserts[0]?.values).toMatchObject({ paymentStatus: "completed" });
+    expect((inserts[0]?.values as { creditsGrantedAt?: unknown }).creditsGrantedAt).toBeInstanceOf(Date);
     expect(updates).toHaveLength(1);
     expect(updates[0]?.table).toBe(userCredits);
     expect(notifications.createNotification).toHaveBeenCalledOnce();
@@ -152,6 +154,10 @@ describe("createBillingService", () => {
 
   // Verifies pending purchases do not mutate balances or produce side effects.
   it("does not mutate credits for pending purchases", async () => {
+    const purchaseValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: "purchase-pending", paymentStatus: "pending" }]),
+    });
+
     const tx = {
       query: {
         creditPurchases: {
@@ -162,14 +168,7 @@ describe("createBillingService", () => {
         },
       },
       insert: vi.fn().mockImplementation((table: unknown) => ({
-        values: vi.fn(() => {
-          if (table === creditPurchases) {
-            return {
-              returning: vi.fn().mockResolvedValue([{ id: "purchase-pending", paymentStatus: "pending" }]),
-            };
-          }
-          return Promise.resolve(undefined);
-        }),
+        values: table === creditPurchases ? purchaseValues : vi.fn().mockResolvedValue(undefined),
       })),
       update: vi.fn(),
     };
@@ -187,6 +186,7 @@ describe("createBillingService", () => {
     const purchase = await service.processCreditPurchase("u1", "silver", "pay_2", "pending");
 
     expect(purchase).toMatchObject({ id: "purchase-pending", paymentStatus: "pending" });
+    expect(purchaseValues).toHaveBeenCalledWith(expect.objectContaining({ creditsGrantedAt: null }));
     expect(tx.update).not.toHaveBeenCalled();
     expect(tx.query.userCredits.findFirst).not.toHaveBeenCalled();
     expect(notifications.createNotification).not.toHaveBeenCalled();
@@ -194,6 +194,7 @@ describe("createBillingService", () => {
 
   // Verifies repeated payment events with the same paymentId are safely deduplicated.
   it("is idempotent for same paymentId and does not double-credit", async () => {
+    const alreadyGrantedAt = new Date("2026-01-01T00:00:00Z");
     const tx = {
       query: {
         creditPurchases: {
@@ -202,6 +203,7 @@ describe("createBillingService", () => {
             userId: "u1",
             paymentId: "pay_dup",
             paymentStatus: "completed",
+            creditsGrantedAt: alreadyGrantedAt,
           }),
         },
         userCredits: {
@@ -223,11 +225,70 @@ describe("createBillingService", () => {
 
     const result = await service.processCreditPurchase("u1", "silver", "pay_dup", "completed");
 
-    expect(result).toMatchObject({ id: "existing-purchase", paymentId: "pay_dup" });
+    expect(result).toMatchObject({ id: "existing-purchase", paymentId: "pay_dup", creditsGrantedAt: alreadyGrantedAt });
     expect(tx.insert).not.toHaveBeenCalled();
     expect(tx.update).not.toHaveBeenCalled();
     expect(tx.query.userCredits.findFirst).not.toHaveBeenCalled();
     expect(notifications.createNotification).not.toHaveBeenCalled();
+  });
+
+  // Verifies a pending purchase receives credits on its first completed transition only.
+  it("grants credits once when an existing pending purchase completes", async () => {
+    const notifications = { createNotification: vi.fn().mockResolvedValue(undefined) };
+    const inserts: Array<{ table: unknown; values: unknown }> = [];
+    const updates: Array<{ table: unknown; set: unknown }> = [];
+
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce({
+            id: "existing-pending",
+            userId: "u1",
+            paymentId: "pay_pending",
+            paymentStatus: "pending",
+            dodoCustomerId: null,
+            creditsGrantedAt: null,
+          }),
+        },
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "10", totalPurchased: "20", totalSpent: "0" }),
+        },
+      },
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn((values: unknown) => {
+          inserts.push({ table, values });
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: vi.fn().mockImplementation((table: unknown) => ({
+        set: vi.fn((set: unknown) => {
+          updates.push({ table, set });
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        }),
+      })),
+    };
+
+    const service = createBillingService({
+      db: {
+        transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)),
+      } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications,
+    });
+
+    const result = await service.processCreditPurchase("u1", "silver", "pay_pending", "completed");
+
+    expect(result).toMatchObject({ id: "existing-pending", paymentStatus: "completed" });
+    expect(result.creditsGrantedAt).toBeInstanceOf(Date);
+    expect(updates).toHaveLength(2);
+    expect(updates[0]?.table).toBe(creditPurchases);
+    expect(updates[0]?.set).toMatchObject({ paymentStatus: "completed" });
+    expect((updates[0]?.set as { creditsGrantedAt?: unknown }).creditsGrantedAt).toBeInstanceOf(Date);
+    expect(updates[1]?.table).toBe(userCredits);
+
+    const transactionInserts = inserts.filter((entry) => entry.table === creditTransactions);
+    expect(transactionInserts).toHaveLength(2);
+    expect(notifications.createNotification).toHaveBeenCalledOnce();
   });
 
   // Verifies invalid package keys fail fast before any persistence call.

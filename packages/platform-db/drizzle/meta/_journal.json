@@ -15,6 +15,13 @@
       "when": 1777210168221,
       "tag": "0001_add_payment_webhook_events",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777211840464,
+      "tag": "0002_add_credits_granted_marker",
+      "breakpoints": true
     }
   ]
 }
