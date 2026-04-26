@@ -19,6 +19,7 @@ function sign(body: string, timestampSeconds: number, secret = SECRET) {
 }
 
 const samplePayload = JSON.stringify({
+  id: "evt_test_123",
   type: "payment.succeeded",
   data: {
     payment_id: "pay_test_123",
@@ -112,15 +113,16 @@ describe("verifyDodoWebhookSignatureDetailed", () => {
 
 describe("POST /webhooks/dodo response codes", () => {
   function build(opts?: Partial<Parameters<typeof createPaymentsModule>[0]>) {
-    const onPaymentEvent = vi.fn<(event: NormalizedPaymentEvent) => Promise<void>>(
-      async () => {},
-    );
+    const onPaymentEvent =
+      opts?.onPaymentEvent ??
+      vi.fn<(event: NormalizedPaymentEvent) => Promise<void>>(async () => {});
     const module = createPaymentsModule({
       dodoWebhookSecret: SECRET,
       onPaymentEvent,
       ...opts,
     });
     const app = new Hono();
+    app.onError((_, c) => c.text("Internal Server Error", 500));
     app.route("/", module.router);
     return { app, onPaymentEvent };
   }
@@ -204,9 +206,122 @@ describe("POST /webhooks/dodo response codes", () => {
     const firstCall = onPaymentEvent.mock.calls[0];
     expect(firstCall?.[0]).toMatchObject({
       provider: "dodo",
+      providerEventId: "evt_test_123",
       eventType: "payment.succeeded",
       paymentId: "pay_test_123",
     });
+  });
+
+  it("200 skips duplicate events already recorded as processed", async () => {
+    const store = {
+      claim: vi.fn(async () => ({ claimed: false as const, status: "processed" as const })),
+      markProcessed: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const { app, onPaymentEvent } = build({ webhookEventStore: store });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(samplePayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: samplePayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { processed: false, duplicate: true, status: "processed" } });
+    expect(store.claim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "dodo",
+        providerEventId: "evt_test_123",
+        eventType: "payment.succeeded",
+        paymentId: "pay_test_123",
+      }),
+    );
+    expect(onPaymentEvent).not.toHaveBeenCalled();
+    expect(store.markProcessed).not.toHaveBeenCalled();
+    expect(store.markFailed).not.toHaveBeenCalled();
+  });
+
+  it("400 rejects DB-backed webhook processing without a provider event id", async () => {
+    const store = {
+      claim: vi.fn(async () => ({ claimed: true as const })),
+      markProcessed: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const { app, onPaymentEvent } = build({ webhookEventStore: store });
+    const payloadWithoutEventId = JSON.stringify({
+      type: "payment.succeeded",
+      data: {
+        payment_id: "pay_without_event_id",
+        customer: { email: "buyer@example.com" },
+        product_cart: [{ product_id: "prod_credits_100" }],
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+      },
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(payloadWithoutEventId, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: payloadWithoutEventId,
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: "Missing webhook event id" });
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(onPaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("marks claimed events processed after handler success", async () => {
+    const store = {
+      claim: vi.fn(async () => ({ claimed: true as const })),
+      markProcessed: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const { app, onPaymentEvent } = build({ webhookEventStore: store });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(samplePayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: samplePayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(onPaymentEvent).toHaveBeenCalledOnce();
+    expect(store.markProcessed).toHaveBeenCalledWith({ provider: "dodo", providerEventId: "evt_test_123" });
+    expect(store.markFailed).not.toHaveBeenCalled();
+  });
+
+  it("marks claimed events failed when handler throws", async () => {
+    const handlerError = new Error("boom");
+    const store = {
+      claim: vi.fn(async () => ({ claimed: true as const })),
+      markProcessed: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const { app, onPaymentEvent } = build({
+      webhookEventStore: store,
+      onPaymentEvent: vi.fn(async () => {
+        throw handlerError;
+      }),
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(samplePayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: samplePayload,
+    });
+
+    expect(res.status).toBe(500);
+    expect(onPaymentEvent).toHaveBeenCalledOnce();
+    expect(store.markProcessed).not.toHaveBeenCalled();
+    expect(store.markFailed).toHaveBeenCalledWith({ provider: "dodo", providerEventId: "evt_test_123", error: handlerError });
   });
 
   it("legacy boolean-returning verifier still works (backward compat)", async () => {
