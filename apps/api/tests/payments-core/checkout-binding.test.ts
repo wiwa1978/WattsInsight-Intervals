@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { NormalizedPaymentEvent } from "@platform/payments-core";
+
 import { buildDodoCheckoutUrl } from "../../src/lib/dodo-checkout";
 import { createPaymentEventHandler } from "../../src/modules/billing/payment-event-handler";
 import { creditPackages } from "../../src/config/billing";
@@ -67,6 +69,19 @@ describe("buildDodoCheckoutUrl", () => {
 
 describe("createPaymentEventHandler", () => {
   const samplePackage = creditPackages[0];
+
+  const validPaymentEvent = (overrides: Partial<NormalizedPaymentEvent> = {}): NormalizedPaymentEvent => ({
+    provider: "dodo",
+    eventType: "payment.succeeded",
+    paymentId: "pay_valid",
+    productId: samplePackage.productId,
+    metadata: { userId: "real-user-id" },
+    currency: "EUR",
+    totalAmount: samplePackage.price,
+    taxAmount: 200,
+    raw: {},
+    ...overrides,
+  });
 
   function makeDeps(overrides?: {
     findUser?: (id: string) => Promise<{ id: string } | null>;
@@ -137,8 +152,8 @@ describe("createPaymentEventHandler", () => {
       customerEmail: "attacker@example.com",
       customerId: "cus_abc",
       metadata: { userId: "real-user-id" },
-      currency: "USD",
-      totalAmount: 1200,
+      currency: "EUR",
+      totalAmount: samplePackage.price,
       taxAmount: 200,
       raw: {},
     });
@@ -151,12 +166,72 @@ describe("createPaymentEventHandler", () => {
       "completed",
       "cus_abc",
       {
-        priceExclVat: 1000,
-        priceInclVat: 1200,
+        priceExclVat: samplePackage.price - 200,
+        priceInclVat: samplePackage.price,
         vatAmount: 200,
-        currency: "USD",
+        currency: "EUR",
       },
     );
+  });
+
+  it("refuses payment.succeeded without currency", async () => {
+    const { handler, processCreditPurchase } = makeDeps();
+
+    await expect(handler(validPaymentEvent({ paymentId: "pay_no_currency", currency: undefined }))).rejects.toThrow(
+      /currency missing/,
+    );
+
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("refuses payment.succeeded with unexpected currency", async () => {
+    const { handler, processCreditPurchase } = makeDeps();
+
+    await expect(handler(validPaymentEvent({ paymentId: "pay_usd", currency: "USD" }))).rejects.toThrow(
+      /expected EUR, received USD/,
+    );
+
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("refuses payment.succeeded without total amount", async () => {
+    const { handler, processCreditPurchase } = makeDeps();
+
+    await expect(handler(validPaymentEvent({ paymentId: "pay_no_total", totalAmount: undefined }))).rejects.toThrow(
+      /invalid total amount/,
+    );
+
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("refuses payment.succeeded when amount does not match package price", async () => {
+    const { handler, processCreditPurchase } = makeDeps();
+
+    await expect(handler(validPaymentEvent({ paymentId: "pay_wrong_amount", totalAmount: samplePackage.price - 1 }))).rejects.toThrow(
+      /expected amount/,
+    );
+
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("refuses payment.succeeded without tax amount", async () => {
+    const { handler, processCreditPurchase } = makeDeps();
+
+    await expect(handler(validPaymentEvent({ paymentId: "pay_no_tax", taxAmount: undefined }))).rejects.toThrow(
+      /invalid tax amount/,
+    );
+
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("refuses payment.succeeded when tax exceeds total", async () => {
+    const { handler, processCreditPurchase } = makeDeps();
+
+    await expect(handler(validPaymentEvent({ paymentId: "pay_tax_gt_total", taxAmount: samplePackage.price + 1 }))).rejects.toThrow(
+      /tax amount exceeds total amount/,
+    );
+
+    expect(processCreditPurchase).not.toHaveBeenCalled();
   });
 
   it("ignores non-succeeded events", async () => {
