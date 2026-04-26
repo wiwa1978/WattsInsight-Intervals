@@ -191,6 +191,10 @@ describe("createPaymentEventHandler", () => {
         vatAmount: 200,
         currency: "EUR",
       },
+      {
+        provider: "dodo",
+        customerId: "cus_abc",
+      },
     );
   });
 
@@ -289,6 +293,10 @@ describe("createPaymentEventHandler", () => {
         vatAmount: 200,
         currency: "EUR",
       },
+      {
+        provider: "dodo",
+        customerId: "cus_failed",
+      },
     );
   });
 
@@ -309,6 +317,10 @@ describe("createPaymentEventHandler", () => {
         priceInclVat: samplePackage.price,
         vatAmount: 200,
         currency: "EUR",
+      },
+      {
+        provider: "dodo",
+        customerId: "cus_processing",
       },
     );
   });
