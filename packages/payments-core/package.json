@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
+    "@platform/contracts": "*",
     "@hono/zod-validator": "^0.7.4",
     "hono": "^4.10.3",
     "zod": "^4.2.1"
