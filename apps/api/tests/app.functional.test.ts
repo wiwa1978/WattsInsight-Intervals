@@ -214,11 +214,13 @@ vi.mock("../src/observability/sentry", () => ({
   setupSentry: vi.fn(),
   Sentry: {
     withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
+    captureMessage: vi.fn(),
   },
 }));
 
-const [{ app }, { API_VERSION_POLICY, APP_OWNED_API_ROUTES }] = await Promise.all([
+const [{ app }, { clearRequestGuardrailStateForTests }, { API_VERSION_POLICY, APP_OWNED_API_ROUTES }] = await Promise.all([
   import("../src/app"),
+  import("../src/middleware/request-guardrails"),
   import("../src/openapi"),
 ]);
 
@@ -289,6 +291,7 @@ function getSourceDefinedAppRoutes() {
 describe("API functional routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearRequestGuardrailStateForTests();
   });
 
   // Verifies the health endpoint always reports service readiness.
@@ -1036,6 +1039,68 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
+  });
+
+  // Verifies client log endpoint redacts common secrets before writing logs.
+  it("redacts sensitive client log metadata", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: "failed with Bearer abc.def.ghi",
+        url: "https://app.test/callback?token=secret-token&safe=1",
+        context: {
+          password: "super-secret",
+          nested: { authorization: "Bearer abc.def.ghi" },
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("[redacted]");
+    expect(output).not.toContain("super-secret");
+    expect(output).not.toContain("secret-token");
+    expect(output).not.toContain("abc.def.ghi");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies guarded endpoints reject oversized bodies before route parsing.
+  it("rejects oversized checkout payloads", async () => {
+    const res = await app.request("/payments/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ packageKey: "starter", padding: "x".repeat(9 * 1024) }),
+    });
+
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "PAYLOAD_TOO_LARGE",
+    });
+  });
+
+  // Verifies guarded endpoints return stable rate-limit envelopes.
+  it("rate limits voucher redemption", async () => {
+    mocks.vouchersService.redeemVoucher.mockResolvedValue({ success: true, data: { credits: 10 } });
+    let res = new Response();
+    for (let i = 0; i < 21; i += 1) {
+      res = await app.request("/me/vouchers/redeem", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+        body: JSON.stringify({ code: "WELCOME" }),
+      });
+    }
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBeTruthy();
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "RATE_LIMITED",
+    });
   });
 
   // Verifies discount code generation endpoint maps service errors to 400 responses.
