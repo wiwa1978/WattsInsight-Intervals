@@ -4,6 +4,8 @@ import { and, desc, eq, ilike, inArray, like, or, sql } from "drizzle-orm";
 
 import { discounts, user, userDiscounts } from "@platform/platform-db";
 
+import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
+
 type DodoDiscountType = "percentage";
 
 type DodoDiscount = {
@@ -105,18 +107,25 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     }
 
     const url = `${getDodoApiBaseUrl(deps.env.DODO_PAYMENTS_ENVIRONMENT)}${endpoint}`;
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        ...(options.headers ?? {}),
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(
+        url,
+        withProviderTimeout({
+          ...options,
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            ...(options.headers ?? {}),
+          },
+        }),
+      );
+    } catch (error) {
+      throw new Error(isProviderTimeout(error) ? "Dodo provider request timed out" : "Dodo provider request failed");
+    }
 
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Dodo request failed (${response.status}): ${text}`);
+      throw new Error("Dodo provider request failed");
     }
 
     if (response.status === 204) {

@@ -8,6 +8,7 @@ import {
 } from "@platform/platform-db";
 
 import { creditPackages } from "../../config/billing";
+import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
 
 type BillingServiceDeps = {
   db: any;
@@ -363,13 +364,21 @@ export function createBillingService(deps: BillingServiceDeps) {
         ? "https://live.dodopayments.com"
         : "https://test.dodopayments.com";
 
-    const response = await fetch(`${baseUrl}/invoices/payments/${paymentId}`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(
+        `${baseUrl}/invoices/payments/${paymentId}`,
+        withProviderTimeout({
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+        }),
+      );
+    } catch (error) {
+      throw new Error(isProviderTimeout(error) ? "Invoice provider request timed out" : "Invoice provider request failed");
+    }
 
     if (!response.ok) {
       throw new Error("Invoice provider request failed");
