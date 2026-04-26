@@ -39,6 +39,7 @@ export const updateDiscountSchema = z.object({
   startDate: z.coerce.date().optional(),
   endDate: z.coerce.date().optional(),
   maxUses: z.number().int().min(1).max(100000).nullable().optional(),
+  userIds: z.array(z.string().uuid()).max(500).optional(),
   status: discountStatusSchema.optional(),
   sendEmail: z.boolean().optional(),
   sendNotification: z.boolean().optional(),

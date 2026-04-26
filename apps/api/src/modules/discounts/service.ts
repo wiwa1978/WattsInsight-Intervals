@@ -49,6 +49,7 @@ type UpdateDiscountInput = {
   startDate?: Date;
   endDate?: Date;
   maxUses?: number | null;
+  userIds?: string[];
   status?: DiscountStatus;
 };
 
@@ -98,6 +99,24 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
   function dedupeIds(ids: string[]) {
     return [...new Set(ids.map((value) => value.trim()).filter(Boolean))];
+  }
+
+  async function replaceDiscountAssignments(tx: DiscountsServiceDeps["db"], discountId: string, userIds: string[]) {
+    await tx.delete(userDiscounts).where(eq(userDiscounts.discountId, discountId));
+
+    if (userIds.length === 0) {
+      return;
+    }
+
+    await tx
+      .insert(userDiscounts)
+      .values(
+        userIds.map((userId) => ({
+          discountId,
+          userId,
+        })),
+      )
+      .onConflictDoNothing();
   }
 
   async function dodoRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -388,14 +407,28 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       if (input.value !== undefined) dodoUpdateData.amount = Math.round(input.value * 100);
       if (input.endDate !== undefined) dodoUpdateData.expires_at = input.endDate.toISOString();
       if (input.maxUses !== undefined) dodoUpdateData.usage_limit = input.maxUses ?? null;
-      await updateDodoDiscount(existing.dodoDiscountId, dodoUpdateData);
+      if (Object.keys(dodoUpdateData).length > 0) {
+        await updateDodoDiscount(existing.dodoDiscountId, dodoUpdateData);
+      }
     }
 
-    const [updated] = await deps.db
-      .update(discounts)
-      .set(updateData)
-      .where(eq(discounts.id, input.id))
-      .returning();
+    const updateLocalDiscount = async (tx: DiscountsServiceDeps["db"]) => {
+      const [updated] = await tx
+        .update(discounts)
+        .set(updateData)
+        .where(eq(discounts.id, input.id))
+        .returning();
+
+      if (input.userIds !== undefined) {
+        await replaceDiscountAssignments(tx, input.id, dedupeIds(input.userIds));
+      }
+
+      return updated;
+    };
+
+    const updated = input.userIds === undefined
+      ? await updateLocalDiscount(deps.db)
+      : await deps.db.transaction(updateLocalDiscount);
 
     return discountSuccess({ discount: updated });
   }

@@ -834,7 +834,7 @@ describe("API functional routes", () => {
     const patchRes = await app.request(`/admin/discounts/${discountId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: 20 }),
+      body: JSON.stringify({ value: 20, userIds }),
     });
 
     const assignRes = await app.request(`/admin/discounts/${discountId}/assign`, {
@@ -856,6 +856,13 @@ describe("API functional routes", () => {
     expect(assignRes.status).toBe(200);
     expect(removeRes.status).toBe(200);
     expect(deleteRes.status).toBe(200);
+    expect(mocks.discountsService.updateDiscount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: discountId,
+        value: 20,
+        userIds,
+      }),
+    );
   });
 
   // Verifies voucher list and search endpoints pass validated filters to the service.

@@ -280,6 +280,100 @@ describe("createDiscountsService", () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
+  // Verifies discount edits replace selected-user assignments in the same local transaction.
+  it("replaces user assignments when updating a discount", async () => {
+    const updateReturning = vi.fn().mockResolvedValue([{ id: "d1", code: "SAVE-ABC-1234" }]);
+    const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const insertOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const insertValues = vi.fn().mockReturnValue({ onConflictDoNothing: insertOnConflictDoNothing });
+    const tx = {
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+      delete: vi.fn().mockReturnValue({ where: deleteWhere }),
+      insert: vi.fn().mockReturnValue({ values: insertValues }),
+    };
+    const db = {
+      query: {
+        discounts: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: "d1",
+            code: "SAVE-ABC-1234",
+            type: "percentage",
+            value: "10",
+            startDate: new Date("2026-01-01"),
+            endDate: new Date("2026-02-01"),
+            maxUses: null,
+            dodoDiscountId: "dd_1",
+            status: "active",
+          }),
+        },
+      },
+      transaction: vi.fn(async (callback) => callback(tx)),
+    };
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+    });
+
+    const result = await service.updateDiscount({
+      id: "d1",
+      userIds: ["u1", " u1 ", "u2"],
+    });
+
+    expect(result).toEqual({ success: true, discount: { id: "d1", code: "SAVE-ABC-1234" } });
+    expect(db.transaction).toHaveBeenCalledOnce();
+    expect(deleteWhere).toHaveBeenCalledOnce();
+    expect(insertValues).toHaveBeenCalledWith([
+      { discountId: "d1", userId: "u1" },
+      { discountId: "d1", userId: "u2" },
+    ]);
+    expect(insertOnConflictDoNothing).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  // Verifies assignment-only edits can clear all selected users without inserting rows.
+  it("clears user assignments when updating a discount with an empty user list", async () => {
+    const updateReturning = vi.fn().mockResolvedValue([{ id: "d1", code: "SAVE-ABC-1234" }]);
+    const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const tx = {
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+      delete: vi.fn().mockReturnValue({ where: deleteWhere }),
+      insert: vi.fn(),
+    };
+    const db = {
+      query: {
+        discounts: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: "d1",
+            code: "SAVE-ABC-1234",
+            startDate: new Date("2026-01-01"),
+            endDate: new Date("2026-02-01"),
+            dodoDiscountId: null,
+          }),
+        },
+      },
+      transaction: vi.fn(async (callback) => callback(tx)),
+    };
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+    });
+
+    const result = await service.updateDiscount({
+      id: "d1",
+      userIds: [],
+    });
+
+    expect(result.success).toBe(true);
+    expect(deleteWhere).toHaveBeenCalledOnce();
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
+
   // Verifies code generation retries when a generated code already exists.
   it("generates unique codes and retries on collision", async () => {
     const findFirst = vi
