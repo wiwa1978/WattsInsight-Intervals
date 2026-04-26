@@ -42,6 +42,27 @@ bun run dev
 - revoke refresh tokens: `POST /auth/mobile/revoke`
 - protected endpoints may accept `Authorization: Bearer <token>`
 
+## API Versioning
+
+Versioning policy:
+
+- `/api/v1` is the planned canonical prefix for stable external clients,
+  generated SDKs, and native apps.
+- Existing unversioned app-owned routes stay available during the current
+  contract-hardening phase as temporary compatibility routes.
+- New public client integrations should be designed against `/api/v1` once the
+  v1 aliases are mounted.
+- Breaking response-shape or auth-contract changes should land in `/api/v1`
+  unless an unversioned route has already been explicitly migrated and tested.
+
+Current routing status:
+
+- Runtime routes are still mounted unversioned, such as `/countries`,
+  `/me/session`, and `/payments/checkout`.
+- The OpenAPI document advertises both the current unversioned server and the
+  planned `/api/v1` server so client-generation work can target the stable
+  prefix once aliases are introduced.
+
 ## API Docs
 
 - OpenAPI JSON: `/openapi.json`
