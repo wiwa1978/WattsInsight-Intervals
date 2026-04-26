@@ -157,6 +157,20 @@ Typical required values:
 
 Optional integrations include billing, email, and observability values.
 
+## Database Migrations
+
+The Drizzle schema lives in `packages/platform-db/src/schema`, and generated migrations live in `packages/platform-db/drizzle`.
+
+Common commands from the repo root:
+
+```bash
+bun run db:generate -- --name describe_change
+bun run db:check
+DATABASE_URL=postgres://user:password@host:5432/database bun run db:migrate
+```
+
+Any PR that adds or changes DB-backed runtime behavior must include the corresponding generated migration. See `packages/platform-db/README.md` for the full workflow.
+
 ### Web
 
 Typical required public values:
