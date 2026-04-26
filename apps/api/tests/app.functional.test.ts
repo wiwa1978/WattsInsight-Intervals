@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -186,7 +187,65 @@ vi.mock("../src/observability/sentry", () => ({
   },
 }));
 
-const { app } = await import("../src/app");
+const [{ app }, { APP_OWNED_API_ROUTES }] = await Promise.all([
+  import("../src/app"),
+  import("../src/openapi"),
+]);
+
+type RouteSignature = `${string} ${string}`;
+
+function normalizeRoutePath(path: string) {
+  return path.replace(/:([A-Za-z][A-Za-z0-9_]*)/g, "{$1}");
+}
+
+function joinRoutePath(prefix: string, path: string) {
+  const joined = `${prefix}${path}`.replace(/\/+/g, "/");
+  return joined === "" ? "/" : normalizeRoutePath(joined);
+}
+
+function routeSignature(method: string, path: string): RouteSignature {
+  return `${method.toUpperCase()} ${path}`;
+}
+
+function readRouteSource(fileName: string) {
+  return readFileSync(new URL(`../src/routes/${fileName}`, import.meta.url), "utf8");
+}
+
+function extractRouterRoutes(fileName: string, prefix = "") {
+  const source = readRouteSource(fileName);
+  const routes: RouteSignature[] = [];
+  const directRoutePattern = /router\.(get|post|patch|put|delete)\("([^"]+)"/g;
+  const adminAuthActionPattern = /registerAdminAuth(?:Json|Response)Action\(\s*"([^"]+)"/g;
+
+  for (const match of source.matchAll(directRoutePattern)) {
+    const [, method, path] = match;
+    routes.push(routeSignature(method, joinRoutePath(prefix, path)));
+  }
+
+  for (const match of source.matchAll(adminAuthActionPattern)) {
+    const [, path] = match;
+    routes.push(routeSignature("post", joinRoutePath(prefix, path)));
+  }
+
+  return routes;
+}
+
+function getSourceDefinedAppRoutes() {
+  return [
+    ...extractRouterRoutes("system.ts"),
+    ...extractRouterRoutes("logs.ts"),
+    ...extractRouterRoutes("payments.ts"),
+    ...extractRouterRoutes("auth.ts", "/auth"),
+    ...extractRouterRoutes("me.ts", "/me"),
+    ...extractRouterRoutes("admin.ts", "/admin"),
+    routeSignature("post", "/payments/webhooks/dodo"),
+    routeSignature("post", "/auth/mobile/token"),
+    routeSignature("post", "/auth/mobile/refresh"),
+    routeSignature("post", "/auth/mobile/revoke"),
+    routeSignature("get", "/session/me"),
+    routeSignature("get", "/session/admin/me"),
+  ].sort();
+}
 
 describe("API functional routes", () => {
   beforeEach(() => {
@@ -331,32 +390,20 @@ describe("API functional routes", () => {
 
     expect(rootSpec.openapi).toBe("3.1.0");
     expect(rootSpec.info?.title).toBe("SaaS Platform API");
-    expect(rootSpec.paths?.["/me/credits/balance"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/me/session"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/admin/session"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/health"]?.get).toBeTruthy();
     expect(rootSpec.paths?.["/auth/sign-in/email"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/auth/mobile/token"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/auth/mobile/refresh"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/auth/mobile/revoke"]?.post).toBeTruthy();
-    expect(rootSpec.paths?.["/admin/dashboard/stats"]?.get).toBeTruthy();
-    expect(rootSpec.paths?.["/payments/webhooks/dodo"]?.post).toBeTruthy();
     expect(apiSpec).toEqual(rootSpec);
 
-    const openApiPaths = Object.keys(rootSpec.paths || {});
-    expect(openApiPaths.sort()).toEqual([
-      "/admin/dashboard/stats",
-      "/admin/session",
-      "/auth/mobile/refresh",
-      "/auth/mobile/revoke",
-      "/auth/mobile/token",
-      "/auth/sign-in/email",
-      "/countries",
-      "/health",
-      "/me/credits/balance",
-      "/me/session",
-      "/payments/webhooks/dodo",
-    ]);
+    for (const route of APP_OWNED_API_ROUTES) {
+      const operation = rootSpec.paths?.[route.path]?.[route.method];
+      expect(operation).toBeTruthy();
+      expect(operation?.operationId).toBe(route.operation.operationId);
+      expect(operation?.tags).toEqual(route.operation.tags);
+      expect(operation?.responses?.["200"]).toBeTruthy();
+    }
+
+    const documentedAppRoutes = APP_OWNED_API_ROUTES.map((route) => `${route.method.toUpperCase()} ${route.path}`);
+    expect(new Set(documentedAppRoutes).size).toBe(documentedAppRoutes.length);
+    expect(documentedAppRoutes.sort()).toEqual(getSourceDefinedAppRoutes());
   });
 
   // Verifies admin dashboard endpoint returns delegated stats payload.
