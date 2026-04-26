@@ -83,6 +83,13 @@ describe("createPaymentEventHandler", () => {
     ...overrides,
   });
 
+  const validFailedPaymentEvent = (overrides: Partial<NormalizedPaymentEvent> = {}): NormalizedPaymentEvent =>
+    validPaymentEvent({
+      eventType: "payment.failed",
+      paymentId: "pay_failed",
+      ...overrides,
+    });
+
   function makeDeps(overrides?: {
     findUser?: (id: string) => Promise<{ id: string } | null>;
   }) {
@@ -234,21 +241,6 @@ describe("createPaymentEventHandler", () => {
     expect(processCreditPurchase).not.toHaveBeenCalled();
   });
 
-  it("ignores non-succeeded events", async () => {
-    const { handler, processCreditPurchase, getUserById } = makeDeps();
-
-    await handler({
-      provider: "dodo",
-      eventType: "payment.failed",
-      paymentId: "pay_4",
-      metadata: { userId: "real-user-id" },
-      raw: {},
-    });
-
-    expect(getUserById).not.toHaveBeenCalled();
-    expect(processCreditPurchase).not.toHaveBeenCalled();
-  });
-
   it("rejects unknown product ids even with valid userId", async () => {
     const { handler, processCreditPurchase } = makeDeps();
 
@@ -262,6 +254,35 @@ describe("createPaymentEventHandler", () => {
         raw: {},
       }),
     ).rejects.toThrow(/Unknown product id/);
+
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("records payment.failed without granting credits", async () => {
+    const { handler, getUserById, processCreditPurchase } = makeDeps();
+
+    await handler(validFailedPaymentEvent({ paymentId: "pay_failed", customerId: "cus_failed" }));
+
+    expect(getUserById).toHaveBeenCalledWith("real-user-id");
+    expect(processCreditPurchase).toHaveBeenCalledWith(
+      "real-user-id",
+      samplePackage.key,
+      "pay_failed",
+      "failed",
+      "cus_failed",
+      {
+        priceExclVat: samplePackage.price - 200,
+        priceInclVat: samplePackage.price,
+        vatAmount: 200,
+        currency: "EUR",
+      },
+    );
+  });
+
+  it("refuses payment.failed without metadata.userId", async () => {
+    const { handler, processCreditPurchase } = makeDeps();
+
+    await expect(handler(validFailedPaymentEvent({ metadata: {} }))).rejects.toThrow(/metadata\.userId missing/);
 
     expect(processCreditPurchase).not.toHaveBeenCalled();
   });

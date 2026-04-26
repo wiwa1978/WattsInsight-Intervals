@@ -190,6 +190,10 @@ export function createBillingService(deps: BillingServiceDeps) {
           throw new Error(`Payment ${paymentId} is already associated with another user`);
         }
 
+        if (existingPurchase.creditsGrantedAt && paymentStatus !== "completed") {
+          return existingPurchase;
+        }
+
         const shouldGrantCredits = paymentStatus === "completed" && !existingPurchase.creditsGrantedAt;
         const creditsGrantedAt = shouldGrantCredits ? new Date() : existingPurchase.creditsGrantedAt;
         const nextDodoCustomerId = dodoCustomerId ?? existingPurchase.dodoCustomerId;
