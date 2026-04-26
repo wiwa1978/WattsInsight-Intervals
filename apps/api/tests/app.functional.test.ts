@@ -539,23 +539,23 @@ describe("API functional routes", () => {
     expect(url.searchParams.get("cancel_url")).toBe("http://localhost:3100/billing?cancel=true");
   });
 
-  // Verifies checkout cannot be used as an open redirect to a third-party origin.
-  it("rejects checkout return URLs outside first-party origins", async () => {
+  // Verifies checkout ignores client-controlled return URLs and uses server config.
+  it("ignores checkout return URLs from clients", async () => {
     const res = await app.request("/payments/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         packageKey: "silver",
         successUrl: "https://evil.example/capture",
+        cancelUrl: "https://evil.example/cancel",
       }),
     });
 
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      error: "Invalid checkout return URL",
-      errorCode: "BAD_REQUEST",
-    });
+    expect(res.status).toBe(200);
+    const payload = (await res.json()) as { success: boolean; data: { checkoutUrl: string } };
+    const url = new URL(payload.data.checkoutUrl);
+    expect(url.searchParams.get("redirect_url")).toBe("http://localhost:3100/billing?success=true");
+    expect(url.searchParams.get("cancel_url")).toBe("http://localhost:3100/billing?cancel=true");
   });
 
   // Verifies user detail endpoint returns 404 for unknown users.
