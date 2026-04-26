@@ -474,6 +474,63 @@ describe("createDiscountsService", () => {
     expect(tx.insert).not.toHaveBeenCalled();
   });
 
+  // Verifies changed discount codes are normalized locally and synced to Dodo.
+  it("syncs discount code updates to dodo", async () => {
+    const updateReturning = vi.fn().mockResolvedValue([{ id: "d1", code: "SAVE-NEW-1234" }]);
+    const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const db = {
+      query: {
+        discounts: {
+          findFirst: vi
+            .fn()
+            .mockResolvedValueOnce({
+              id: "d1",
+              code: "SAVE-OLD-1234",
+              startDate: new Date("2026-01-01"),
+              endDate: new Date("2026-02-01"),
+              dodoDiscountId: "dd_1",
+            })
+            .mockResolvedValueOnce(null),
+        },
+      },
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+    };
+
+    (fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue([]),
+    });
+    (fetch as any).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        discount_id: "dd_1",
+        code: "SAVE-NEW-1234",
+        amount: 1000,
+        type: "percentage",
+      }),
+    });
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+    });
+
+    const result = await service.updateDiscount({
+      id: "d1",
+      code: "save-new-1234",
+    });
+
+    expect(result.success).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect((fetch as any).mock.calls[1][0]).toContain("/discounts/dd_1");
+    expect((fetch as any).mock.calls[1][1]).toEqual(expect.objectContaining({ method: "PATCH" }));
+    expect(JSON.parse((fetch as any).mock.calls[1][1].body)).toEqual({ code: "SAVE-NEW-1234" });
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ code: "SAVE-NEW-1234" }));
+  });
+
   // Verifies code generation retries when a generated code already exists.
   it("generates unique codes and retries on collision", async () => {
     const findFirst = vi

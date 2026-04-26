@@ -417,6 +417,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
     if (existing.dodoDiscountId) {
       const dodoUpdateData: DodoUpdateDiscountRequest = {};
+      if (input.code !== undefined) dodoUpdateData.code = input.code;
       if (input.value !== undefined) dodoUpdateData.amount = Math.round(input.value * 100);
       if (input.endDate !== undefined) dodoUpdateData.expires_at = input.endDate.toISOString();
       if (input.maxUses !== undefined) dodoUpdateData.usage_limit = input.maxUses ?? null;
