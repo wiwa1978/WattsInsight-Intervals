@@ -146,4 +146,61 @@ describe("createVouchersService", () => {
     expect(update).toHaveBeenCalledWith(userCredits);
     expect(update).toHaveBeenCalledWith(vouchers);
   });
+
+  // Verifies duplicate redemption fails before mutating user credits or voucher counters.
+  it("rejects duplicate user redemptions before credit mutation", async () => {
+    const voucher = {
+      id: "22222222-2222-4222-8222-222222222222",
+      code: "WELCOME",
+      creditAmount: 10,
+      status: "active",
+      currentRedemptions: 0,
+      maxRedemptions: 2,
+      appliesToAllUsers: true,
+      expiresAt: null,
+      redeemedAt: null,
+    };
+    const execute = vi.fn().mockResolvedValue([voucher]);
+    const insert = vi.fn().mockImplementation((table: unknown) => ({
+      values: vi.fn(() => {
+        if (table === voucherRedemptions) {
+          return {
+            onConflictDoNothing: vi.fn(() => ({
+              returning: vi.fn().mockResolvedValue([]),
+            })),
+          };
+        }
+
+        return Promise.resolve(undefined);
+      }),
+    }));
+    const findCredits = vi.fn();
+    const update = vi.fn();
+    const tx = {
+      execute,
+      query: {
+        userCredits: { findFirst: findCredits },
+      },
+      insert,
+      update,
+    };
+    const createNotification = vi.fn();
+    const db = {
+      transaction: vi.fn(async (cb: (trx: unknown) => unknown) => cb(tx)),
+    };
+
+    const service = createVouchersService({
+      db,
+      notifications: { createNotification },
+    });
+
+    const result = await service.redeemVoucher("33333333-3333-4333-8333-333333333333", "welcome");
+
+    expect(result).toEqual({ success: false, error: "Voucher has already been redeemed by this user" });
+    expect(insert).toHaveBeenCalledWith(voucherRedemptions);
+    expect(insert).not.toHaveBeenCalledWith(creditTransactions);
+    expect(findCredits).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(createNotification).not.toHaveBeenCalled();
+  });
 });
