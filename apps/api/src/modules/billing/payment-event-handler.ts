@@ -24,8 +24,11 @@ export type PaymentEventHandlerDeps = {
       },
     ) => Promise<unknown>;
     processCreditRefund: (paymentId: string, refundId?: string) => Promise<unknown>;
+    processCreditDisputeLoss: (paymentId: string, disputeId?: string, disputeStatus?: string) => Promise<unknown>;
   };
 };
+
+const DISPUTE_REVERSAL_EVENTS = new Set(["dispute.accepted", "dispute.lost"]);
 
 /**
  * Build the payment event handler that turns a verified Dodo
@@ -46,6 +49,14 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       }
 
       await deps.billing.processCreditRefund(event.paymentId, event.refundId);
+      return;
+    }
+
+    if (event.eventType.startsWith("dispute.")) {
+      if (DISPUTE_REVERSAL_EVENTS.has(event.eventType)) {
+        await deps.billing.processCreditDisputeLoss(event.paymentId, event.disputeId, event.disputeStatus);
+      }
+
       return;
     }
 

@@ -102,12 +102,14 @@ describe("createPaymentEventHandler", () => {
   }) {
     const processCreditPurchase = vi.fn(async () => ({ ok: true }));
     const processCreditRefund = vi.fn(async () => ({ ok: true }));
+    const processCreditDisputeLoss = vi.fn(async () => ({ ok: true }));
     const getUserById = vi.fn(
       overrides?.findUser ?? (async (id: string) => ({ id })),
     );
     return {
       processCreditPurchase,
       processCreditRefund,
+      processCreditDisputeLoss,
       getUserById,
       handler: createPaymentEventHandler({
         creditPackages,
@@ -115,6 +117,7 @@ describe("createPaymentEventHandler", () => {
           getUserById,
           processCreditPurchase,
           processCreditRefund,
+          processCreditDisputeLoss,
         },
       }),
     };
@@ -350,5 +353,41 @@ describe("createPaymentEventHandler", () => {
     ).rejects.toThrow(/partial refunds require manual reconciliation/);
 
     expect(processCreditRefund).not.toHaveBeenCalled();
+  });
+
+  it("routes lost disputes to credit reversal", async () => {
+    const { handler, processCreditDisputeLoss, processCreditPurchase, processCreditRefund, getUserById } = makeDeps();
+
+    await handler({
+      provider: "dodo",
+      eventType: "dispute.lost",
+      paymentId: "pay_disputed",
+      disputeId: "disp_123",
+      disputeStatus: "dispute_lost",
+      raw: {},
+    });
+
+    expect(processCreditDisputeLoss).toHaveBeenCalledWith("pay_disputed", "disp_123", "dispute_lost");
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+    expect(processCreditRefund).not.toHaveBeenCalled();
+    expect(getUserById).not.toHaveBeenCalled();
+  });
+
+  it("records informational dispute events without credit reversal", async () => {
+    const { handler, processCreditDisputeLoss, processCreditPurchase, processCreditRefund, getUserById } = makeDeps();
+
+    await handler({
+      provider: "dodo",
+      eventType: "dispute.opened",
+      paymentId: "pay_disputed",
+      disputeId: "disp_123",
+      disputeStatus: "dispute_opened",
+      raw: {},
+    });
+
+    expect(processCreditDisputeLoss).not.toHaveBeenCalled();
+    expect(processCreditPurchase).not.toHaveBeenCalled();
+    expect(processCreditRefund).not.toHaveBeenCalled();
+    expect(getUserById).not.toHaveBeenCalled();
   });
 });

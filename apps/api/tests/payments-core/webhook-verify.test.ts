@@ -336,6 +336,46 @@ describe("POST /webhooks/dodo response codes", () => {
     );
   });
 
+  it("200 normalizes dispute loss payloads", async () => {
+    const disputePayload = JSON.stringify({
+      id: "evt_dispute_123",
+      type: "dispute.lost",
+      data: {
+        payload_type: "Dispute",
+        payment_id: "pay_disputed_123",
+        dispute_id: "disp_123",
+        dispute_status: "dispute_lost",
+        customer: { email: "buyer@example.com", customer_id: "cus_dispute" },
+        amount: "1000",
+        currency: "EUR",
+      },
+    });
+    const { app, onPaymentEvent } = build();
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(disputePayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: disputePayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(onPaymentEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "dodo",
+        providerEventId: "evt_dispute_123",
+        eventType: "dispute.lost",
+        paymentId: "pay_disputed_123",
+        disputeId: "disp_123",
+        disputeStatus: "dispute_lost",
+        customerId: "cus_dispute",
+        currency: "EUR",
+        totalAmount: 1000,
+      }),
+    );
+  });
+
   it("200 skips duplicate events already recorded as processed", async () => {
     const store = {
       claim: vi.fn(async () => ({ claimed: false as const, status: "processed" as const })),

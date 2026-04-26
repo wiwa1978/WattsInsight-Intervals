@@ -257,25 +257,31 @@ export function createBillingService(deps: BillingServiceDeps) {
     });
   }
 
-  async function processCreditRefund(paymentId: string, refundId?: string) {
+  async function processCreditReversal(
+    paymentId: string,
+    reason: "refund" | "dispute",
+    metadata: Record<string, string | undefined> = {},
+  ) {
     return deps.db.transaction(async (tx: any) => {
       const purchase = await tx.query.creditPurchases.findFirst({
         where: eq(creditPurchases.paymentId, paymentId),
       });
 
       if (!purchase) {
-        throw new Error(`Payment ${paymentId} not found for refund`);
+        throw new Error(`Payment ${paymentId} not found for ${reason}`);
       }
+
+      const nextStatus = reason === "refund" ? "refunded" : "failed";
 
       if (!purchase.creditsGrantedAt) {
         await tx
           .update(creditPurchases)
-          .set({ paymentStatus: "refunded", updatedAt: new Date() })
+          .set({ paymentStatus: nextStatus, updatedAt: new Date() })
           .where(eq(creditPurchases.id, purchase.id));
-        return { ...purchase, paymentStatus: "refunded" };
+        return { ...purchase, paymentStatus: nextStatus };
       }
 
-      if (purchase.paymentStatus === "refunded") {
+      if (purchase.paymentStatus === nextStatus) {
         return purchase;
       }
 
@@ -293,22 +299,30 @@ export function createBillingService(deps: BillingServiceDeps) {
 
       await tx.insert(creditTransactions).values({
         userId: purchase.userId,
-        type: "refund",
+        type: reason === "refund" ? "refund" : "adjustment",
         amount: (-totalCredits).toString(),
-        description: `Refund: ${purchase.packageKey.charAt(0).toUpperCase() + purchase.packageKey.slice(1)}`,
+        description: `${reason === "refund" ? "Refund" : "Dispute reversal"}: ${purchase.packageKey.charAt(0).toUpperCase() + purchase.packageKey.slice(1)}`,
         referenceType: "payment",
         referenceId: paymentId,
         balanceAfter: newBalance.toString(),
-        metadata: { refundId },
+        metadata,
       });
 
       await tx
         .update(creditPurchases)
-        .set({ paymentStatus: "refunded", updatedAt: new Date() })
+        .set({ paymentStatus: nextStatus, updatedAt: new Date() })
         .where(eq(creditPurchases.id, purchase.id));
 
-      return { ...purchase, paymentStatus: "refunded" };
+      return { ...purchase, paymentStatus: nextStatus };
     });
+  }
+
+  async function processCreditRefund(paymentId: string, refundId?: string) {
+    return processCreditReversal(paymentId, "refund", { refundId });
+  }
+
+  async function processCreditDisputeLoss(paymentId: string, disputeId?: string, disputeStatus?: string) {
+    return processCreditReversal(paymentId, "dispute", { disputeId, disputeStatus });
   }
 
   async function getUserByEmail(email: string) {
@@ -401,6 +415,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     getCreditPurchases,
     processCreditPurchase,
     processCreditRefund,
+    processCreditDisputeLoss,
     getUserByEmail,
     getUserById,
     downloadInvoice,

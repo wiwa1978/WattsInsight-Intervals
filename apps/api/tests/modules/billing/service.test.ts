@@ -438,6 +438,72 @@ describe("createBillingService", () => {
     expect(tx.query.userCredits.findFirst).not.toHaveBeenCalled();
   });
 
+  // Verifies dispute losses reverse granted credits and mark the purchase failed.
+  it("reverses credits once for lost disputes", async () => {
+    const inserts: Array<{ table: unknown; values: unknown }> = [];
+    const updates: Array<{ table: unknown; set: unknown }> = [];
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce({
+            id: "purchase-dispute",
+            userId: "u1",
+            packageKey: "silver",
+            paymentId: "pay_dispute",
+            paymentStatus: "completed",
+            credits: 100,
+            bonusCredits: 10,
+            creditsGrantedAt: new Date("2026-01-01T00:00:00Z"),
+          }),
+        },
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "150", totalPurchased: "100", totalSpent: "0" }),
+        },
+      },
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn((values: unknown) => {
+          inserts.push({ table, values });
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: vi.fn().mockImplementation((table: unknown) => ({
+        set: vi.fn((set: unknown) => {
+          updates.push({ table, set });
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        }),
+      })),
+    };
+
+    const service = createBillingService({
+      db: {
+        transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)),
+      } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.processCreditDisputeLoss("pay_dispute", "disp_123", "dispute_lost");
+
+    expect(result).toMatchObject({ id: "purchase-dispute", paymentStatus: "failed" });
+    expect(updates).toHaveLength(2);
+    expect(updates[0]?.table).toBe(userCredits);
+    expect(updates[0]?.set).toMatchObject({ balance: "40" });
+    expect(updates[1]?.table).toBe(creditPurchases);
+    expect(updates[1]?.set).toMatchObject({ paymentStatus: "failed" });
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]?.table).toBe(creditTransactions);
+    expect(inserts[0]?.values).toMatchObject({
+      userId: "u1",
+      type: "adjustment",
+      amount: "-110",
+      description: "Dispute reversal: Silver",
+      referenceType: "payment",
+      referenceId: "pay_dispute",
+      balanceAfter: "40",
+      metadata: { disputeId: "disp_123", disputeStatus: "dispute_lost" },
+    });
+  });
+
   // Verifies invalid package keys fail fast before any persistence call.
   it("throws for unknown package key", async () => {
     const service = createBillingService({

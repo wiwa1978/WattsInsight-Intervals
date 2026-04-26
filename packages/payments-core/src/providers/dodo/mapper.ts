@@ -2,6 +2,18 @@ import { z } from "zod";
 
 import type { NormalizedPaymentEvent } from "../../types";
 
+const disputeEventTypes = [
+  "dispute.opened",
+  "dispute.expired",
+  "dispute.accepted",
+  "dispute.cancelled",
+  "dispute.challenged",
+  "dispute.won",
+  "dispute.lost",
+] as const;
+
+const disputeEventTypeSchema = z.enum(disputeEventTypes);
+
 const paymentSucceededSchema = z.object({
   id: z.string().min(1).optional(),
   event_id: z.string().min(1).optional(),
@@ -79,6 +91,25 @@ const refundSucceededSchema = z.object({
       .optional(),
     amount: z.number().nullable().optional(),
     currency: z.string().nullable().optional(),
+  }),
+});
+
+const disputeSchema = z.object({
+  id: z.string().min(1).optional(),
+  event_id: z.string().min(1).optional(),
+  type: disputeEventTypeSchema,
+  data: z.object({
+    payment_id: z.string().min(1),
+    dispute_id: z.string().min(1),
+    dispute_status: z.string().min(1).optional(),
+    customer: z
+      .object({
+        email: z.string().email().optional(),
+        customer_id: z.string().min(1).optional(),
+      })
+      .optional(),
+    amount: z.union([z.number(), z.string()]).optional(),
+    currency: z.string().optional(),
   }),
 });
 
@@ -183,6 +214,29 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
       metadata: data.metadata,
       currency: data.currency ?? undefined,
       totalAmount: data.amount ?? undefined,
+      raw: payload,
+    };
+  }
+
+  if (disputeEventTypes.includes(parsed.data.type as (typeof disputeEventTypes)[number])) {
+    const dispute = disputeSchema.safeParse(payload);
+    if (!dispute.success) {
+      return null;
+    }
+
+    const data = dispute.data.data;
+    const amount = typeof data.amount === "string" ? Number(data.amount) : data.amount;
+    return {
+      provider: "dodo",
+      providerEventId: dispute.data.id ?? dispute.data.event_id,
+      eventType: dispute.data.type,
+      paymentId: data.payment_id,
+      disputeId: data.dispute_id,
+      disputeStatus: data.dispute_status,
+      customerEmail: data.customer?.email,
+      customerId: data.customer?.customer_id,
+      currency: data.currency,
+      totalAmount: Number.isFinite(amount) ? amount : undefined,
       raw: payload,
     };
   }

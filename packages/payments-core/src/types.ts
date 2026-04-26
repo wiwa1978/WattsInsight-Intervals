@@ -3,10 +3,23 @@ import type { WebhookVerifyResult } from "./providers/dodo/webhook-verify";
 export type NormalizedPaymentEvent = {
   provider: "dodo";
   providerEventId?: string;
-  eventType: "payment.succeeded" | "payment.failed" | "payment.processing" | "refund.succeeded";
+  eventType:
+    | "payment.succeeded"
+    | "payment.failed"
+    | "payment.processing"
+    | "refund.succeeded"
+    | "dispute.opened"
+    | "dispute.expired"
+    | "dispute.accepted"
+    | "dispute.cancelled"
+    | "dispute.challenged"
+    | "dispute.won"
+    | "dispute.lost";
   paymentId: string;
   refundId?: string;
   refundIsPartial?: boolean;
+  disputeId?: string;
+  disputeStatus?: string;
   customerEmail?: string;
   customerId?: string;
   productId?: string;
