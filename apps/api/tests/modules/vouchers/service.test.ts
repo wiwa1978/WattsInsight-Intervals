@@ -5,6 +5,77 @@ import { creditTransactions, userCredits, voucherRedemptions, vouchers } from "@
 import { createVouchersService } from "../../../src/modules/vouchers/service";
 
 describe("createVouchersService", () => {
+  // Verifies all-user vouchers do not silently default to a single redemption.
+  it("defaults all-user vouchers to the contract maximum redemptions", async () => {
+    const createdVoucher = { id: "11111111-1111-4111-8111-111111111111", maxRedemptions: 100000 };
+    const values = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([createdVoucher]),
+    });
+    const insert = vi.fn().mockReturnValue({ values });
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
+    const db = {
+      query: {
+        vouchers: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+      },
+      transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb({ insert, delete: deleteFn })),
+    };
+
+    const service = createVouchersService({
+      db,
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.createVoucher({
+      code: "WELCOME",
+      creditAmount: 10,
+      assignmentScope: "all",
+      userIds: [],
+    });
+
+    expect(result).toEqual({ success: true, voucher: createdVoucher });
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({ maxRedemptions: 100000, appliesToAllUsers: true }));
+  });
+
+  // Verifies selected-user vouchers continue to use the selected-user count.
+  it("defaults selected-user voucher redemptions to selected user count", async () => {
+    const createdVoucher = { id: "11111111-1111-4111-8111-111111111111", maxRedemptions: 2 };
+    const values = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([createdVoucher]),
+    });
+    const assignmentValues = vi.fn().mockResolvedValue(undefined);
+    const insert = vi.fn().mockImplementation((table: unknown) => ({
+      values: table === vouchers ? values : assignmentValues,
+    }));
+    const deleteWhere = vi.fn().mockResolvedValue(undefined);
+    const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
+    const db = {
+      query: {
+        vouchers: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+      },
+      transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb({ insert, delete: deleteFn })),
+    };
+
+    const service = createVouchersService({
+      db,
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.createVoucher({
+      code: "WELCOME",
+      creditAmount: 10,
+      assignmentScope: "selected",
+      userIds: ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"],
+    });
+
+    expect(result).toEqual({ success: true, voucher: createdVoucher });
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({ maxRedemptions: 2, appliesToAllUsers: false }));
+  });
+
   // Verifies updates cannot create an impossible redeemed-count state.
   it("rejects maxRedemptions below currentRedemptions", async () => {
     const db = {

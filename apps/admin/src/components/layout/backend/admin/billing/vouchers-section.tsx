@@ -71,6 +71,8 @@ type VoucherFormValues = {
   expiresAt?: Date | null;
 };
 
+const DEFAULT_ALL_USER_VOUCHER_MAX_REDEMPTIONS = 100_000;
+
 function getStatusVariant(status: VoucherStatus) {
   if (status === "active") return "default" as const;
   if (status === "inactive") return "secondary" as const;
@@ -135,7 +137,7 @@ export function VouchersSection() {
     }
 
     if (!form.getValues("maxRedemptions")) {
-      form.setValue("maxRedemptions", 1, { shouldValidate: false });
+      form.setValue("maxRedemptions", DEFAULT_ALL_USER_VOUCHER_MAX_REDEMPTIONS, { shouldValidate: false });
     }
   }, [assignmentScope, form, selectedUserIds.length]);
 
