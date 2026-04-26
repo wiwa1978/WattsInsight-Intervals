@@ -327,31 +327,44 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
     const dodoDiscount = await createDodoDiscount(dodoDiscountData);
     const status = inferDiscountStatus(input.startDate, input.endDate);
-
-    const [created] = await deps.db
-      .insert(discounts)
-        .values({
-          code: normalizedCode,
-          type: input.type,
-          value: input.value.toString(),
-        startDate: input.startDate,
-        endDate: input.endDate,
-        maxUses: input.maxUses,
-        currentUses: 0,
-        dodoDiscountId: dodoDiscount.discount_id,
-        status,
-      })
-      .returning();
-
     const dedupedUserIds = dedupeIds(input.userIds ?? []);
 
-    if (dedupedUserIds.length > 0) {
-      await deps.db.insert(userDiscounts).values(
-        dedupedUserIds.map((userId) => ({
-          discountId: created.id,
-          userId,
-        })),
-      );
+    let created;
+    try {
+      created = await deps.db.transaction(async (tx: DiscountsServiceDeps["db"]) => {
+        const [createdDiscount] = await tx
+          .insert(discounts)
+          .values({
+            code: normalizedCode,
+            type: input.type,
+            value: input.value.toString(),
+            startDate: input.startDate,
+            endDate: input.endDate,
+            maxUses: input.maxUses,
+            currentUses: 0,
+            dodoDiscountId: dodoDiscount.discount_id,
+            status,
+          })
+          .returning();
+
+        if (dedupedUserIds.length > 0) {
+          await tx.insert(userDiscounts).values(
+            dedupedUserIds.map((userId) => ({
+              discountId: createdDiscount.id,
+              userId,
+            })),
+          );
+        }
+
+        return createdDiscount;
+      });
+    } catch (error) {
+      try {
+        await deleteDodoDiscount(dodoDiscount.discount_id);
+      } catch {
+        // Preserve the local persistence failure; reconciliation can retry provider cleanup separately.
+      }
+      throw error;
     }
 
     return discountSuccess({ discount: created });
