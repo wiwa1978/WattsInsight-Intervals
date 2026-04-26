@@ -332,6 +332,112 @@ describe("createBillingService", () => {
     expect(notifications.createNotification).toHaveBeenCalledOnce();
   });
 
+  // Verifies full refunds reverse granted credits once and mark the purchase refunded.
+  it("reverses credits once for refunded completed purchases", async () => {
+    const inserts: Array<{ table: unknown; values: unknown }> = [];
+    const updates: Array<{ table: unknown; set: unknown }> = [];
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce({
+            id: "purchase-refund",
+            userId: "u1",
+            packageKey: "silver",
+            paymentId: "pay_refund",
+            paymentStatus: "completed",
+            credits: 100,
+            bonusCredits: 10,
+            creditsGrantedAt: new Date("2026-01-01T00:00:00Z"),
+          }),
+        },
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "150", totalPurchased: "100", totalSpent: "0" }),
+        },
+      },
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn((values: unknown) => {
+          inserts.push({ table, values });
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: vi.fn().mockImplementation((table: unknown) => ({
+        set: vi.fn((set: unknown) => {
+          updates.push({ table, set });
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        }),
+      })),
+    };
+
+    const service = createBillingService({
+      db: {
+        transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)),
+      } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.processCreditRefund("pay_refund", "rfnd_123");
+
+    expect(result).toMatchObject({ id: "purchase-refund", paymentStatus: "refunded" });
+    expect(updates).toHaveLength(2);
+    expect(updates[0]?.table).toBe(userCredits);
+    expect(updates[0]?.set).toMatchObject({ balance: "40" });
+    expect(updates[1]?.table).toBe(creditPurchases);
+    expect(updates[1]?.set).toMatchObject({ paymentStatus: "refunded" });
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]?.table).toBe(creditTransactions);
+    expect(inserts[0]?.values).toMatchObject({
+      userId: "u1",
+      type: "refund",
+      amount: "-110",
+      referenceType: "payment",
+      referenceId: "pay_refund",
+      balanceAfter: "40",
+      metadata: { refundId: "rfnd_123" },
+    });
+  });
+
+  // Verifies repeated refund events do not create duplicate reversal transactions.
+  it("is idempotent for already refunded purchases", async () => {
+    const existingPurchase = {
+      id: "purchase-refunded",
+      userId: "u1",
+      packageKey: "silver",
+      paymentId: "pay_refunded",
+      paymentStatus: "refunded",
+      credits: 100,
+      bonusCredits: 10,
+      creditsGrantedAt: new Date("2026-01-01T00:00:00Z"),
+    };
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce(existingPurchase),
+        },
+        userCredits: {
+          findFirst: vi.fn(),
+        },
+      },
+      insert: vi.fn(),
+      update: vi.fn(),
+    };
+
+    const service = createBillingService({
+      db: {
+        transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)),
+      } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.processCreditRefund("pay_refunded", "rfnd_123");
+
+    expect(result).toBe(existingPurchase);
+    expect(tx.insert).not.toHaveBeenCalled();
+    expect(tx.update).not.toHaveBeenCalled();
+    expect(tx.query.userCredits.findFirst).not.toHaveBeenCalled();
+  });
+
   // Verifies invalid package keys fail fast before any persistence call.
   it("throws for unknown package key", async () => {
     const service = createBillingService({

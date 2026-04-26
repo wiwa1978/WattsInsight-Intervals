@@ -256,6 +256,60 @@ export function createBillingService(deps: BillingServiceDeps) {
     });
   }
 
+  async function processCreditRefund(paymentId: string, refundId?: string) {
+    return deps.db.transaction(async (tx: any) => {
+      const purchase = await tx.query.creditPurchases.findFirst({
+        where: eq(creditPurchases.paymentId, paymentId),
+      });
+
+      if (!purchase) {
+        throw new Error(`Payment ${paymentId} not found for refund`);
+      }
+
+      if (!purchase.creditsGrantedAt) {
+        await tx
+          .update(creditPurchases)
+          .set({ paymentStatus: "refunded", updatedAt: new Date() })
+          .where(eq(creditPurchases.id, purchase.id));
+        return { ...purchase, paymentStatus: "refunded" };
+      }
+
+      if (purchase.paymentStatus === "refunded") {
+        return purchase;
+      }
+
+      const current = await getOrInitializeCredits(tx, purchase.userId);
+      const totalCredits = Number(purchase.credits) + Number(purchase.bonusCredits ?? 0);
+      const newBalance = Math.max(0, Number(current.balance) - totalCredits);
+
+      await tx
+        .update(userCredits)
+        .set({
+          balance: newBalance.toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(userCredits.userId, purchase.userId));
+
+      await tx.insert(creditTransactions).values({
+        userId: purchase.userId,
+        type: "refund",
+        amount: (-totalCredits).toString(),
+        description: `Refund: ${purchase.packageKey.charAt(0).toUpperCase() + purchase.packageKey.slice(1)}`,
+        referenceType: "payment",
+        referenceId: paymentId,
+        balanceAfter: newBalance.toString(),
+        metadata: { refundId },
+      });
+
+      await tx
+        .update(creditPurchases)
+        .set({ paymentStatus: "refunded", updatedAt: new Date() })
+        .where(eq(creditPurchases.id, purchase.id));
+
+      return { ...purchase, paymentStatus: "refunded" };
+    });
+  }
+
   async function getUserByEmail(email: string) {
     const rows = await deps.db
       .select({ id: user.id })
@@ -337,6 +391,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     getCreditHistory,
     getCreditPurchases,
     processCreditPurchase,
+    processCreditRefund,
     getUserByEmail,
     getUserById,
     downloadInvoice,
