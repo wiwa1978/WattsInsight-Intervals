@@ -4,6 +4,8 @@ import type { creditPackages as CreditPackagesList } from "../../config/billing"
 
 type CreditPackage = (typeof CreditPackagesList)[number];
 
+const EXPECTED_PAYMENT_CURRENCY = "EUR";
+
 export type PaymentEventHandlerDeps = {
   creditPackages: ReadonlyArray<CreditPackage>;
   billing: {
@@ -67,6 +69,32 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       throw new Error(`Unknown product id: ${event.productId}`);
     }
 
+    if (!event.currency) {
+      throw new Error(`Refusing payment ${event.paymentId}: currency missing.`);
+    }
+
+    if (event.currency !== EXPECTED_PAYMENT_CURRENCY) {
+      throw new Error(`Refusing payment ${event.paymentId}: expected ${EXPECTED_PAYMENT_CURRENCY}, received ${event.currency}.`);
+    }
+
+    if (!Number.isFinite(event.totalAmount) || event.totalAmount === undefined || event.totalAmount <= 0) {
+      throw new Error(`Refusing payment ${event.paymentId}: invalid total amount.`);
+    }
+
+    if (event.totalAmount !== matchedPackage.price) {
+      throw new Error(
+        `Refusing payment ${event.paymentId}: expected amount ${matchedPackage.price}, received ${event.totalAmount}.`,
+      );
+    }
+
+    if (!Number.isFinite(event.taxAmount) || event.taxAmount === undefined || event.taxAmount < 0) {
+      throw new Error(`Refusing payment ${event.paymentId}: invalid tax amount.`);
+    }
+
+    if (event.taxAmount > event.totalAmount) {
+      throw new Error(`Refusing payment ${event.paymentId}: tax amount exceeds total amount.`);
+    }
+
     await deps.billing.processCreditPurchase(
       foundUser.id,
       matchedPackage.key,
@@ -74,10 +102,10 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       "completed",
       event.customerId,
       {
-        priceExclVat: (event.totalAmount ?? 0) - (event.taxAmount ?? 0),
-        priceInclVat: event.totalAmount ?? 0,
-        vatAmount: event.taxAmount ?? 0,
-        currency: event.currency ?? "EUR",
+        priceExclVat: event.totalAmount - event.taxAmount,
+        priceInclVat: event.totalAmount,
+        vatAmount: event.taxAmount,
+        currency: event.currency,
       },
     );
   };
