@@ -238,7 +238,7 @@ async function addVoucherCredits(tx: DbTransaction, userId: string, voucher: Vou
   return newBalance;
 }
 
-async function recordVoucherRedemption(tx: DbTransaction, userId: string, voucher: VoucherRecord) {
+async function reserveVoucherRedemption(tx: DbTransaction, userId: string, voucher: VoucherRecord) {
   const insertedRedemptions = await tx
     .insert(voucherRedemptions)
     .values({
@@ -282,8 +282,8 @@ async function redeemVoucherTransaction(tx: DbTransaction, userId: string, norma
 
   await assertVoucherCanBeRedeemed(tx, voucher, userId);
 
+  await reserveVoucherRedemption(tx, userId, voucher);
   const newBalance = await addVoucherCredits(tx, userId, voucher);
-  await recordVoucherRedemption(tx, userId, voucher);
   await updateVoucherRedemptionState(tx, voucher);
 
   return { voucher, newBalance };
