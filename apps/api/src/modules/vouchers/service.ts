@@ -556,17 +556,21 @@ export function createVouchersService(deps: VouchersServiceDeps) {
         redeemVoucherTransaction(tx, userId, normalizedCode),
       );
 
-      await deps.notifications.createNotification({
-        userId,
-        title: "voucherRedeemed.title",
-        message: "voucherRedeemed.message",
-        type: "success",
-        category: "billing",
-        data: {
-          code: result.voucher.code,
-          credits: result.voucher.creditAmount,
-        },
-      });
+      try {
+        await deps.notifications.createNotification({
+          userId,
+          title: "voucherRedeemed.title",
+          message: "voucherRedeemed.message",
+          type: "success",
+          category: "billing",
+          data: {
+            code: result.voucher.code,
+            credits: result.voucher.creditAmount,
+          },
+        });
+      } catch {
+        // Redemption is already committed; notification delivery is best-effort until an outbox exists.
+      }
 
       return voucherSuccess({
         creditsAdded: result.voucher.creditAmount,
