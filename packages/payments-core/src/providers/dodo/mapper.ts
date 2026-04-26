@@ -58,6 +58,10 @@ const paymentFailedSchema = z.object({
   }),
 });
 
+const paymentProcessingSchema = paymentFailedSchema.extend({
+  type: z.literal("payment.processing"),
+});
+
 const refundSucceededSchema = z.object({
   id: z.string().min(1).optional(),
   event_id: z.string().min(1).optional(),
@@ -125,6 +129,29 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
       provider: "dodo",
       providerEventId: failed.data.id ?? failed.data.event_id,
       eventType: "payment.failed",
+      paymentId: data.payment_id,
+      customerEmail: data.customer?.email,
+      customerId: data.customer?.customer_id,
+      productId: data.product_cart?.[0]?.product_id,
+      metadata: data.metadata,
+      currency: data.settlement_currency,
+      totalAmount: data.settlement_amount ?? data.total_amount,
+      taxAmount: data.settlement_tax ?? data.tax,
+      raw: payload,
+    };
+  }
+
+  if (parsed.data.type === "payment.processing") {
+    const processing = paymentProcessingSchema.safeParse(payload);
+    if (!processing.success) {
+      return null;
+    }
+
+    const data = processing.data.data;
+    return {
+      provider: "dodo",
+      providerEventId: processing.data.id ?? processing.data.event_id,
+      eventType: "payment.processing",
       paymentId: data.payment_id,
       customerEmail: data.customer?.email,
       customerId: data.customer?.customer_id,
