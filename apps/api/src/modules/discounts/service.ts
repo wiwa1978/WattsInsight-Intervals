@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { and, desc, eq, ilike, inArray, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, ilike, inArray, like, lt, lte, or, sql } from "drizzle-orm";
 
 import { discounts, user, userDiscounts } from "@platform/platform-db";
 
@@ -61,11 +61,16 @@ type DiscountsServiceDeps = {
   };
 };
 
-function inferDiscountStatus(startDate: Date, endDate: Date): DiscountStatus {
-  const now = new Date();
+function inferDiscountStatus(startDate: Date, endDate: Date, now = new Date()): DiscountStatus {
   if (now < startDate) return "inactive";
   if (now > endDate) return "expired";
   return "active";
+}
+
+function getStatusWhereClause(status: DiscountStatus, now: Date) {
+  if (status === "active") return and(lte(discounts.startDate, now), gte(discounts.endDate, now));
+  if (status === "inactive") return gt(discounts.startDate, now);
+  return lt(discounts.endDate, now);
 }
 
 function discountFailure(error: string) {
@@ -99,6 +104,23 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
   function dedupeIds(ids: string[]) {
     return [...new Set(ids.map((value) => value.trim()).filter(Boolean))];
+  }
+
+  async function refreshDiscountStatus<T extends { id: string; status: DiscountStatus; startDate: Date; endDate: Date }>(
+    discount: T,
+    now = new Date(),
+  ): Promise<T> {
+    const refreshedStatus = inferDiscountStatus(discount.startDate, discount.endDate, now);
+    if (refreshedStatus === discount.status) {
+      return discount;
+    }
+
+    await deps.db
+      .update(discounts)
+      .set({ status: refreshedStatus, updatedAt: new Date() })
+      .where(eq(discounts.id, discount.id));
+
+    return { ...discount, status: refreshedStatus };
   }
 
   async function replaceDiscountAssignments(tx: DiscountsServiceDeps["db"], discountId: string, userIds: string[]) {
@@ -229,10 +251,11 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
   async function getDiscounts(limit = 20, offset = 0, search?: string, status?: DiscountStatus) {
     const normalizedLimit = normalizeLimit(limit, 100);
     const normalizedOffset = normalizeOffset(offset);
+    const now = new Date();
     const whereConditions = [] as any[];
 
     if (search?.trim()) whereConditions.push(like(discounts.code, `%${search.trim().toUpperCase()}%`));
-    if (status) whereConditions.push(eq(discounts.status, status));
+    if (status) whereConditions.push(getStatusWhereClause(status, now));
 
     const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined;
 
@@ -256,6 +279,10 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       },
     });
 
+    const refreshedDiscountsList = await Promise.all(
+      discountsList.map((discount: any) => refreshDiscountStatus(discount, now)),
+    );
+
     const totalResult = await deps.db
       .select({ count: sql<number>`COUNT(*)` })
       .from(discounts)
@@ -263,7 +290,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
     const total = totalResult[0]?.count || 0;
     return {
-      discounts: discountsList,
+      discounts: refreshedDiscountsList,
       total,
       hasMore: normalizedOffset + normalizedLimit < total,
     };
@@ -291,8 +318,8 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       return { success: false, discount: null, error: "Discount not found" };
     }
 
-    await updateDiscountStatus(id);
-    return { success: true, discount };
+    const refreshedDiscount = await refreshDiscountStatus(discount);
+    return { success: true, discount: refreshedDiscount };
   }
 
   async function createDiscount(input: CreateDiscountInput) {
@@ -550,33 +577,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       .from(user)
       .where(or(ilike(user.name, `%${normalizedQuery}%`), ilike(user.email, `%${normalizedQuery}%`)))
       .limit(normalizedLimit);
-  }
-
-  async function updateDiscountStatus(discountId: string) {
-    const discount = await deps.db.query.discounts.findFirst({
-      where: eq(discounts.id, discountId),
-    });
-    if (!discount) return;
-
-    const now = new Date();
-    let newStatus = discount.status as DiscountStatus;
-
-    if (discount.status === "active") {
-      if (now > discount.endDate) {
-        newStatus = "expired";
-      } else if (now < discount.startDate) {
-        newStatus = "inactive";
-      }
-    } else if (discount.status === "inactive" && now >= discount.startDate && now <= discount.endDate) {
-      newStatus = "active";
-    }
-
-    if (newStatus !== discount.status) {
-      await deps.db
-        .update(discounts)
-        .set({ status: newStatus, updatedAt: new Date() })
-        .where(eq(discounts.id, discountId));
-    }
   }
 
   return {
