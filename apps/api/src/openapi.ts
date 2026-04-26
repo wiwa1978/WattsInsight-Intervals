@@ -11,7 +11,9 @@ import {
   discountIdParamSchema,
   discountListQuerySchema,
   discountUserAssignmentSchema,
+  errorResultSchema,
   generateDiscountCodeSchema,
+  healthResponseSchema,
   invoiceRequestSchema,
   logEntriesQuerySchema,
   logFilesQuerySchema,
@@ -24,6 +26,7 @@ import {
   paginationQuerySchema,
   redeemVoucherSchema,
   searchUsersQuerySchema,
+  sessionResponseSchema,
   setRoleSchema,
   setUserPasswordSchema,
   userIdParamSchema,
@@ -59,7 +62,7 @@ export type AppOwnedApiRoute = {
 
 const cookieOrBearerAuth: Array<Record<string, string[]>> = [{ cookieAuth: [] }, { bearerAuth: [] }];
 const genericSuccessSchema = z.object({ success: z.literal(true) }).passthrough();
-const genericErrorSchema = z.object({ success: z.literal(false), error: z.string() }).passthrough();
+const genericErrorSchema = errorResultSchema.passthrough();
 const genericObjectSchema = z.object({}).passthrough();
 
 function jsonContent(schema: z.ZodTypeAny) {
@@ -192,7 +195,7 @@ const searchUsersParameters = [
 export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/health", ["System"], "Health check", {
     responses: {
-      "200": jsonResponse("Service health status", z.object({ success: z.literal(true), data: z.object({ status: z.string() }) })),
+      "200": jsonResponse("Service health status", healthResponseSchema),
     },
   }),
   route("get", "/countries", ["System"], "List countries for a locale", {
@@ -245,7 +248,10 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
 
   route("get", "/me/session", ["Me"], "Get current authenticated user", {
     security: cookieOrBearerAuth,
-    responses: defaultResponses("Current authenticated user", ["401"]),
+    responses: {
+      "200": jsonResponse("Current authenticated user", sessionResponseSchema),
+      "401": jsonResponse("Unauthorized", genericErrorSchema),
+    },
   }),
   route("get", "/me/credits/balance", ["Me"], "Get current user credit balance", {
     security: cookieOrBearerAuth,

@@ -6,11 +6,11 @@ import {
   notificationIdParamSchema,
   optionalLimitQuerySchema,
   redeemVoucherSchema,
-} from "@platform/contracts";
+} from "@platform/contracts/wire";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
-import { parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
+import { ok, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
@@ -26,11 +26,7 @@ export function createMeRouter() {
   router.use("/*", bootstrap.authModule.requireAuth);
 
   router.get("/session", (c) => {
-    const authUser = c.get("authUser");
-    return c.json({
-      success: true,
-      data: authUser,
-    });
+    return ok(c, getAuthUser(c));
   });
 
   router.get("/credits/balance", async (c) => {

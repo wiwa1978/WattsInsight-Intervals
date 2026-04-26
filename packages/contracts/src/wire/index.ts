@@ -12,6 +12,7 @@ export * from "./common/error-codes";
 export * from "./common/pagination";
 export * from "./common/query";
 export * from "./common/ids";
+export * from "./system/responses";
 export * from "./logs/common";
 export * from "./auth/requests";
 export * from "./auth/responses";

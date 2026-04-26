@@ -4,6 +4,7 @@ export const errorResultSchema = z.object({
   success: z.literal(false),
   error: z.string().min(1),
   errorCode: z.string().min(1).optional(),
+  details: z.unknown().optional(),
   requestId: z.string().min(1).optional(),
 });
 
@@ -29,6 +30,7 @@ export type ErrorResult = {
   success: false;
   error: string;
   errorCode?: string;
+  details?: unknown;
   requestId?: string;
 };
 export type ActionResult<T> = SuccessResult<T> | ErrorResult;
