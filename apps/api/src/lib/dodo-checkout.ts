@@ -33,6 +33,42 @@ export function buildDodoCheckoutUrl(args: {
   return url.toString();
 }
 
+export const CHECKOUT_SUCCESS_RETURN_PATH = "/billing?success=true";
+export const CHECKOUT_CANCEL_RETURN_PATH = "/billing?cancel=true";
+
+export function getCheckoutReturnOrigins(args: { appUrl: string; adminAppUrl?: string | null }) {
+  return [args.appUrl, args.adminAppUrl]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new URL(value).origin);
+}
+
+export function normalizeCheckoutReturnUrl(
+  value: string | undefined,
+  args: {
+    appUrl: string;
+    allowedOrigins: string[];
+    fallbackPath: string;
+  },
+) {
+  if (!value) {
+    return new URL(args.fallbackPath, args.appUrl).toString();
+  }
+
+  try {
+    const trimmed = value.trim();
+    const url = trimmed.startsWith("/") && !trimmed.startsWith("//") ? new URL(trimmed, args.appUrl) : new URL(trimmed);
+    const allowedOrigins = new Set(args.allowedOrigins);
+
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || !allowedOrigins.has(url.origin)) {
+      return null;
+    }
+
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 export const DODO_CHECKOUT_BASE_URL = {
   live_mode: "https://checkout.dodopayments.com",
   test_mode: "https://test.checkout.dodopayments.com",

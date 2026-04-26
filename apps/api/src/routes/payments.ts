@@ -6,8 +6,15 @@ import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { creditPackages } from "../config/billing";
 import { env } from "../env";
-import { DODO_CHECKOUT_BASE_URL, buildDodoCheckoutUrl } from "../lib/dodo-checkout";
-import { parseJsonBody, validationError } from "../lib/http";
+import {
+  CHECKOUT_CANCEL_RETURN_PATH,
+  CHECKOUT_SUCCESS_RETURN_PATH,
+  DODO_CHECKOUT_BASE_URL,
+  buildDodoCheckoutUrl,
+  getCheckoutReturnOrigins,
+  normalizeCheckoutReturnUrl,
+} from "../lib/dodo-checkout";
+import { badRequest, parseJsonBody, validationError } from "../lib/http";
 
 export { buildDodoCheckoutUrl } from "../lib/dodo-checkout";
 
@@ -40,6 +47,21 @@ export function createPaymentsRouter() {
       env.DODO_PAYMENTS_ENVIRONMENT === "live_mode"
         ? DODO_CHECKOUT_BASE_URL.live_mode
         : DODO_CHECKOUT_BASE_URL.test_mode;
+    const allowedReturnOrigins = getCheckoutReturnOrigins({ appUrl: env.APP_URL, adminAppUrl: env.ADMIN_APP_URL });
+    const successUrl = normalizeCheckoutReturnUrl(parsedBody.data.successUrl, {
+      appUrl: env.APP_URL,
+      allowedOrigins: allowedReturnOrigins,
+      fallbackPath: CHECKOUT_SUCCESS_RETURN_PATH,
+    });
+    const cancelUrl = normalizeCheckoutReturnUrl(parsedBody.data.cancelUrl, {
+      appUrl: env.APP_URL,
+      allowedOrigins: allowedReturnOrigins,
+      fallbackPath: CHECKOUT_CANCEL_RETURN_PATH,
+    });
+
+    if (!successUrl || !cancelUrl) {
+      return badRequest(c, "Invalid checkout return URL");
+    }
 
     const checkoutUrl = buildDodoCheckoutUrl({
       baseUrl,
@@ -47,8 +69,8 @@ export function createPaymentsRouter() {
       userId: authUser.id,
       packageKey,
       customerEmail: authUser.email ?? null,
-      successUrl: parsedBody.data.successUrl,
-      cancelUrl: parsedBody.data.cancelUrl,
+      successUrl,
+      cancelUrl,
     });
 
     return c.json({ success: true, data: { checkoutUrl } });

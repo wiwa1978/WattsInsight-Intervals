@@ -18,11 +18,12 @@ export const userOnlySchema = z.object({
 
 export const setUserPasswordSchema = z.object({
   userId: z.string().uuid(),
-  newPassword: z.string().min(1).max(255),
+  newPassword: z.string().min(8).max(128),
 });
 
 export const banUserSchema = z.object({
   userId: z.string().uuid(),
+  secret: z.string().trim().min(1).max(255),
   banReason: z.string().trim().min(1).max(1000).optional(),
   banExpiresIn: z.number().int().positive().optional(),
 });

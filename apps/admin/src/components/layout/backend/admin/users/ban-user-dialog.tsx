@@ -123,6 +123,7 @@ export function BanUserDialog({
 
     const result = await banAdminUser({
       userId,
+      secret: values.secretKey,
       ...(values.reason && { banReason: values.reason }),
       ...(banExpiresIn && { banExpiresIn }),
     });
