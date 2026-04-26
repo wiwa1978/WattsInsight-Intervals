@@ -1,4 +1,5 @@
 export * from "./common/result";
+export * from "./common/error-codes";
 export * from "./common/pagination";
 export * from "./common/query";
 export * from "./common/ids";

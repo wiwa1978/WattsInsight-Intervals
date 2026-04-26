@@ -3,3 +3,5 @@ export { authAdditionalUserFields, hasAdminAccess, normalizeAuthEmail, normalize
 export * from "./create-auth-module";
 export * from "./middleware/require-admin";
 export * from "./middleware/require-admin-access";
+export * from "./mobile-sign-in-gate";
+export type { AuthUserRecord, AuthModuleOptions, AuthContextVariables, AuthMiddleware, AuthenticatedUser } from "./types";

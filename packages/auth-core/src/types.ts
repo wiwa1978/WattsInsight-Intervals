@@ -11,14 +11,26 @@ export type AuthGuardContext = {
   };
 };
 
+export type AuthUserRecord = {
+  id: string;
+  role?: string | null;
+  email?: string | null;
+  /**
+   * Required for the mobile sign-in gate. Cookie-only deployments may stub
+   * these to `true`/`false`/`false` respectively, but mobile flows MUST
+   * surface the real values so {@link enforceMobileSignInGate} can apply
+   * email-verification, 2FA, and ban checks.
+   */
+  emailVerified?: boolean;
+  twoFactorEnabled?: boolean | null;
+  banned?: boolean | null;
+  banExpires?: Date | null;
+};
+
 export type AuthModuleOptions = {
   betterAuthOptions: BetterAuthOptions;
   users: {
-    findById: (userId: string) => Promise<{
-      id: string;
-      role?: string | null;
-      email?: string | null;
-    } | null>;
+    findById: (userId: string) => Promise<AuthUserRecord | null>;
   };
   admin: {
     allowlist: Set<string>;
