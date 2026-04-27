@@ -73,20 +73,26 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
   };
 
   const handleStopImpersonating = async () => {
-    const result = await stopAdminImpersonation();
-    if ((result as { error?: unknown }).error) {
-      toast.error(t("admin.impersonation.stopError"));
-      return;
-    }
+    try {
+      const result = await stopAdminImpersonation();
+      if ((result as { error?: unknown }).error) {
+        toast.error(t("admin.impersonation.stopError"));
+        return;
+      }
 
-    toast.success(t("admin.impersonation.stopped"));
-    const adminAppUrl = process.env.NEXT_PUBLIC_ADMIN_APP_URL;
-    if (adminAppUrl) {
+      const adminAppUrl = process.env.NEXT_PUBLIC_ADMIN_APP_URL;
+      if (!adminAppUrl) {
+        toast.error(t("admin.impersonation.adminUrlMissing"));
+        router.refresh();
+        return;
+      }
+
+      toast.success(t("admin.impersonation.stopped"));
       window.location.assign(new URL("/admin/overview", adminAppUrl).toString());
-    } else {
-      toast.error(t("admin.impersonation.adminUrlMissing"));
+      router.refresh();
+    } catch {
+      toast.error(t("admin.impersonation.stopError"));
     }
-    router.refresh();
   };
 
   if (!session?.user) {

@@ -86,15 +86,19 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
   };
 
   const handleStopImpersonating = async () => {
-    const result = await stopAdminImpersonation();
-    if ((result as { error?: unknown }).error) {
-      toast.error(t("admin.impersonation.stopError"));
-      return;
-    }
+    try {
+      const result = await stopAdminImpersonation();
+      if ((result as { error?: unknown }).error) {
+        toast.error(t("admin.impersonation.stopError"));
+        return;
+      }
 
-    toast.success(t("admin.impersonation.stopped"));
-    router.push("/admin/overview");
-    router.refresh();
+      toast.success(t("admin.impersonation.stopped"));
+      router.push("/admin/overview");
+      router.refresh();
+    } catch {
+      toast.error(t("admin.impersonation.stopError"));
+    }
   };
 
   if (!session?.user) {
