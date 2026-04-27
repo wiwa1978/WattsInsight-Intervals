@@ -642,7 +642,7 @@ export function createAdminRouter() {
       return validationError(c, "Invalid notification search query");
     }
 
-    const users = await bootstrap.vouchersService.searchUsers(parsedQuery.data.query, parsedQuery.data.limit);
+    const users = await bootstrap.adminService.searchUsers(parsedQuery.data.query, parsedQuery.data.limit);
     return c.json({ success: true, data: users });
   });
 

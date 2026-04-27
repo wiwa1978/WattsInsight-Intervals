@@ -751,7 +751,21 @@
         "title": "Send Notification to All Users",
         "description": "This will send a notification to every user in the system. Provide translations for each language.",
         "success": "Notification sent to {count} users successfully.",
+        "skipped": "{count} skipped.",
         "error": "Failed to send notification. Please try again.",
+        "sendSelected": {
+          "title": "Send Notification to Selected Users",
+          "description": "This will send a notification only to selected users. Provide translations for each language."
+        },
+        "recipients": {
+          "label": "Recipients",
+          "description": "Choose whether to notify every user or only selected users.",
+          "allUsers": "All users",
+          "selectedUsers": "Selected users",
+          "placeholder": "Select notification recipients...",
+          "summary": "{count} recipient(s) selected",
+          "emptyError": "Select at least one recipient"
+        },
         "form": {
           "title": "Title",
           "titlePlaceholder": "Enter notification title",
@@ -781,6 +795,7 @@
           "bannerExpiresAtDescription": "Banner will be hidden after this date and time",
           "bannerTime": "Expiry Time",
           "submit": "Send to All Users",
+          "submitSelected": "Send to Selected Users",
           "sending": "Sending..."
         }
       },

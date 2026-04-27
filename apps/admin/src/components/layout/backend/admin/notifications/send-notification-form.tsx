@@ -83,7 +83,7 @@ export function SendNotificationForm() {
     setIsSubmitting(true);
     try {
       if (recipientMode === "selected" && selectedUserIds.length === 0) {
-        toast.error("Select at least one recipient");
+        toast.error(t("recipients.emptyError"));
         return;
       }
 
@@ -122,7 +122,7 @@ export function SendNotificationForm() {
 
       if (result.success) {
         const successMessage = t("success", { count: result.sentCount || 0 });
-        toast.success(result.skippedCount > 0 ? `${successMessage} ${result.skippedCount} skipped.` : successMessage);
+        toast.success(result.skippedCount > 0 ? `${successMessage} ${t("skipped", { count: result.skippedCount })}` : successMessage);
         form.reset();
         setSelectedUserIds([]);
         router.refresh();
@@ -139,24 +139,24 @@ export function SendNotificationForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("sendToAll.title")}</CardTitle>
-        <CardDescription>{t("sendToAll.description")}</CardDescription>
+        <CardTitle>{t(recipientMode === "selected" ? "sendSelected.title" : "sendToAll.title")}</CardTitle>
+        <CardDescription>{t(recipientMode === "selected" ? "sendSelected.description" : "sendToAll.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-3 rounded-md border p-4">
               <div className="space-y-1">
-                <FormLabel>Recipients</FormLabel>
-                <FormDescription>Choose whether to notify every user or only selected users.</FormDescription>
+                <FormLabel>{t("recipients.label")}</FormLabel>
+                <FormDescription>{t("recipients.description")}</FormDescription>
               </div>
               <Select value={recipientMode} onValueChange={(value: "all" | "selected") => setRecipientMode(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All users</SelectItem>
-                  <SelectItem value="selected">Selected users</SelectItem>
+                  <SelectItem value="all">{t("recipients.allUsers")}</SelectItem>
+                  <SelectItem value="selected">{t("recipients.selectedUsers")}</SelectItem>
                 </SelectContent>
               </Select>
               {recipientMode === "selected" && (
@@ -165,8 +165,8 @@ export function SendNotificationForm() {
                   onSelectionChange={setSelectedUserIds}
                   searchUsers={searchUsersForNotification}
                   disabled={isSubmitting}
-                  placeholder="Select notification recipients..."
-                  selectionSummary={(count) => `${count} recipient${count === 1 ? "" : "s"} selected`}
+                  placeholder={t("recipients.placeholder")}
+                  selectionSummary={(count) => t("recipients.summary", { count })}
                 />
               )}
             </div>
@@ -476,7 +476,7 @@ export function SendNotificationForm() {
               ) : (
                 <>
                   <Send className="mr-2 h-4 w-4" />
-                  {t("form.submit")}
+                  {t(recipientMode === "selected" ? "form.submitSelected" : "form.submit")}
                 </>
               )}
             </Button>
