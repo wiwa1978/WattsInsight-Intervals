@@ -731,6 +731,10 @@
           "allUsers": "Tous les utilisateurs",
           "selectedUsers": "Utilisateurs sélectionnés",
           "placeholder": "Sélectionnez les destinataires...",
+          "searchPlaceholder": "Rechercher par nom ou e-mail...",
+          "loadingMessage": "Recherche...",
+          "emptyMessage": "Aucun utilisateur trouvé",
+          "minSearchMessage": "Saisissez au moins 2 caractères pour rechercher",
           "summary": "{count} destinataire(s) sélectionné(s)",
           "emptyError": "Sélectionnez au moins un destinataire"
         },

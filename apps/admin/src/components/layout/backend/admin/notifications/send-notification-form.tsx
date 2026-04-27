@@ -166,6 +166,10 @@ export function SendNotificationForm() {
                   searchUsers={searchUsersForNotification}
                   disabled={isSubmitting}
                   placeholder={t("recipients.placeholder")}
+                  searchPlaceholder={t("recipients.searchPlaceholder")}
+                  loadingMessage={t("recipients.loadingMessage")}
+                  emptyMessage={t("recipients.emptyMessage")}
+                  minSearchMessage={t("recipients.minSearchMessage")}
                   selectionSummary={(count) => t("recipients.summary", { count })}
                 />
               )}

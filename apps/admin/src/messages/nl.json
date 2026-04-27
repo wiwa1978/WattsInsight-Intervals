@@ -731,6 +731,10 @@
           "allUsers": "Alle gebruikers",
           "selectedUsers": "Geselecteerde gebruikers",
           "placeholder": "Selecteer ontvangers...",
+          "searchPlaceholder": "Zoek gebruikers op naam of e-mail...",
+          "loadingMessage": "Zoeken...",
+          "emptyMessage": "Geen gebruikers gevonden",
+          "minSearchMessage": "Typ minstens 2 tekens om te zoeken",
           "summary": "{count} ontvanger(s) geselecteerd",
           "emptyError": "Selecteer minstens één ontvanger"
         },
