@@ -131,14 +131,26 @@ export function PurchaseHistoryTable({
 
   const limit = PURCHASES_LIMIT;
   const isServerBacked = Boolean(onSearchPageChange);
-  const total = serverTotal ?? purchases.length;
+  const filteredPurchases = React.useMemo(() => {
+    if (isServerBacked || !searchQuery) return purchases;
+
+    const query = searchQuery.toLowerCase();
+    return purchases.filter((purchase) => (
+      purchase.userName?.toLowerCase().includes(query) ||
+      purchase.userEmail?.toLowerCase().includes(query) ||
+      purchase.packageKey.toLowerCase().includes(query) ||
+      purchase.paymentStatus.toLowerCase().includes(query) ||
+      purchase.paymentId?.toLowerCase().includes(query)
+    ));
+  }, [isServerBacked, purchases, searchQuery]);
+  const total = serverTotal ?? filteredPurchases.length;
   const totalPages = Math.ceil(total / limit);
 
   const visiblePurchases = React.useMemo(() => {
     if (isServerBacked) return purchases;
     const start = (currentPage - 1) * limit;
-    return purchases.slice(start, start + limit);
-  }, [currentPage, isServerBacked, limit, purchases]);
+    return filteredPurchases.slice(start, start + limit);
+  }, [currentPage, filteredPurchases, isServerBacked, limit, purchases]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

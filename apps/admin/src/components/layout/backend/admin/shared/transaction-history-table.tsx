@@ -151,14 +151,25 @@ export function TransactionHistoryTable({
 
   const limit = TRANSACTIONS_LIMIT;
   const isServerBacked = Boolean(onSearchPageChange);
-  const total = serverTotal ?? transactions.length;
+  const filteredTransactions = React.useMemo(() => {
+    if (isServerBacked || !searchQuery) return transactions;
+
+    const query = searchQuery.toLowerCase();
+    return transactions.filter((transaction) => (
+      transaction.userName?.toLowerCase().includes(query) ||
+      transaction.userEmail?.toLowerCase().includes(query) ||
+      transaction.type.toLowerCase().includes(query) ||
+      transaction.description?.toLowerCase().includes(query)
+    ));
+  }, [isServerBacked, searchQuery, transactions]);
+  const total = serverTotal ?? filteredTransactions.length;
   const totalPages = Math.ceil(total / limit);
 
   const visibleTransactions = React.useMemo(() => {
     if (isServerBacked) return transactions;
     const start = (currentPage - 1) * limit;
-    return transactions.slice(start, start + limit);
-  }, [currentPage, isServerBacked, limit, transactions]);
+    return filteredTransactions.slice(start, start + limit);
+  }, [currentPage, filteredTransactions, isServerBacked, limit, transactions]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
