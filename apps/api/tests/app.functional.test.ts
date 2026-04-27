@@ -1139,7 +1139,14 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "notification_batch",
       targetId: "11111111-1111-4111-8111-111111111111",
-      after: expect.objectContaining({ title: "Ops", message: "Maintenance", scope: "all" }),
+      after: expect.objectContaining({
+        title: "Ops",
+        message: "Maintenance",
+        scope: "all",
+        type: "info",
+        category: "system",
+        showAsBanner: false,
+      }),
       metadata: expect.objectContaining({ sentCount: 3 }),
     }));
 

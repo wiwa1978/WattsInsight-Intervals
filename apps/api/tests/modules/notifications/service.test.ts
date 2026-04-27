@@ -128,6 +128,38 @@ describe("createNotificationsService", () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  it("listForUser strips internal batch metadata from notification data", async () => {
+    const limit = vi.fn().mockResolvedValue([
+      {
+        id: "n1",
+        data: {
+          notificationBatchId: "11111111-1111-4111-8111-111111111111",
+          translations: { title: "Hallo" },
+          source: "admin",
+        },
+      },
+      { id: "n2", data: null },
+    ]);
+    const orderBy = vi.fn().mockReturnValue({ limit });
+    const where = vi.fn().mockReturnValue({ orderBy });
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = createNotificationsService({ db: { select } as any });
+
+    const result = await service.listForUser("u1", 10);
+
+    expect(result).toEqual([
+      {
+        id: "n1",
+        data: {
+          translations: { title: "Hallo" },
+          source: "admin",
+        },
+      },
+      { id: "n2", data: null },
+    ]);
+  });
+
   // Verifies targeted notifications deduplicate recipients and report missing users without failing the request.
   it("sendNotificationToUsers inserts valid recipients and reports invalid recipients", async () => {
     const values = vi.fn().mockResolvedValue(undefined);

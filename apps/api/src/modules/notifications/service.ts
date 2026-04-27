@@ -27,6 +27,26 @@ function withBatchData(data: Record<string, unknown> | undefined, batchId: strin
   };
 }
 
+function sanitizeNotificationData(data: unknown) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return data;
+  }
+
+  const { notificationBatchId: _notificationBatchId, ...publicData } = data as Record<string, unknown>;
+  return publicData;
+}
+
+function sanitizeNotificationRow<T extends { data?: unknown }>(row: T): T {
+  if (!("data" in row)) {
+    return row;
+  }
+
+  return {
+    ...row,
+    data: sanitizeNotificationData(row.data),
+  };
+}
+
 async function withTransaction<T>(db: any, callback: (tx: any) => Promise<T>) {
   if (typeof db.transaction === "function") {
     return db.transaction(callback);
@@ -78,12 +98,14 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
   async function listForUser(userId: string, limit = 20) {
     const normalizedLimit = normalizeLimit(limit, 100);
 
-    return deps.db
+    const rows = await deps.db
       .select()
       .from(notification)
       .where(eq(notification.userId, userId))
       .orderBy(desc(notification.createdAt))
       .limit(normalizedLimit);
+
+    return rows.map(sanitizeNotificationRow);
   }
 
   async function unreadCount(userId: string) {
@@ -118,7 +140,7 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
   async function getAllNotifications(limit = 50) {
     const normalizedLimit = normalizeLimit(limit, 100);
 
-    return deps.db
+    const rows = await deps.db
       .select({
         id: notification.id,
         title: notification.title,
@@ -133,6 +155,8 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       .from(notification)
       .orderBy(desc(notification.createdAt))
       .limit(normalizedLimit);
+
+    return rows.map(sanitizeNotificationRow);
   }
 
   async function sendNotificationToAllUsers(input: {
