@@ -68,7 +68,11 @@ function findUnterminatedQuotedValueEnd(value: string, start: number, extraDelim
 
 function findUnquotedValueEnd(value: string, start: number, extraDelimiters: string) {
   let index = start;
-  while (index < value.length && !/\s/.test(value[index] ?? "") && !extraDelimiters.includes(value[index] ?? "")) {
+  while (index < value.length && !extraDelimiters.includes(value[index] ?? "")) {
+    if (index > start && value.slice(index).search(SECRET_ASSIGNMENT_PREFIX_PATTERN) === 0) {
+      return index;
+    }
+
     index += 1;
   }
 

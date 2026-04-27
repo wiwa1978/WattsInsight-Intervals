@@ -1383,6 +1383,36 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies unquoted multi-token secrets do not leak trailing tokens.
+  it("redacts unquoted multi-token secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: "client payload Authorization: Basic abc123",
+        userAgent: "agent password: correct horse battery",
+        context: {
+          detail: "client_secret = correct horse battery token: plain-secret",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("Authorization: [redacted]");
+    expect(output).toContain("password: [redacted]");
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).toContain("token: [redacted]");
+    expect(output).not.toContain("Basic abc123");
+    expect(output).not.toContain("correct horse");
+    expect(output).not.toContain("horse battery");
+    expect(output).not.toContain("plain-secret");
+    infoSpy.mockRestore();
+  });
+
   // Verifies free-form client strings redact sensitive key/value assignments with spaced equals signs.
   it("redacts whitespace-tolerant secret assignments in client log strings", async () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});

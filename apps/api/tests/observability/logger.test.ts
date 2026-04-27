@@ -68,6 +68,13 @@ describe("redactString", () => {
     expect(redactString('\\"password\\"=\\"secret value\\"')).toBe('\\"password\\"=[redacted]');
   });
 
+  it("redacts unquoted multi-token secret assignment values", () => {
+    expect(redactString("Authorization: Basic abc123")).toBe("Authorization: [redacted]");
+    expect(redactString("password: correct horse battery")).toBe("password: [redacted]");
+    expect(redactString("client_secret = correct horse battery")).toBe("client_secret = [redacted]");
+    expect(redactString("password: correct horse token: plain-secret")).toBe("password: [redacted]token: [redacted]");
+  });
+
   it("keeps redacting existing colon-style secret variants", () => {
     expect(redactString('"token": abc123')).toBe('"token": [redacted]');
     expect(redactString('"client_secret" : bare-secret')).toBe('"client_secret" : [redacted]');
@@ -251,6 +258,33 @@ describe("logger metadata serialization", () => {
     expect(output).toContain('\\"password\\"=[redacted]');
     expect(output).not.toContain("secret value");
     expect(output).not.toContain("bare-secret");
+  });
+
+  it("redacts unquoted multi-token metadata secrets without leaking values", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-logs-"));
+    tmpDirs.push(dir);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.doMock("../../src/env", () => ({ env: { NODE_ENV: "test", LOG_FILE_PATH: dir } }));
+    const { logger } = await import("../../src/observability/logger");
+
+    logger.warn(
+      {
+        safe: "Authorization: Basic abc123",
+        nested: { detail: "client_secret = correct horse battery token: plain-secret" },
+      },
+      "client sent password: correct horse battery",
+    );
+
+    const output = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("Authorization: [redacted]");
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).toContain("token: [redacted]");
+    expect(output).toContain("password: [redacted]");
+    expect(output).not.toContain("Basic abc123");
+    expect(output).not.toContain("correct horse");
+    expect(output).not.toContain("horse battery");
+    expect(output).not.toContain("plain-secret");
   });
 
   it("redacts long quoted metadata secrets before serialization truncates strings", async () => {
