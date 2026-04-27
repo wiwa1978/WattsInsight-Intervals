@@ -1507,8 +1507,8 @@ describe("API functional routes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         level: "info",
-        message: 'client payload password: "abc}def"',
-        userAgent: "agent client_secret = 'abc}def'",
+        message: 'client payload password: "abc}def" {"password":"abc}def"}',
+        userAgent: String.raw`agent client_secret = 'abc}def' \"password\":\"abc}def\"`,
         context: {
           detail: 'password: "abc}def"',
         },
@@ -1518,6 +1518,8 @@ describe("API functional routes", () => {
     expect(res.status).toBe(200);
     const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
     expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
     expect(output).toContain("client_secret = [redacted]");
     expect(output).not.toContain("abc");
     expect(output).not.toContain("def");

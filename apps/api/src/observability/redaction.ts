@@ -16,6 +16,8 @@ const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
 const JWT_PATTERN = /\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
 function findQuotedValueEnd(value: string, start: number, quote: string, stopAtStructuralDelimiter = false) {
+  let structuralDelimiterIndex = -1;
+
   for (let index = start + 1; index < value.length; index += 1) {
     if (value[index] === "\\") {
       index += 1;
@@ -23,11 +25,19 @@ function findQuotedValueEnd(value: string, start: number, quote: string, stopAtS
     }
 
     if (value[index] === quote) {
+      if (
+        stopAtStructuralDelimiter &&
+        structuralDelimiterIndex !== -1 &&
+        value.slice(structuralDelimiterIndex + 1, index).search(SECRET_ASSIGNMENT_PREFIX_PATTERN) !== -1
+      ) {
+        return -1;
+      }
+
       return index;
     }
 
-    if (stopAtStructuralDelimiter && value[index] === "}") {
-      return -1;
+    if (stopAtStructuralDelimiter && value[index] === "}" && structuralDelimiterIndex === -1) {
+      structuralDelimiterIndex = index;
     }
   }
 
@@ -35,13 +45,23 @@ function findQuotedValueEnd(value: string, start: number, quote: string, stopAtS
 }
 
 function findEscapedQuotedValueEnd(value: string, start: number, quote: string, stopAtStructuralDelimiter = false) {
+  let structuralDelimiterIndex = -1;
+
   for (let index = start + 2; index < value.length; index += 1) {
     if (value[index] === "\\" && value[index + 1] === quote && value[index - 1] !== "\\") {
+      if (
+        stopAtStructuralDelimiter &&
+        structuralDelimiterIndex !== -1 &&
+        value.slice(structuralDelimiterIndex + 1, index).search(SECRET_ASSIGNMENT_PREFIX_PATTERN) !== -1
+      ) {
+        return -1;
+      }
+
       return index;
     }
 
-    if (stopAtStructuralDelimiter && value[index] === "}") {
-      return -1;
+    if (stopAtStructuralDelimiter && value[index] === "}" && structuralDelimiterIndex === -1) {
+      structuralDelimiterIndex = index;
     }
   }
 

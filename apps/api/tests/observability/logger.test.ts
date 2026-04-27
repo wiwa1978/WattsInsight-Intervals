@@ -58,6 +58,8 @@ describe("redactString", () => {
   it("redacts quoted secret values containing structural delimiters", () => {
     expect(redactString('password: "abc}def"')).toBe('password: "[redacted]"');
     expect(redactString("client_secret = 'abc}def'")).toBe("client_secret = [redacted]");
+    expect(redactString('{"password":"abc}def"}')).toBe('{"password":"[redacted]"}');
+    expect(redactString(String.raw`\"password\":\"abc}def\"`)).toBe(String.raw`\"password\":\"[redacted]\"`);
   });
 
   it("redacts serialized escaped-quote secret values without leaking suffix tokens", () => {
@@ -232,14 +234,16 @@ describe("logger metadata serialization", () => {
 
     logger.warn(
       {
-        safe: 'password: "abc}def"',
+        safe: 'password: "abc}def" {"password":"abc}def"}',
         nested: { detail: "client_secret = 'abc}def'" },
       },
-      'client sent password: "abc}def"',
+      String.raw`client sent password: "abc}def" \"password\":\"abc}def\"`,
     );
 
     const output = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
     expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
     expect(output).toContain("client_secret = [redacted]");
     expect(output).not.toContain("abc");
     expect(output).not.toContain("def");
