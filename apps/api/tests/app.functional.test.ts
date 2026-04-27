@@ -107,6 +107,10 @@ const mocks = vi.hoisted(() => {
       return builder;
     }),
   };
+  const Sentry = {
+    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
+    captureMessage: vi.fn(),
+  };
 
   return {
     billingService,
@@ -117,6 +121,7 @@ const mocks = vi.hoisted(() => {
     auditService,
     adminAuthApi,
     db,
+    Sentry,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -252,10 +257,7 @@ vi.mock("@platform/email-core", () => ({
 
 vi.mock("../src/observability/sentry", () => ({
   setupSentry: vi.fn(),
-  Sentry: {
-    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
-    captureMessage: vi.fn(),
-  },
+  Sentry: mocks.Sentry,
 }));
 
 const [
@@ -1337,6 +1339,295 @@ describe("API functional routes", () => {
     expect(output).not.toContain("secret-token");
     expect(output).not.toContain("abc.def.ghi");
     infoSpy.mockRestore();
+  });
+
+  // Verifies JSON-like and colon-style secrets in client strings are redacted.
+  it("redacts colon-style secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"token": abc123,"password": "password-secret"} password: "correct horse battery staple"',
+        userAgent: "agent refreshToken: refresh-secret",
+        context: {
+          detail:
+            "token: plain-secret accessToken: access-secret \"client_secret\" : bare-secret client_secret: 'single word secret' 'client_secret': 'single-secret'",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"token\\": [redacted]');
+    expect(output).toContain('\\"password\\": \\"[redacted]\\"');
+    expect(output).toContain('\\"client_secret\\" : [redacted]');
+    expect(output).toContain("'client_secret': '[redacted]'");
+    expect(output).toContain("refreshToken: [redacted]");
+    expect(output).toContain("accessToken: [redacted]");
+    expect(output).toContain('password: \\\"[redacted]\\\"');
+    expect(output).toContain("client_secret: '[redacted]'");
+    expect(output).not.toContain("abc123");
+    expect(output).not.toContain("password-secret");
+    expect(output).not.toContain("correct horse battery staple");
+    expect(output).not.toContain("horse battery staple");
+    expect(output).not.toContain("refresh-secret");
+    expect(output).not.toContain("plain-secret");
+    expect(output).not.toContain("access-secret");
+    expect(output).not.toContain("bare-secret");
+    expect(output).not.toContain("single word secret");
+    expect(output).not.toContain("word secret");
+    expect(output).not.toContain("single-secret");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies unquoted multi-token secrets do not leak trailing tokens.
+  it("redacts unquoted multi-token secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: "client payload Authorization: Basic abc123",
+        userAgent: "agent password: correct horse battery",
+        context: {
+          detail: "client_secret = correct horse battery token: plain-secret",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("Authorization: [redacted]");
+    expect(output).toContain("password: [redacted]");
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).toContain("token: [redacted]");
+    expect(output).not.toContain("Basic abc123");
+    expect(output).not.toContain("correct horse");
+    expect(output).not.toContain("horse battery");
+    expect(output).not.toContain("plain-secret");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies free-form client strings redact sensitive key/value assignments with spaced equals signs.
+  it("redacts whitespace-tolerant secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client_secret = "multi word secret"',
+        userAgent: "agent password = 'correct horse battery staple'",
+        context: {
+          detail: "clientSecret = def456",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).toContain("password = [redacted]");
+    expect(output).toContain("clientSecret = [redacted]");
+    expect(output).not.toContain("multi word secret");
+    expect(output).not.toContain("word secret");
+    expect(output).not.toContain("correct horse battery staple");
+    expect(output).not.toContain("horse battery staple");
+    expect(output).not.toContain("def456");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies quoted sensitive keys are redacted for equals assignments too.
+  it("redacts quoted equals secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload "password" = "secret value"',
+        userAgent: 'agent "client_secret" = bare-secret',
+        context: {
+          detail: '\\"password\\"=\\"secret value\\"',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\" = [redacted]');
+    expect(output).toContain('\\"client_secret\\" = [redacted]');
+    expect(output).toContain('\\\\\\"password\\\\\\"=[redacted]');
+    expect(output).not.toContain("secret value");
+    expect(output).not.toContain("bare-secret");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies escaped quote delimiters do not terminate redaction early.
+  it("redacts escaped delimiter secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"password":"abc\\"def"} password: "abc\\"def"',
+        userAgent: "agent api_key = 'abc\\'def'",
+        context: {
+          detail: "client_secret: 'abc\\'def'",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain("api_key = [redacted]");
+    expect(output).toContain("client_secret: '[redacted]'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies structural delimiters inside quoted secret values are not treated as value boundaries.
+  it("redacts quoted secret values containing structural delimiters in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload password: "abc}def" {"password":"abc}def"}',
+        userAgent: String.raw`agent client_secret = 'abc}def' \"password\":\"abc}def\"`,
+        context: {
+          detail: 'password: "abc}def"',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies serialized escaped quote delimiters inside values do not end redaction early.
+  it("redacts serialized escaped-quote client log strings without leaking suffix tokens", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: String.raw`client payload \"password\":\"abc\\\"def\"`,
+        userAgent: String.raw`agent \"password\"=\"abc\\\"def\"`,
+        context: {
+          detail: String.raw`\'client_secret\':\'abc\\\'def\'`,
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
+    expect(output).toContain('\\\\\\"password\\\\\\"=[redacted]');
+    expect(output).toContain("\\\\'client_secret\\\\':\\\\'[redacted]\\\\'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies malformed quoted assignments do not leak remaining secret tokens.
+  it("redacts unterminated quoted secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"password":"first second} password = "first second',
+        userAgent: 'agent password: "first second',
+        context: {
+          detail: '"client_secret" : "first second',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\":[redacted]');
+    expect(output).toContain("password = [redacted]");
+    expect(output).toContain("password: [redacted]");
+    expect(output).toContain('\\"client_secret\\" : [redacted]');
+    expect(output).not.toContain("first");
+    expect(output).not.toContain("second");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies Sentry receives only sanitized bounded client log context.
+  it("sends only sanitized bounded client log context to Sentry", async () => {
+    mocks.Sentry.captureMessage.mockClear();
+
+    const wideContext = Object.fromEntries(Array.from({ length: 20 }, (_, index) => [`extra${index}`, `value${index}`]));
+
+    const payload = {
+      source: "web",
+      level: "error",
+      message: "failed with token=abc123 and bearer Bearer abc.def.ghi",
+      url: "https://example.com/path?token=abc&safe=yes",
+      userAgent: "Vitest",
+      context: {
+        safe: "ok",
+        password: "secret",
+        longValue: "x".repeat(600),
+        nested: { authorization: "Bearer abc.def.ghi", safe: "ok" },
+        ...wideContext,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    expect(res.status).toBe(200);
+    const sentryContext = mocks.Sentry.captureMessage.mock.calls[0]?.[1]?.extra?.context as Record<string, unknown>;
+
+    expect(Object.keys(sentryContext)).toHaveLength(8);
+    expect(String(sentryContext.longValue).length).toBeLessThanOrEqual(128);
+    expect(sentryContext.extra19).toBeUndefined();
+    expect(mocks.Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.not.stringContaining("abc.def.ghi"),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          url: expect.not.stringContaining("token=abc"),
+          context: expect.objectContaining({
+            safe: "ok",
+            password: "[redacted]",
+            nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
+          }),
+        }),
+      }),
+    );
   });
 
   // Verifies guarded endpoints reject oversized bodies before route parsing.

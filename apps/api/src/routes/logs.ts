@@ -6,7 +6,7 @@ import { clientLogSchema } from "@platform/contracts";
 import type { AppEnv } from "../context";
 import { fail } from "../lib/http";
 import { logger } from "../observability/logger";
-import { redactLogValue, redactString } from "../observability/redaction";
+import { redactLogValue, redactSafeContext, redactString } from "../observability/redaction";
 import { Sentry } from "../observability/sentry";
 
 const MAX_CLIENT_LOG_BYTES = 4 * 1024;
@@ -52,14 +52,21 @@ export function createLogsRouter() {
     const payload = parsed.data;
     const requestId = c.get("requestId");
     const message = redactString(payload.message);
+    const context = redactLogValue(payload.context);
+    const sentryContext = redactSafeContext(payload.context);
+    const sentryExtra = {
+      url: payload.url ? redactString(payload.url) : undefined,
+      userAgent: payload.userAgent ? redactString(payload.userAgent) : undefined,
+      context: sentryContext,
+    };
     const logRecord = {
       requestId,
       source: "web",
       ip,
-      url: payload.url ? redactString(payload.url) : undefined,
-      userAgent: payload.userAgent ? redactString(payload.userAgent) : undefined,
+      url: sentryExtra.url,
+      userAgent: sentryExtra.userAgent,
       timestamp: payload.timestamp,
-      context: redactLogValue(payload.context),
+      context,
     };
 
     if (payload.level === "error") {
@@ -69,7 +76,7 @@ export function createLogsRouter() {
         tags: {
           source: "web",
         },
-        extra: logRecord,
+        extra: sentryExtra,
       });
     } else if (payload.level === "warn") {
       logger.warn(logRecord, message);
@@ -78,7 +85,7 @@ export function createLogsRouter() {
         tags: {
           source: "web",
         },
-        extra: logRecord,
+        extra: sentryExtra,
       });
     } else if (payload.level === "info") {
       logger.info(logRecord, message);
