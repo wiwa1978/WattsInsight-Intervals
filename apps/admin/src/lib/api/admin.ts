@@ -23,10 +23,17 @@ export async function getAdminDashboardStatsApi() {
   return result.data;
 }
 
-export async function getAdminUsersApi(limit = 20, offset = 0) {
-  const result = await apiRequest<{ success: boolean; data: unknown }>(
-    `/admin/users?limit=${limit}&offset=${offset}`,
-  );
+export async function getAdminUsersApi(limit = 20, offset = 0, search?: string) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    offset: String(offset),
+  });
+
+  if (search?.trim()) {
+    params.set("search", search.trim());
+  }
+
+  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/users?${params.toString()}`);
   return result.data;
 }
 

@@ -190,9 +190,9 @@ export async function getAdminCreditsConsumedData(timeRange: TimeRange) {
   return getAdminCreditsConsumedDataApi(timeRange) as Promise<Array<{ period: string; consumed: number }>>;
 }
 
-export async function getUsers(limit = 20, offset = 0) {
+export async function getUsers(limit = 20, offset = 0, search?: string) {
   try {
-    const result = (await getAdminUsersApi(limit, offset)) as {
+    const result = (await getAdminUsersApi(limit, offset, search)) as {
       users: Array<{
         id: string;
         name: string;
