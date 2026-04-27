@@ -1413,6 +1413,33 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies quoted sensitive keys are redacted for equals assignments too.
+  it("redacts quoted equals secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload "password" = "secret value"',
+        userAgent: 'agent "client_secret" = bare-secret',
+        context: {
+          detail: '\\"password\\"=\\"secret value\\"',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\" = [redacted]');
+    expect(output).toContain('\\"client_secret\\" = [redacted]');
+    expect(output).toContain('\\\\\\"password\\\\\\"=[redacted]');
+    expect(output).not.toContain("secret value");
+    expect(output).not.toContain("bare-secret");
+    infoSpy.mockRestore();
+  });
+
   // Verifies escaped quote delimiters do not terminate redaction early.
   it("redacts escaped delimiter secrets in client log strings", async () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});

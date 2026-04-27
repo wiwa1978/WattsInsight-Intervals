@@ -9,7 +9,7 @@ const SENSITIVE_KEY_PATTERN = /(?:password|passcode|secret|token|authorization|c
 const SENSITIVE_STRING_KEY_PATTERN = String.raw`[A-Za-z0-9_-]*(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)[A-Za-z0-9_-]*`;
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
 const SECRET_ASSIGNMENT_PREFIX_PATTERN = new RegExp(
-  String.raw`((?:\b${SENSITIVE_STRING_KEY_PATTERN}\s*=|(?:\\(["'])${SENSITIVE_STRING_KEY_PATTERN}\\\2|(["'])${SENSITIVE_STRING_KEY_PATTERN}\3|\b${SENSITIVE_STRING_KEY_PATTERN})\s*:)\s*)`,
+  String.raw`((?:(?:\\(["'])${SENSITIVE_STRING_KEY_PATTERN}\\\2|(["'])${SENSITIVE_STRING_KEY_PATTERN}\3|\b${SENSITIVE_STRING_KEY_PATTERN})\s*[:=])\s*)`,
   "gi",
 );
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
