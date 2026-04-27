@@ -11,6 +11,12 @@ import type { CreatePaymentsModuleOptions, WebhookFailureAuditEvent } from "./ty
 
 type SafeDodoMetadata = Pick<WebhookFailureAuditEvent, "providerEventId" | "eventType" | "paymentId">;
 
+const UNAUTHENTICATED_DODO_METADATA: SafeDodoMetadata = {
+  providerEventId: null,
+  eventType: null,
+  paymentId: null,
+};
+
 type SafeWebhookFailureError =
   | Exclude<WebhookVerifyResult, { ok: true }>["reason"]
   | "invalid_json"
@@ -84,7 +90,7 @@ function signatureTimestamp(signatureHeader: string | null) {
 
 function extractSafeDodoMetadata(payload: unknown): SafeDodoMetadata {
   if (!payload || typeof payload !== "object") {
-    return { providerEventId: null, eventType: null, paymentId: null };
+    return UNAUTHENTICATED_DODO_METADATA;
   }
 
   const record = payload as Record<string, unknown>;
@@ -94,14 +100,6 @@ function extractSafeDodoMetadata(payload: unknown): SafeDodoMetadata {
     eventType: typeof record.type === "string" ? record.type : null,
     paymentId: typeof data?.payment_id === "string" ? data.payment_id : null,
   };
-}
-
-function tryParseSafeDodoMetadata(rawBody: string): SafeDodoMetadata {
-  try {
-    return extractSafeDodoMetadata(JSON.parse(rawBody));
-  } catch {
-    return { providerEventId: null, eventType: null, paymentId: null };
-  }
 }
 
 async function recordWebhookFailure(
@@ -149,7 +147,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
         );
 
     if (!verification.ok) {
-      await recordWebhookFailure(options, tryParseSafeDodoMetadata(rawBody), verification.reason);
+      await recordWebhookFailure(options, UNAUTHENTICATED_DODO_METADATA, verification.reason);
       const { status, body } = failureToResponse(verification.reason);
       return c.json(body, status);
     }
@@ -158,7 +156,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     try {
       payload = JSON.parse(rawBody);
     } catch {
-      await recordWebhookFailure(options, { providerEventId: null, eventType: null, paymentId: null }, "invalid_json");
+      await recordWebhookFailure(options, UNAUTHENTICATED_DODO_METADATA, "invalid_json");
       return c.json({ success: false, error: "Invalid JSON payload" }, 400);
     }
 

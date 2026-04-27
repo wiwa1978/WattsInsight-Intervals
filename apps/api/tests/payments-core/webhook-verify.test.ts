@@ -141,7 +141,7 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
 
-  it("401 reports safe webhook failure metadata for signature rejection", async () => {
+  it("401 reports only unauthenticated-safe webhook failure metadata when signature header is missing", async () => {
     const onWebhookFailure = vi.fn(async () => {});
     const { app, onPaymentEvent } = build({ onWebhookFailure });
     const payload = JSON.stringify({
@@ -159,13 +159,54 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(onPaymentEvent).not.toHaveBeenCalled();
     expect(onWebhookFailure).toHaveBeenCalledWith({
       provider: "dodo",
-      providerEventId: "evt_signature_1",
-      eventType: "payment.succeeded",
-      paymentId: "pay_signature_1",
+      providerEventId: null,
+      eventType: null,
+      paymentId: null,
       outcome: "failure",
       error: "missing_header",
     });
+    expect(JSON.stringify(onWebhookFailure.mock.calls[0]?.[0])).not.toContain("evt_signature_1");
+    expect(JSON.stringify(onWebhookFailure.mock.calls[0]?.[0])).not.toContain("pay_signature_1");
     expect(JSON.stringify(onWebhookFailure.mock.calls[0]?.[0])).not.toContain("abc.def.ghi");
+  });
+
+  it("401 reports only unauthenticated-safe webhook failure metadata when signature is invalid", async () => {
+    const onWebhookFailure = vi.fn(async () => {});
+    const { app, onPaymentEvent } = build({ onWebhookFailure });
+    const legitimatePayload = JSON.stringify({ id: "evt_legitimate", type: "payment.succeeded" });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(legitimatePayload, t);
+    const maliciousPayload = JSON.stringify({
+      id: "evt_attacker_chosen",
+      type: "payment.failed",
+      data: { payment_id: "pay_attacker_chosen", token: "abc.def.ghi" },
+    });
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: maliciousPayload,
+    });
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toMatchObject({
+      success: false,
+      errorCode: "WEBHOOK_SIGNATURE_INVALID",
+    });
+    expect(onPaymentEvent).not.toHaveBeenCalled();
+    expect(onWebhookFailure).toHaveBeenCalledWith({
+      provider: "dodo",
+      providerEventId: null,
+      eventType: null,
+      paymentId: null,
+      outcome: "failure",
+      error: "signature_mismatch",
+    });
+    const auditPayload = JSON.stringify(onWebhookFailure.mock.calls[0]?.[0]);
+    expect(auditPayload).not.toContain("evt_attacker_chosen");
+    expect(auditPayload).not.toContain("payment.failed");
+    expect(auditPayload).not.toContain("pay_attacker_chosen");
+    expect(auditPayload).not.toContain("abc.def.ghi");
   });
 
   it("401 WEBHOOK_SIGNATURE_INVALID with malformed header", async () => {
