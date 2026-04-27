@@ -251,12 +251,17 @@ describe("createDiscountsService", () => {
     await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Dodo provider request timed out");
   });
 
-  // Verifies assignment fails when requested user links would exceed the configured max uses.
-  it("enforces maxUses guard during assignment", async () => {
+  // Verifies maxUses remains a redemption limit and does not cap selected-user assignments.
+  it("does not treat maxUses as an assignment limit", async () => {
+    const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const insertValues = vi.fn().mockReturnValue({ onConflictDoNothing });
     const db = {
       query: {
         discounts: {
           findFirst: vi.fn().mockResolvedValue({ id: "d1", maxUses: 2 }),
+        },
+        userDiscounts: {
+          findMany: vi.fn().mockResolvedValue([]),
         },
       },
       select: vi.fn().mockReturnValue({
@@ -264,6 +269,7 @@ describe("createDiscountsService", () => {
           where: vi.fn().mockResolvedValue([{ count: 1 }]),
         }),
       }),
+      insert: vi.fn().mockReturnValue({ values: insertValues }),
     };
 
     const service = createDiscountsService({
@@ -273,8 +279,12 @@ describe("createDiscountsService", () => {
 
     const result = await service.assignDiscountToUsers("d1", ["u1", "u2"]);
 
-    expect(result.success).toBe(false);
-    expect((result as any).error).toContain("exceed maximum uses");
+    expect(result).toEqual({ success: true, assignedCount: 2 });
+    expect(insertValues).toHaveBeenCalledWith([
+      { discountId: "d1", userId: "u1" },
+      { discountId: "d1", userId: "u2" },
+    ]);
+    expect(onConflictDoNothing).toHaveBeenCalledOnce();
   });
 
   // Verifies remote provider deletion occurs before local discount deletion.
