@@ -139,8 +139,8 @@ export function SendNotificationForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t(recipientMode === "selected" ? "sendSelected.title" : "sendToAll.title")}</CardTitle>
-        <CardDescription>{t(recipientMode === "selected" ? "sendSelected.description" : "sendToAll.description")}</CardDescription>
+        <CardTitle>{t(recipientMode === "selected" ? "sendSelected.title" : "title")}</CardTitle>
+        <CardDescription>{t(recipientMode === "selected" ? "sendSelected.description" : "description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
