@@ -121,6 +121,16 @@ function resultError(result: unknown, fallback: string) {
   return typeof error === "string" ? error : fallback;
 }
 
+function publicMutationResult(result: unknown, internalFields: string[]) {
+  if (!isRecord(result)) return result;
+
+  const publicResult = { ...result };
+  for (const field of internalFields) {
+    delete publicResult[field];
+  }
+  return publicResult;
+}
+
 function isSuccessfulMutationResult(result: unknown) {
   return !isRecord(result) || result.success !== false;
 }
@@ -634,20 +644,23 @@ export function createAdminRouter() {
           status: bodyData.status,
         });
         const discount = resultField(result, "discount");
+        const previousDiscount = resultField(result, "previousDiscount");
         const discountSummary = safeDiscountSummary(discount);
+        const previousDiscountSummary = safeDiscountSummary(previousDiscount);
 
         await recordMutationAudit(c, {
           action: "discount.update",
           outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
           targetType: "discount",
           targetId: discountId,
+          before: isSuccessfulMutationResult(result) ? previousDiscountSummary : null,
           after: isSuccessfulMutationResult(result) ? discountSummary : null,
           metadata: isSuccessfulMutationResult(result)
             ? { code: discountSummary?.code ?? null }
             : { error: resultError(result, "Discount update failed") },
         });
 
-        return c.json(result, result.success ? 200 : 400);
+        return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
       });
     });
   });
@@ -655,21 +668,21 @@ export function createAdminRouter() {
   router.delete("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
       const result = await bootstrap.discountsService.deleteDiscount(discountId);
-      const discount = resultField(result, "discount");
-      const discountSummary = safeDiscountSummary(discount);
+      const previousDiscount = resultField(result, "previousDiscount");
+      const previousDiscountSummary = safeDiscountSummary(previousDiscount);
 
       await recordMutationAudit(c, {
         action: "discount.delete",
         outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
         targetType: "discount",
         targetId: discountId,
-        before: isSuccessfulMutationResult(result) ? discountSummary : null,
+        before: isSuccessfulMutationResult(result) ? previousDiscountSummary : null,
         metadata: isSuccessfulMutationResult(result)
-          ? { code: discountSummary?.code ?? null }
+          ? { code: previousDiscountSummary?.code ?? null }
           : { error: resultError(result, "Discount delete failed") },
       });
 
-      return c.json(result, result.success ? 200 : 400);
+      return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
     });
   });
 
@@ -749,20 +762,23 @@ export function createAdminRouter() {
           ...bodyData,
         });
         const voucher = resultField(result, "voucher");
+        const previousVoucher = resultField(result, "previousVoucher");
         const voucherSummary = safeVoucherSummary(voucher);
+        const previousVoucherSummary = safeVoucherSummary(previousVoucher);
 
         await recordMutationAudit(c, {
           action: "voucher.update",
           outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
           targetType: "voucher",
           targetId: voucherId,
+          before: isSuccessfulMutationResult(result) ? previousVoucherSummary : null,
           after: isSuccessfulMutationResult(result) ? voucherSummary : null,
           metadata: isSuccessfulMutationResult(result)
             ? { code: voucherSummary?.code ?? null }
             : { error: resultError(result, "Voucher update failed") },
         });
 
-        return c.json(result, result.success ? 200 : 400);
+        return c.json(publicMutationResult(result, ["previousVoucher"]), result.success ? 200 : 400);
       });
     });
   });

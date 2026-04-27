@@ -1060,6 +1060,14 @@ describe("API functional routes", () => {
       value: 10,
       dodoDiscountId: "provider-secret-discount-id",
     };
+    const previousDiscount = {
+      id: discountId,
+      code: "SAVE-ABC-1234",
+      type: "percentage",
+      value: 10,
+      status: "active",
+      dodoDiscountId: "provider-secret-discount-id",
+    };
     const updatedDiscount = {
       id: discountId,
       code: "SAVE-ABC-1234",
@@ -1069,8 +1077,8 @@ describe("API functional routes", () => {
     };
 
     mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: true, discount: createdDiscount });
-    mocks.discountsService.updateDiscount.mockResolvedValueOnce({ success: true, discount: updatedDiscount });
-    mocks.discountsService.deleteDiscount.mockResolvedValueOnce({ success: true });
+    mocks.discountsService.updateDiscount.mockResolvedValueOnce({ success: true, discount: updatedDiscount, previousDiscount });
+    mocks.discountsService.deleteDiscount.mockResolvedValueOnce({ success: true, previousDiscount });
 
     const createRes = await app.request("/admin/discounts", {
       method: "POST",
@@ -1093,6 +1101,8 @@ describe("API functional routes", () => {
     expect(createRes.status).toBe(200);
     expect(patchRes.status).toBe(200);
     expect(deleteRes.status).toBe(200);
+    await expect(patchRes.json()).resolves.toEqual({ success: true, discount: updatedDiscount });
+    await expect(deleteRes.json()).resolves.toEqual({ success: true });
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "discount.create",
       outcome: "success",
@@ -1108,6 +1118,7 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "discount",
       targetId: discountId,
+      before: expect.objectContaining({ id: discountId, code: "SAVE-ABC-1234", value: 10 }),
       after: expect.objectContaining({ id: discountId, code: "SAVE-ABC-1234", value: 20 }),
       metadata: { code: "SAVE-ABC-1234" },
     }));
@@ -1117,7 +1128,8 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "discount",
       targetId: discountId,
-      metadata: { code: null },
+      before: expect.objectContaining({ id: discountId, code: "SAVE-ABC-1234", value: 10 }),
+      metadata: { code: "SAVE-ABC-1234" },
     }));
 
     const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
@@ -1241,9 +1253,16 @@ describe("API functional routes", () => {
       creditAmount: 25,
       status: "inactive",
     };
+    const previousVoucher = {
+      id: voucherId,
+      code: "WELCOME10",
+      creditAmount: 10,
+      status: "active",
+      rawPaymentPayload: "raw-provider-secret",
+    };
 
     mocks.vouchersService.createVoucher.mockResolvedValueOnce({ success: true, voucher: createdVoucher });
-    mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: true, voucher: updatedVoucher });
+    mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: true, voucher: updatedVoucher, previousVoucher });
 
     const createRes = await app.request("/admin/vouchers", {
       method: "POST",
@@ -1264,6 +1283,7 @@ describe("API functional routes", () => {
 
     expect(createRes.status).toBe(200);
     expect(patchRes.status).toBe(200);
+    await expect(patchRes.json()).resolves.toEqual({ success: true, voucher: updatedVoucher });
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "voucher.create",
       outcome: "success",
@@ -1279,6 +1299,7 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "voucher",
       targetId: voucherId,
+      before: expect.objectContaining({ id: voucherId, code: "WELCOME10", creditAmount: 10, status: "active" }),
       after: expect.objectContaining({ id: voucherId, code: "WELCOME10", creditAmount: 25, status: "inactive" }),
       metadata: { code: "WELCOME10" },
     }));
