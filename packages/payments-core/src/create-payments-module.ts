@@ -7,7 +7,22 @@ import {
   type WebhookVerifyResult,
   verifyDodoWebhookSignatureDetailed,
 } from "./providers/dodo/webhook-verify";
-import type { CreatePaymentsModuleOptions } from "./types";
+import type { CreatePaymentsModuleOptions, WebhookFailureAuditEvent } from "./types";
+
+type SafeDodoMetadata = Pick<WebhookFailureAuditEvent, "providerEventId" | "eventType" | "paymentId">;
+
+const UNAUTHENTICATED_DODO_METADATA: SafeDodoMetadata = {
+  providerEventId: null,
+  eventType: null,
+  paymentId: null,
+};
+
+type SafeWebhookFailureError =
+  | Exclude<WebhookVerifyResult, { ok: true }>["reason"]
+  | "invalid_json"
+  | "unsupported_event"
+  | "missing_event_id"
+  | "handler_failed";
 
 function failureToResponse(reason: Exclude<WebhookVerifyResult, { ok: true }>["reason"]) {
   switch (reason) {
@@ -73,6 +88,39 @@ function signatureTimestamp(signatureHeader: string | null) {
   return new Date(timestampSeconds * 1000);
 }
 
+function extractSafeDodoMetadata(payload: unknown): SafeDodoMetadata {
+  if (!payload || typeof payload !== "object") {
+    return UNAUTHENTICATED_DODO_METADATA;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const data = record.data && typeof record.data === "object" ? (record.data as Record<string, unknown>) : undefined;
+  return {
+    providerEventId: typeof record.id === "string" ? record.id : typeof record.event_id === "string" ? record.event_id : null,
+    eventType: typeof record.type === "string" ? record.type : null,
+    paymentId: typeof data?.payment_id === "string" ? data.payment_id : null,
+  };
+}
+
+async function recordWebhookFailure(
+  options: CreatePaymentsModuleOptions,
+  metadata: SafeDodoMetadata,
+  error: SafeWebhookFailureError,
+) {
+  try {
+    await options.onWebhookFailure?.({
+      provider: "dodo",
+      providerEventId: metadata.providerEventId ?? null,
+      eventType: metadata.eventType ?? null,
+      paymentId: metadata.paymentId ?? null,
+      outcome: "failure",
+      error,
+    });
+  } catch {
+    // Webhook failure auditing is best-effort and must not alter webhook responses.
+  }
+}
+
 export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
   const router = new Hono();
 
@@ -99,6 +147,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
         );
 
     if (!verification.ok) {
+      await recordWebhookFailure(options, UNAUTHENTICATED_DODO_METADATA, verification.reason);
       const { status, body } = failureToResponse(verification.reason);
       return c.json(body, status);
     }
@@ -107,17 +156,20 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     try {
       payload = JSON.parse(rawBody);
     } catch {
+      await recordWebhookFailure(options, UNAUTHENTICATED_DODO_METADATA, "invalid_json");
       return c.json({ success: false, error: "Invalid JSON payload" }, 400);
     }
 
     const event = mapDodoEvent(payload);
     if (!event) {
+      await recordWebhookFailure(options, extractSafeDodoMetadata(payload), "unsupported_event");
       return c.json({ success: false, error: "Unsupported webhook payload" }, 400);
     }
 
     if (options.webhookEventStore) {
       const providerEventId = event.providerEventId;
       if (!providerEventId) {
+        await recordWebhookFailure(options, event, "missing_event_id");
         return c.json({ success: false, error: "Missing webhook event id" }, 400);
       }
 
@@ -139,11 +191,17 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
         return c.json({ success: true, data: { processed: true } }, 200);
       } catch (error) {
         await options.webhookEventStore.markFailed({ provider: event.provider, providerEventId, error });
+        await recordWebhookFailure(options, event, "handler_failed");
         throw error;
       }
     }
 
-    await options.onPaymentEvent(event);
+    try {
+      await options.onPaymentEvent(event);
+    } catch (error) {
+      await recordWebhookFailure(options, event, "handler_failed");
+      throw error;
+    }
     return c.json({ success: true, data: { processed: true } }, 200);
   });
 

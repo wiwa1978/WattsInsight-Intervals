@@ -425,7 +425,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       .where(eq(discounts.id, input.id))
       .returning();
 
-    return discountSuccess({ discount: updated });
+    return discountSuccess({ discount: updated, previousDiscount: existing });
   }
 
   async function deleteDiscount(id: string) {
@@ -442,7 +442,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     }
 
     await deps.db.delete(discounts).where(eq(discounts.id, id));
-    return discountSuccess({});
+    return discountSuccess({ previousDiscount: existing });
   }
 
   return {

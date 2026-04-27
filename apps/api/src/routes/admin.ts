@@ -46,6 +46,14 @@ type NotificationSendResultWithBatch = {
   batchId?: string | null;
 };
 
+type AdminAuthAuditDetails<T> = {
+  action: string;
+  targetType: string;
+  targetId: (body: T) => string | null;
+  after?: (body: T) => unknown;
+  metadata?: (body: T) => unknown;
+};
+
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
   if (!authUser) {
@@ -74,6 +82,61 @@ function publicNotificationSendResult(result: NotificationSendResultWithBatch) {
     invalidRecipientCount: result.invalidRecipientCount,
     invalidRecipientIds: result.invalidRecipientIds,
   };
+}
+
+function safeDiscountSummary(value: unknown) {
+  if (!isRecord(value)) return null;
+
+  return {
+    id: typeof value.id === "string" ? value.id : null,
+    code: typeof value.code === "string" ? value.code : null,
+    type: typeof value.type === "string" ? value.type : null,
+    value: typeof value.value === "number" || typeof value.value === "string" ? value.value : null,
+    status: typeof value.status === "string" ? value.status : null,
+    maxUses: typeof value.maxUses === "number" || value.maxUses === null ? value.maxUses : null,
+    currentUses: typeof value.currentUses === "number" ? value.currentUses : null,
+  };
+}
+
+function safeVoucherSummary(value: unknown) {
+  if (!isRecord(value)) return null;
+
+  return {
+    id: typeof value.id === "string" ? value.id : null,
+    code: typeof value.code === "string" ? value.code : null,
+    creditAmount: typeof value.creditAmount === "number" ? value.creditAmount : null,
+    status: typeof value.status === "string" ? value.status : null,
+    maxRedemptions: typeof value.maxRedemptions === "number" || value.maxRedemptions === null ? value.maxRedemptions : null,
+    currentRedemptions: typeof value.currentRedemptions === "number" ? value.currentRedemptions : null,
+    appliesToAllUsers: typeof value.appliesToAllUsers === "boolean" ? value.appliesToAllUsers : null,
+  };
+}
+
+function resultField(result: unknown, field: string) {
+  return isRecord(result) ? result[field] : undefined;
+}
+
+function resultError(result: unknown, fallback: string) {
+  const error = resultField(result, "error");
+  return typeof error === "string" ? error : fallback;
+}
+
+function safeErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function publicMutationResult(result: unknown, internalFields: string[]) {
+  if (!isRecord(result)) return result;
+
+  const publicResult = { ...result };
+  for (const field of internalFields) {
+    delete publicResult[field];
+  }
+  return publicResult;
+}
+
+function isSuccessfulMutationResult(result: unknown) {
+  return !isRecord(result) || result.success !== false;
 }
 
 function notificationSendHistoryItem(entry: Record<string, unknown>) {
@@ -162,6 +225,36 @@ export function createAdminRouter() {
     return handler(parsedParams.data);
   }
 
+  async function recordAdminAuthAudit<T>(c: AdminContext, body: T, details: AdminAuthAuditDetails<T>) {
+    await bootstrap.auditService.recordAuditEntry({
+      ...getAuditRequestContext(c),
+      action: details.action,
+      outcome: "success",
+      targetType: details.targetType,
+      targetId: details.targetId(body),
+      after: details.after?.(body),
+      metadata: details.metadata?.(body),
+    }).catch(() => undefined);
+  }
+
+  async function recordMutationAudit(
+    c: AdminContext,
+    input: {
+      action: string;
+      outcome: "success" | "failure";
+      targetType: string;
+      targetId: string | null;
+      before?: unknown;
+      after?: unknown;
+      metadata?: unknown;
+    },
+  ) {
+    await bootstrap.auditService.recordAuditEntry({
+      ...getAuditRequestContext(c),
+      ...input,
+    }).catch(() => undefined);
+  }
+
   function withUserIdParam(c: AdminContext, handler: (userId: string) => Response | Promise<Response>) {
     return withParams(c, userIdParamSchema, { userId: c.req.param("userId") ?? "" }, "Invalid user id", ({ userId }) => handler(userId));
   }
@@ -179,10 +272,14 @@ export function createAdminRouter() {
     schema: z.ZodSchema<T>,
     errorMessage: string,
     action: (body: T, headers: Headers) => Promise<unknown>,
+    auditDetails?: AdminAuthAuditDetails<T>,
   ) {
     router.post(path, (c) => {
       return withJsonBody(c, schema, errorMessage, async (body) => {
         const result = await action(body, c.req.raw.headers);
+        if (auditDetails && isSuccessfulMutationResult(result)) {
+          await recordAdminAuthAudit(c, body, auditDetails);
+        }
         return c.json(result);
       });
     });
@@ -194,11 +291,17 @@ export function createAdminRouter() {
     errorMessage: string,
     fallbackError: string,
     action: (body: T, headers: Headers) => Promise<Response>,
+    auditDetails?: AdminAuthAuditDetails<T>,
   ) {
     router.post(path, (c) => {
       return withJsonBody(c, schema, errorMessage, async (body) => {
         const response = await action(body, c.req.raw.headers);
-        return createJsonResponseFromAuthResponse(response, fallbackError);
+        const jsonResponse = await createJsonResponseFromAuthResponse(response, fallbackError);
+        const payload = await jsonResponse.clone().json().catch(() => null);
+        if (auditDetails && jsonResponse.ok && isSuccessfulMutationResult(payload)) {
+          await recordAdminAuthAudit(c, body, auditDetails);
+        }
+        return jsonResponse;
       });
     });
   }
@@ -255,10 +358,20 @@ export function createAdminRouter() {
 
   registerAdminAuthJsonAction("/users/set-role", setRoleSchema, "Invalid role payload", (body, headers) => {
     return requireAdminAuthApi().setRole({ body, headers });
+  }, {
+    action: "admin.user.set_role",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: (body) => ({ role: body.role }),
   });
 
   registerAdminAuthJsonAction("/users/unban", userOnlySchema, "Invalid unban payload", (body, headers) => {
     return requireAdminAuthApi().unbanUser({ body, headers });
+  }, {
+    action: "admin.user.unban",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: () => ({ banned: false }),
   });
 
   router.post("/users/ban", (c) => {
@@ -270,6 +383,14 @@ export function createAdminRouter() {
 
       const { secret: _secret, ...banBody } = body;
       const result = await requireAdminAuthApi().banUser({ body: banBody, headers: c.req.raw.headers });
+      if (isSuccessfulMutationResult(result)) {
+        await recordAdminAuthAudit(c, banBody, {
+          action: "admin.user.ban",
+          targetType: "user",
+          targetId: (body) => body.userId,
+          after: (body) => ({ banned: true, ...body }),
+        });
+      }
       return c.json(result);
     });
   });
@@ -286,14 +407,29 @@ export function createAdminRouter() {
         asResponse: true,
       })) as Response;
     },
+    {
+      action: "admin.impersonation.start",
+      targetType: "user",
+      targetId: (body) => body.userId,
+    },
   );
 
   registerAdminAuthJsonAction("/users/revoke-sessions", userOnlySchema, "Invalid session revoke payload", (body, headers) => {
     return requireAdminAuthApi().revokeUserSessions({ body, headers });
+  }, {
+    action: "admin.user.revoke_sessions",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: () => ({ sessionsRevoked: true }),
   });
 
   registerAdminAuthJsonAction("/users/set-password", setUserPasswordSchema, "Invalid password payload", (body, headers) => {
     return requireAdminAuthApi().setUserPassword({ body, headers });
+  }, {
+    action: "admin.user.set_password",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: () => ({ passwordUpdated: true }),
   });
 
   router.get("/users/stats", async (c) => {
@@ -478,13 +614,39 @@ export function createAdminRouter() {
     }
 
     const bodyData = parsedBody.data;
-    const result = await bootstrap.discountsService.createDiscount({
-      code: bodyData.code,
-      type: bodyData.type,
-      value: bodyData.value,
-      startDate: bodyData.startDate,
-      endDate: bodyData.endDate,
-      maxUses: bodyData.maxUses,
+    let result: Awaited<ReturnType<typeof bootstrap.discountsService.createDiscount>>;
+    try {
+      result = await bootstrap.discountsService.createDiscount({
+        code: bodyData.code,
+        type: bodyData.type,
+        value: bodyData.value,
+        startDate: bodyData.startDate,
+        endDate: bodyData.endDate,
+        maxUses: bodyData.maxUses,
+      });
+    } catch (error) {
+      await recordMutationAudit(c, {
+        action: "discount.create",
+        outcome: "failure",
+        targetType: "discount",
+        targetId: null,
+        after: null,
+        metadata: { error: safeErrorMessage(error, "Discount create failed") },
+      });
+      throw error;
+    }
+    const discount = resultField(result, "discount");
+    const discountSummary = safeDiscountSummary(discount);
+
+    await recordMutationAudit(c, {
+      action: "discount.create",
+      outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+      targetType: "discount",
+      targetId: isRecord(discount) && typeof discount.id === "string" ? discount.id : null,
+      after: isSuccessfulMutationResult(result) ? discountSummary : null,
+      metadata: isSuccessfulMutationResult(result)
+        ? { code: discountSummary?.code ?? null }
+        : { error: resultError(result, "Discount create failed") },
     });
 
     return c.json(result, result.success ? 200 : 400);
@@ -493,26 +655,83 @@ export function createAdminRouter() {
   router.patch("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
       return withJsonBody(c, updateDiscountSchema, "Invalid discount update payload", async (bodyData) => {
-        const result = await bootstrap.discountsService.updateDiscount({
-          id: discountId,
-          code: bodyData.code,
-          type: bodyData.type,
-          value: bodyData.value,
-          startDate: bodyData.startDate,
-          endDate: bodyData.endDate,
-          maxUses: bodyData.maxUses,
-          status: bodyData.status,
+        let result: Awaited<ReturnType<typeof bootstrap.discountsService.updateDiscount>>;
+        try {
+          result = await bootstrap.discountsService.updateDiscount({
+            id: discountId,
+            code: bodyData.code,
+            type: bodyData.type,
+            value: bodyData.value,
+            startDate: bodyData.startDate,
+            endDate: bodyData.endDate,
+            maxUses: bodyData.maxUses,
+            status: bodyData.status,
+          });
+        } catch (error) {
+          await recordMutationAudit(c, {
+            action: "discount.update",
+            outcome: "failure",
+            targetType: "discount",
+            targetId: discountId,
+            before: null,
+            after: null,
+            metadata: { error: safeErrorMessage(error, "Discount update failed") },
+          });
+          throw error;
+        }
+        const discount = resultField(result, "discount");
+        const previousDiscount = resultField(result, "previousDiscount");
+        const discountSummary = safeDiscountSummary(discount);
+        const previousDiscountSummary = safeDiscountSummary(previousDiscount);
+
+        await recordMutationAudit(c, {
+          action: "discount.update",
+          outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+          targetType: "discount",
+          targetId: discountId,
+          before: isSuccessfulMutationResult(result) ? previousDiscountSummary : null,
+          after: isSuccessfulMutationResult(result) ? discountSummary : null,
+          metadata: isSuccessfulMutationResult(result)
+            ? { code: discountSummary?.code ?? null }
+            : { error: resultError(result, "Discount update failed") },
         });
 
-        return c.json(result, result.success ? 200 : 400);
+        return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
       });
     });
   });
 
   router.delete("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
-      const result = await bootstrap.discountsService.deleteDiscount(discountId);
-      return c.json(result, result.success ? 200 : 400);
+      let result: Awaited<ReturnType<typeof bootstrap.discountsService.deleteDiscount>>;
+      try {
+        result = await bootstrap.discountsService.deleteDiscount(discountId);
+      } catch (error) {
+        await recordMutationAudit(c, {
+          action: "discount.delete",
+          outcome: "failure",
+          targetType: "discount",
+          targetId: discountId,
+          before: null,
+          metadata: { error: safeErrorMessage(error, "Discount delete failed") },
+        });
+        throw error;
+      }
+      const previousDiscount = resultField(result, "previousDiscount");
+      const previousDiscountSummary = safeDiscountSummary(previousDiscount);
+
+      await recordMutationAudit(c, {
+        action: "discount.delete",
+        outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+        targetType: "discount",
+        targetId: discountId,
+        before: isSuccessfulMutationResult(result) ? previousDiscountSummary : null,
+        metadata: isSuccessfulMutationResult(result)
+          ? { code: previousDiscountSummary?.code ?? null }
+          : { error: resultError(result, "Discount delete failed") },
+      });
+
+      return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
     });
   });
 
@@ -566,18 +785,76 @@ export function createAdminRouter() {
       return validationError(c, "Invalid voucher payload");
     }
 
-    const result = await bootstrap.vouchersService.createVoucher(parsedBody.data);
+    let result: Awaited<ReturnType<typeof bootstrap.vouchersService.createVoucher>>;
+    try {
+      result = await bootstrap.vouchersService.createVoucher(parsedBody.data);
+    } catch (error) {
+      await recordMutationAudit(c, {
+        action: "voucher.create",
+        outcome: "failure",
+        targetType: "voucher",
+        targetId: null,
+        after: null,
+        metadata: { error: safeErrorMessage(error, "Voucher create failed") },
+      });
+      throw error;
+    }
+    const voucher = resultField(result, "voucher");
+    const voucherSummary = safeVoucherSummary(voucher);
+
+    await recordMutationAudit(c, {
+      action: "voucher.create",
+      outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+      targetType: "voucher",
+      targetId: isRecord(voucher) && typeof voucher.id === "string" ? voucher.id : null,
+      after: isSuccessfulMutationResult(result) ? voucherSummary : null,
+      metadata: isSuccessfulMutationResult(result)
+        ? { code: voucherSummary?.code ?? null }
+        : { error: resultError(result, "Voucher create failed") },
+    });
+
     return c.json(result, result.success ? 200 : 400);
   });
 
   router.patch("/vouchers/:voucherId", async (c) => {
     return withVoucherIdParam(c, async (voucherId) => {
       return withJsonBody(c, updateVoucherSchema, "Invalid voucher update payload", async (bodyData) => {
-        const result = await bootstrap.vouchersService.updateVoucher({
-          id: voucherId,
-          ...bodyData,
+        let result: Awaited<ReturnType<typeof bootstrap.vouchersService.updateVoucher>>;
+        try {
+          result = await bootstrap.vouchersService.updateVoucher({
+            id: voucherId,
+            ...bodyData,
+          });
+        } catch (error) {
+          await recordMutationAudit(c, {
+            action: "voucher.update",
+            outcome: "failure",
+            targetType: "voucher",
+            targetId: voucherId,
+            before: null,
+            after: null,
+            metadata: { error: safeErrorMessage(error, "Voucher update failed") },
+          });
+          throw error;
+        }
+        const voucher = resultField(result, "voucher");
+        const previousVoucher = resultField(result, "previousVoucher");
+        const voucherSummary = safeVoucherSummary(voucher);
+        const previousVoucherSummary = safeVoucherSummary(previousVoucher);
+
+        await recordMutationAudit(c, {
+          action: "voucher.update",
+          outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+          targetType: "voucher",
+          targetId: voucherId,
+          before: isSuccessfulMutationResult(result) ? previousVoucherSummary : null,
+          after: isSuccessfulMutationResult(result) ? voucherSummary : null,
+          metadata: isSuccessfulMutationResult(result)
+            ? { code: voucherSummary?.code ?? null }
+            : { error: resultError(result, "Voucher update failed") },
         });
-        return c.json(result, result.success ? 200 : 400);
+
+        return c.json(publicMutationResult(result, ["previousVoucher"]), result.success ? 200 : 400);
       });
     });
   });
@@ -606,8 +883,15 @@ export function createAdminRouter() {
       return validationError(c, "Invalid log entries query");
     }
 
-    const data = logger.readLogEntries(parsedQuery.data);
-    return c.json({ success: true, data });
+    try {
+      const data = logger.readLogEntries(parsedQuery.data);
+      return c.json({ success: true, data });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Invalid log file") {
+        return validationError(c, "Invalid log entries query");
+      }
+      throw error;
+    }
   });
 
   router.get("/notifications", async (c) => {

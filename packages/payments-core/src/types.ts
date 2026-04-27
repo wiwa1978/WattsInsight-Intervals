@@ -46,6 +46,15 @@ export type WebhookEventStore = {
   markFailed: (event: { provider: "dodo"; providerEventId: string; error: unknown }) => Promise<void>;
 };
 
+export type WebhookFailureAuditEvent = {
+  provider: "dodo";
+  providerEventId?: string | null;
+  eventType?: string | null;
+  paymentId?: string | null;
+  outcome: "failure";
+  error: string;
+};
+
 export type CreatePaymentsModuleOptions = {
   /**
    * Optional override of the default Dodo signature verifier. May return a
@@ -59,5 +68,6 @@ export type CreatePaymentsModuleOptions = {
   /** Replay-protection window in seconds. Default 300 (±5 minutes). */
   dodoWebhookToleranceSeconds?: number;
   webhookEventStore?: WebhookEventStore;
+  onWebhookFailure?: (event: WebhookFailureAuditEvent) => Promise<void> | void;
   onPaymentEvent: PaymentEventHandler;
 };

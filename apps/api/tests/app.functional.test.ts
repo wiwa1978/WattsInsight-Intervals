@@ -835,6 +835,168 @@ describe("API functional routes", () => {
     expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
   });
 
+  it("records audit entries for admin auth mutations", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.setRole.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.banUser.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.unbanUser.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.impersonateUser.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    mocks.adminAuthApi.setUserPassword.mockResolvedValueOnce({ success: true });
+
+    const setRoleRes = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, role: "admin" }),
+    });
+    const banRes = await app.request("/admin/users/ban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        banReason: "policy violation",
+        banExpiresIn: 3600,
+        secret: "ban-secret-value",
+      }),
+    });
+    const unbanRes = await app.request("/admin/users/unban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    const impersonateRes = await app.request("/admin/users/impersonate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    const setPasswordRes = await app.request("/admin/users/set-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, newPassword: "correct horse battery staple" }),
+    });
+
+    expect(setRoleRes.status).toBe(200);
+    expect(banRes.status).toBe(200);
+    expect(unbanRes.status).toBe(200);
+    expect(impersonateRes.status).toBe(200);
+    expect(setPasswordRes.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.set_role",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { role: "admin" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.ban",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { banned: true, userId, banReason: "policy violation", banExpiresIn: 3600 },
+    }));
+    expect(mocks.adminAuthApi.banUser).toHaveBeenCalledWith(expect.objectContaining({
+      body: { userId, banReason: "policy violation", banExpiresIn: 3600 },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.unban",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { banned: false },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.impersonation.start",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.set_password",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { passwordUpdated: true },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("ban-secret-value");
+    expect(JSON.stringify(auditPayloads)).not.toContain("correct horse battery staple");
+  });
+
+  it("records a safe audit entry when revoking user sessions", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminAuthApi.revokeUserSessions.mockResolvedValue({ success: true });
+
+    const res = await app.request("/admin/users/revoke-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer raw-admin-token" },
+      body: JSON.stringify({ userId }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.revoke_sessions",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { sessionsRevoked: true },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("raw-admin-token");
+
+    mocks.auditService.recordAuditEntry.mockRejectedValueOnce(new Error("audit unavailable"));
+    const auditFailureRes = await app.request("/admin/users/revoke-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    expect(auditFailureRes.status).toBe(200);
+  });
+
+  it("rejects unsupported absolute admin ban expiry without auditing it", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+
+    const res = await app.request("/admin/users/ban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        banReason: "policy violation",
+        banExpires: "2026-05-01T00:00:00.000Z",
+        secret: "ban-secret-value",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid ban payload");
+    expect(mocks.adminService.verifyAdminBanSecret).not.toHaveBeenCalled();
+    expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
+    expect(mocks.auditService.recordAuditEntry).not.toHaveBeenCalled();
+  });
+
+  it("records audit entry when stopping admin impersonation", async () => {
+    mocks.adminAuthApi.stopImpersonating.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+    const res = await app.request("/auth/admin/stop-impersonating", { method: "POST" });
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.impersonation.stop",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "session",
+      metadata: { stopped: true },
+    }));
+  });
+
   // Verifies admin-set passwords follow the same minimum policy as normal password flows.
   it("rejects weak admin-set passwords", async () => {
     const res = await app.request("/admin/users/set-password", {
@@ -922,6 +1084,175 @@ describe("API functional routes", () => {
     expect(mocks.discountsService.removeDiscountFromUsers).not.toHaveBeenCalled();
   });
 
+  it("records safe audit entries for discount mutations", async () => {
+    const discountId = "33333333-3333-4333-8333-333333333333";
+    const createdDiscount = {
+      id: "44444444-4444-4444-8444-444444444444",
+      code: "SAVE-ABC-1234",
+      type: "percentage",
+      value: 10,
+      dodoDiscountId: "provider-secret-discount-id",
+    };
+    const previousDiscount = {
+      id: discountId,
+      code: "SAVE-ABC-1234",
+      type: "percentage",
+      value: 10,
+      status: "active",
+      dodoDiscountId: "provider-secret-discount-id",
+    };
+    const updatedDiscount = {
+      id: discountId,
+      code: "SAVE-ABC-1234",
+      type: "percentage",
+      value: 20,
+      status: "active",
+    };
+
+    mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: true, discount: createdDiscount });
+    mocks.discountsService.updateDiscount.mockResolvedValueOnce({ success: true, discount: updatedDiscount, previousDiscount });
+    mocks.discountsService.deleteDiscount.mockResolvedValueOnce({ success: true, previousDiscount });
+
+    const createRes = await app.request("/admin/discounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "SAVE-ABC-1234",
+        type: "percentage",
+        value: 10,
+        startDate: "2026-01-01T00:00:00.000Z",
+        endDate: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/discounts/${discountId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 20 }),
+    });
+    const deleteRes = await app.request(`/admin/discounts/${discountId}`, { method: "DELETE" });
+
+    expect(createRes.status).toBe(200);
+    expect(patchRes.status).toBe(200);
+    expect(deleteRes.status).toBe(200);
+    await expect(patchRes.json()).resolves.toEqual({ success: true, discount: updatedDiscount });
+    await expect(deleteRes.json()).resolves.toEqual({ success: true });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.create",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: createdDiscount.id,
+      after: expect.objectContaining({ id: createdDiscount.id, code: "SAVE-ABC-1234", value: 10 }),
+      metadata: { code: "SAVE-ABC-1234" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.update",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      before: expect.objectContaining({ id: discountId, code: "SAVE-ABC-1234", value: 10 }),
+      after: expect.objectContaining({ id: discountId, code: "SAVE-ABC-1234", value: 20 }),
+      metadata: { code: "SAVE-ABC-1234" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.delete",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      before: expect.objectContaining({ id: discountId, code: "SAVE-ABC-1234", value: 10 }),
+      metadata: { code: "SAVE-ABC-1234" },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("provider-secret-discount-id");
+  });
+
+  it("records discount mutation failures without changing response envelopes", async () => {
+    mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: false, error: "Discount code already exists" });
+
+    const res = await app.request("/admin/discounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "SAVE-ABC-1234",
+        type: "percentage",
+        value: 10,
+        startDate: "2026-01-01T00:00:00.000Z",
+        endDate: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Discount code already exists" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.create",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: null,
+      after: null,
+      metadata: { error: "Discount code already exists" },
+    }));
+  });
+
+  it("records safe failure audit entries when discount mutations throw", async () => {
+    const discountId = "33333333-3333-4333-8333-333333333333";
+    mocks.discountsService.createDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
+    mocks.discountsService.updateDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
+    mocks.discountsService.deleteDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
+
+    const createRes = await app.request("/admin/discounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "SAVE-ABC-1234",
+        type: "percentage",
+        value: 10,
+        startDate: "2026-01-01T00:00:00.000Z",
+        endDate: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/discounts/${discountId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 20 }),
+    });
+    const deleteRes = await app.request(`/admin/discounts/${discountId}`, { method: "DELETE" });
+
+    expect(createRes.status).toBe(500);
+    expect(patchRes.status).toBe(500);
+    expect(deleteRes.status).toBe(500);
+    await expect(createRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(patchRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(deleteRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.create",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: null,
+      metadata: { error: "Dodo provider request failed" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.update",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      metadata: { error: "Dodo provider request failed" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.delete",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      metadata: { error: "Dodo provider request failed" },
+    }));
+  });
+
   // Verifies voucher list and search endpoints pass validated filters to the service.
   it("routes voucher listing and user search", async () => {
     mocks.vouchersService.getVouchers.mockResolvedValueOnce({
@@ -994,6 +1325,143 @@ describe("API functional routes", () => {
       id: voucherId,
       status: "inactive",
     });
+  });
+
+  it("records safe audit entries for voucher mutations", async () => {
+    const voucherId = "77777777-7777-4777-8777-777777777777";
+    const createdVoucher = {
+      id: "88888888-8888-4888-8888-888888888888",
+      code: "WELCOME10",
+      creditAmount: 10,
+      status: "active",
+      rawPaymentPayload: "raw-provider-secret",
+    };
+    const updatedVoucher = {
+      id: voucherId,
+      code: "WELCOME10",
+      creditAmount: 25,
+      status: "inactive",
+    };
+    const previousVoucher = {
+      id: voucherId,
+      code: "WELCOME10",
+      creditAmount: 10,
+      status: "active",
+      rawPaymentPayload: "raw-provider-secret",
+    };
+
+    mocks.vouchersService.createVoucher.mockResolvedValueOnce({ success: true, voucher: createdVoucher });
+    mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: true, voucher: updatedVoucher, previousVoucher });
+
+    const createRes = await app.request("/admin/vouchers", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "WELCOME10",
+        creditAmount: 10,
+        assignmentScope: "selected",
+        userIds: ["11111111-1111-4111-8111-111111111111"],
+        expiresAt: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ creditAmount: 25, status: "inactive" }),
+    });
+
+    expect(createRes.status).toBe(200);
+    expect(patchRes.status).toBe(200);
+    await expect(patchRes.json()).resolves.toEqual({ success: true, voucher: updatedVoucher });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.create",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: createdVoucher.id,
+      after: expect.objectContaining({ id: createdVoucher.id, code: "WELCOME10", creditAmount: 10 }),
+      metadata: { code: "WELCOME10" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.update",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: voucherId,
+      before: expect.objectContaining({ id: voucherId, code: "WELCOME10", creditAmount: 10, status: "active" }),
+      after: expect.objectContaining({ id: voucherId, code: "WELCOME10", creditAmount: 25, status: "inactive" }),
+      metadata: { code: "WELCOME10" },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("raw-provider-secret");
+  });
+
+  it("records voucher mutation failures without changing response envelopes", async () => {
+    mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: false, error: "Voucher not found" });
+
+    const voucherId = "77777777-7777-4777-8777-777777777777";
+    const res = await app.request(`/admin/vouchers/${voucherId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "inactive" }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Voucher not found" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.update",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: voucherId,
+      after: null,
+      metadata: { error: "Voucher not found" },
+    }));
+  });
+
+  it("records safe failure audit entries when voucher mutations throw", async () => {
+    const voucherId = "77777777-7777-4777-8777-777777777777";
+    mocks.vouchersService.createVoucher.mockRejectedValueOnce(new Error("Voucher provider request failed"));
+    mocks.vouchersService.updateVoucher.mockRejectedValueOnce(new Error("Voucher provider request failed"));
+
+    const createRes = await app.request("/admin/vouchers", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "WELCOME10",
+        creditAmount: 10,
+        assignmentScope: "selected",
+        userIds: ["11111111-1111-4111-8111-111111111111"],
+        expiresAt: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "inactive" }),
+    });
+
+    expect(createRes.status).toBe(500);
+    expect(patchRes.status).toBe(500);
+    await expect(createRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(patchRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.create",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: null,
+      metadata: { error: "Voucher provider request failed" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.update",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: voucherId,
+      metadata: { error: "Voucher provider request failed" },
+    }));
   });
 
   // Verifies voucher endpoints reject malformed identifiers, queries, and payloads.
@@ -1312,6 +1780,13 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
+  });
+
+  it("rejects invalid admin log entry file names with validation error", async () => {
+    const res = await app.request("/admin/logs/entries?file=../bad");
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid log entries query");
   });
 
   // Verifies client log endpoint redacts common secrets before writing logs.

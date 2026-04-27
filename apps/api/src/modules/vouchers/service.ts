@@ -417,7 +417,7 @@ export function createVouchersService(deps: VouchersServiceDeps) {
       return updatedVoucher;
     });
 
-    return voucherSuccess({ voucher });
+    return voucherSuccess({ voucher, previousVoucher: existing });
   }
 
   async function getVouchers(limit = 20, offset = 0, search?: string, status?: string) {

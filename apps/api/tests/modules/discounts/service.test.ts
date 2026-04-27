@@ -272,7 +272,7 @@ describe("createDiscountsService", () => {
 
     const result = await service.deleteDiscount("d1");
 
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({ success: true, previousDiscount: { id: "d1", dodoDiscountId: "dd_1" } });
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("/discounts/dd_1"),
       expect.objectContaining({ method: "DELETE" }),
