@@ -8,31 +8,137 @@ const MAX_SAFE_CONTEXT_STRING_LENGTH = 128;
 const SENSITIVE_KEY_PATTERN = /(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)/i;
 const SENSITIVE_STRING_KEY_PATTERN = String.raw`[A-Za-z0-9_-]*(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)[A-Za-z0-9_-]*`;
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
-const QUOTED_KEY_VALUE_SECRET_PATTERN = new RegExp(
-  String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)(["'])(?:\\[\s\S]|(?!\2)[\s\S])*?\2`,
-  "gi",
-);
-const KEY_VALUE_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)([^\s&#]+)`, "gi");
-const COLON_SECRET_PATTERN = new RegExp(
-  String.raw`((?:(["'])${SENSITIVE_STRING_KEY_PATTERN}\2|\b${SENSITIVE_STRING_KEY_PATTERN})\s*:\s*)(?:(["'])(?:\\[\s\S]|(?!\3)[\s\S])*?\3|([^\s,}\]]+))`,
+const SECRET_ASSIGNMENT_PREFIX_PATTERN = new RegExp(
+  String.raw`((?:\b${SENSITIVE_STRING_KEY_PATTERN}\s*=|(?:\\(["'])${SENSITIVE_STRING_KEY_PATTERN}\\\2|(["'])${SENSITIVE_STRING_KEY_PATTERN}\3|\b${SENSITIVE_STRING_KEY_PATTERN})\s*:)\s*)`,
   "gi",
 );
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
 const JWT_PATTERN = /\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
+
+function findQuotedValueEnd(value: string, start: number, quote: string) {
+  for (let index = start + 1; index < value.length; index += 1) {
+    if (value[index] === "\\") {
+      index += 1;
+      continue;
+    }
+
+    if (value[index] === quote) {
+      return index;
+    }
+
+    if (value[index] === "}") {
+      return -1;
+    }
+  }
+
+  return -1;
+}
+
+function findEscapedQuotedValueEnd(value: string, start: number, quote: string) {
+  for (let index = start + 2; index < value.length; index += 1) {
+    if (value[index] === "\\") {
+      if (value[index + 1] === quote) {
+        return index;
+      }
+
+      index += 1;
+    }
+  }
+
+  return -1;
+}
+
+function findUnterminatedQuotedValueEnd(value: string, start: number, extraDelimiters: string) {
+  let index = start;
+  while (index < value.length) {
+    if (value[index] === "\\") {
+      index += 2;
+      continue;
+    }
+
+    if (extraDelimiters.includes(value[index] ?? "")) {
+      return index;
+    }
+
+    index += 1;
+  }
+
+  return index;
+}
+
+function findUnquotedValueEnd(value: string, start: number, extraDelimiters: string) {
+  let index = start;
+  while (index < value.length && !/\s/.test(value[index] ?? "") && !extraDelimiters.includes(value[index] ?? "")) {
+    index += 1;
+  }
+
+  return index;
+}
+
+function redactSecretAssignments(value: string) {
+  let redacted = "";
+  let readIndex = 0;
+
+  for (const match of value.matchAll(SECRET_ASSIGNMENT_PREFIX_PATTERN)) {
+    const prefix = match[0];
+    const matchIndex = match.index ?? 0;
+    const separator = prefix.includes(":") ? ":" : "=";
+    const valueStart = matchIndex + prefix.length;
+    if (valueStart < readIndex) {
+      continue;
+    }
+
+    redacted += value.slice(readIndex, valueStart);
+    const valueQuote = value[valueStart];
+    if (valueQuote === "\\" && (value[valueStart + 1] === '"' || value[valueStart + 1] === "'")) {
+      const quote = value[valueStart + 1] ?? "";
+      const quotedEnd = findEscapedQuotedValueEnd(value, valueStart, quote);
+      if (quotedEnd === -1) {
+        const valueEnd = findUnterminatedQuotedValueEnd(value, valueStart + 2, separator === ":" ? ",}]" : "&#,}]\n");
+        redacted += REDACTED;
+        readIndex = valueEnd;
+      } else if (separator === ":") {
+        redacted += `\\${quote}${REDACTED}\\${quote}`;
+        readIndex = quotedEnd + 2;
+      } else {
+        redacted += REDACTED;
+        readIndex = quotedEnd + 2;
+      }
+      continue;
+    }
+
+    if (valueQuote === '"' || valueQuote === "'") {
+      const quotedEnd = findQuotedValueEnd(value, valueStart, valueQuote);
+      if (quotedEnd === -1) {
+        const valueEnd = findUnterminatedQuotedValueEnd(value, valueStart + 1, separator === ":" ? ",}]" : "&#,}]\n");
+        redacted += REDACTED;
+        readIndex = valueEnd;
+      } else if (separator === ":") {
+        redacted += `${valueQuote}${REDACTED}${valueQuote}`;
+        readIndex = quotedEnd + 1;
+      } else {
+        redacted += REDACTED;
+        readIndex = quotedEnd + 1;
+      }
+      continue;
+    }
+
+    const valueEnd = findUnquotedValueEnd(value, valueStart, separator === ":" ? ",}][\"'" : "&#");
+    redacted += REDACTED;
+    readIndex = valueEnd;
+  }
+
+  return redacted + value.slice(readIndex);
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function redactString(value: string) {
-  return value
+  return redactSecretAssignments(value)
     .replace(BEARER_PATTERN, "Bearer [redacted]")
     .replace(JWT_PATTERN, REDACTED)
-    .replace(QUOTED_KEY_VALUE_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
-    .replace(KEY_VALUE_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
-    .replace(COLON_SECRET_PATTERN, (_match, prefix: string, _keyQuote: string, valueQuote?: string) =>
-      valueQuote ? `${prefix}${valueQuote}${REDACTED}${valueQuote}` : `${prefix}${REDACTED}`,
-    )
     .replace(URL_SECRET_PARAM_PATTERN, `$1${REDACTED}`);
 }
 

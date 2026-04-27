@@ -1441,6 +1441,34 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies malformed quoted assignments do not leak remaining secret tokens.
+  it("redacts unterminated quoted secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"password":"first second} password = "first second',
+        userAgent: 'agent password: "first second',
+        context: {
+          detail: '"client_secret" : "first second',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\":[redacted]');
+    expect(output).toContain("password = [redacted]");
+    expect(output).toContain("password: [redacted]");
+    expect(output).toContain('\\"client_secret\\" : [redacted]');
+    expect(output).not.toContain("first");
+    expect(output).not.toContain("second");
+    infoSpy.mockRestore();
+  });
+
   // Verifies Sentry receives only sanitized bounded client log context.
   it("sends only sanitized bounded client log context to Sentry", async () => {
     mocks.Sentry.captureMessage.mockClear();
