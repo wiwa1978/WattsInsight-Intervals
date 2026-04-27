@@ -755,6 +755,20 @@ describe("API functional routes", () => {
     await expect(statsRes.json()).resolves.toEqual({ success: true, data: { totalAdmins: 2, totalBanned: 1 } });
   });
 
+  // Verifies admin user listing forwards submitted server-side search.
+  it("passes pagination and search to admin users endpoint", async () => {
+    mocks.adminService.getUsers.mockResolvedValueOnce({ users: [{ id: "u1" }], total: 1 });
+
+    const res = await app.request("/admin/users?limit=20&offset=0&search=%20alice%20");
+
+    expect(res.status).toBe(200);
+    expect(mocks.adminService.getUsers).toHaveBeenCalledWith(20, 0, "alice");
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { users: [{ id: "u1" }], total: 1 },
+    });
+  });
+
   // Verifies user credit sub-resources all return expected payloads.
   it("returns admin user credit endpoints", async () => {
     mocks.adminService.getUserCreditBalance.mockResolvedValueOnce({ balance: 50 });

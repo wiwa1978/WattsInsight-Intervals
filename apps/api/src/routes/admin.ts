@@ -54,6 +54,10 @@ type AdminAuthAuditDetails<T> = {
   metadata?: (body: T) => unknown;
 };
 
+const adminUsersQuerySchema = paginationQuerySchema.extend({
+  search: z.string().optional(),
+});
+
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
   if (!authUser) {
@@ -343,16 +347,22 @@ export function createAdminRouter() {
   });
 
   router.get("/users", async (c) => {
-    const parsedQuery = parseQuery(paginationQuerySchema, {
+    const parsedQuery = parseQuery(adminUsersQuerySchema, {
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
+      search: c.req.query("search"),
     });
 
     if (!parsedQuery.success) {
       return validationError(c, "Invalid users query");
     }
 
-    const users = await bootstrap.adminService.getUsers(parsedQuery.data.limit, parsedQuery.data.offset);
+    const trimmedSearch = parsedQuery.data.search?.trim();
+    const users = await bootstrap.adminService.getUsers(
+      parsedQuery.data.limit,
+      parsedQuery.data.offset,
+      trimmedSearch || undefined,
+    );
     return c.json({ success: true, data: users });
   });
 

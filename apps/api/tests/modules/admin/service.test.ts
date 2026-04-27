@@ -183,4 +183,34 @@ describe("createAdminService", () => {
 
     expect(listLimit).toHaveBeenCalledWith(20);
   });
+
+  // Verifies admin user search is applied consistently to list and count queries.
+  it("filters admin user listing by trimmed name or email search", async () => {
+    const listRows = [{ id: "u1", name: "Alice", email: "alice@example.com" }];
+    const listOffset = vi.fn().mockResolvedValue(listRows);
+    const listLimit = vi.fn().mockReturnValue({ offset: listOffset });
+    const listOrderBy = vi.fn().mockReturnValue({ limit: listLimit });
+    const listWhere = vi.fn().mockReturnValue({ orderBy: listOrderBy });
+    const listFrom = vi.fn().mockReturnValue({ where: listWhere, orderBy: listOrderBy });
+
+    const countRows = [{ count: 1 }];
+    const countWhere = vi.fn().mockResolvedValue(countRows);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+
+    const select = vi.fn()
+      .mockReturnValueOnce({ from: listFrom })
+      .mockReturnValueOnce({ from: countFrom });
+
+    const service = createAdminService({
+      db: { select } as any,
+      adminBanSecret: "secret",
+    });
+
+    const result = await service.getUsers(20, 0, "  alice  ");
+
+    expect(listWhere).toHaveBeenCalledOnce();
+    expect(countWhere).toHaveBeenCalledOnce();
+    expect(countWhere).toHaveBeenCalledWith(listWhere.mock.calls[0]?.[0]);
+    expect(result).toEqual({ users: listRows, total: 1 });
+  });
 });
