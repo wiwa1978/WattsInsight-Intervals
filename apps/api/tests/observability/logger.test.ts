@@ -71,24 +71,28 @@ describe("logger metadata serialization", () => {
 
     logger.warn(
       {
-        safe: '{"password":"json-secret","accessToken": "access-secret"}',
-        nested: { detail: "refreshToken: refresh-secret token: plain-secret" },
+        safe: '{"password":"json-secret","accessToken": "access-secret", "client_secret" : bare-secret}',
+        nested: { detail: "refreshToken: refresh-secret token: plain-secret 'client_secret': 'single-secret'" },
       },
-      'client sent {"token":"abc123","password": "secret"}',
+      'client sent {"token": abc123,"password": "secret"}',
     );
 
     const output = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
-    expect(output).toContain('\\"token\\":\\"[redacted]\\"');
+    expect(output).toContain('\\"token\\": [redacted]');
     expect(output).toContain('\\"password\\": \\"[redacted]\\"');
     expect(output).toContain('\\"accessToken\\": \\"[redacted]\\"');
+    expect(output).toContain('\\"client_secret\\" : [redacted]');
+    expect(output).toContain("'client_secret': '[redacted]'");
     expect(output).toContain("refreshToken: [redacted]");
     expect(output).toContain("token: [redacted]");
     expect(output).not.toContain("abc123");
-    expect(output).not.toContain("secret");
+    expect(output).not.toContain('"secret"');
     expect(output).not.toContain("json-secret");
     expect(output).not.toContain("access-secret");
+    expect(output).not.toContain("bare-secret");
     expect(output).not.toContain("refresh-secret");
     expect(output).not.toContain("plain-secret");
+    expect(output).not.toContain("single-secret");
   });
 
   it("redacts whitespace-tolerant secret assignments in messages and nested metadata strings", async () => {

@@ -1350,25 +1350,29 @@ describe("API functional routes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         level: "info",
-        message: 'client payload {"token":"json-secret","password": "password-secret"}',
+        message: 'client payload {"token": abc123,"password": "password-secret"}',
         userAgent: "agent refreshToken: refresh-secret",
         context: {
-          detail: "token: plain-secret accessToken: access-secret",
+          detail: "token: plain-secret accessToken: access-secret \"client_secret\" : bare-secret 'client_secret': 'single-secret'",
         },
       }),
     });
 
     expect(res.status).toBe(200);
     const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
-    expect(output).toContain('\\"token\\":\\"[redacted]\\"');
+    expect(output).toContain('\\"token\\": [redacted]');
     expect(output).toContain('\\"password\\": \\"[redacted]\\"');
+    expect(output).toContain('\\"client_secret\\" : [redacted]');
+    expect(output).toContain("'client_secret': '[redacted]'");
     expect(output).toContain("refreshToken: [redacted]");
     expect(output).toContain("accessToken: [redacted]");
-    expect(output).not.toContain("json-secret");
+    expect(output).not.toContain("abc123");
     expect(output).not.toContain("password-secret");
     expect(output).not.toContain("refresh-secret");
     expect(output).not.toContain("plain-secret");
     expect(output).not.toContain("access-secret");
+    expect(output).not.toContain("bare-secret");
+    expect(output).not.toContain("single-secret");
     infoSpy.mockRestore();
   });
 
