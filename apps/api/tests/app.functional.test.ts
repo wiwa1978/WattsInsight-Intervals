@@ -1498,6 +1498,33 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies serialized escaped quote delimiters inside values do not end redaction early.
+  it("redacts serialized escaped-quote client log strings without leaking suffix tokens", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: String.raw`client payload \"password\":\"abc\\\"def\"`,
+        userAgent: String.raw`agent \"password\"=\"abc\\\"def\"`,
+        context: {
+          detail: String.raw`\'client_secret\':\'abc\\\'def\'`,
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
+    expect(output).toContain('\\\\\\"password\\\\\\"=[redacted]');
+    expect(output).toContain("\\\\'client_secret\\\\':\\\\'[redacted]\\\\'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
   // Verifies malformed quoted assignments do not leak remaining secret tokens.
   it("redacts unterminated quoted secrets in client log strings", async () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});

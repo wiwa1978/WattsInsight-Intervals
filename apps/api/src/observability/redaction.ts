@@ -36,12 +36,8 @@ function findQuotedValueEnd(value: string, start: number, quote: string) {
 
 function findEscapedQuotedValueEnd(value: string, start: number, quote: string) {
   for (let index = start + 2; index < value.length; index += 1) {
-    if (value[index] === "\\") {
-      if (value[index + 1] === quote) {
-        return index;
-      }
-
-      index += 1;
+    if (value[index] === "\\" && value[index + 1] === quote && value[index - 1] !== "\\") {
+      return index;
     }
   }
 

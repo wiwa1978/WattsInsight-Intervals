@@ -55,6 +55,11 @@ describe("redactString", () => {
     expect(redactString('{"password":"abc\\"def"}')).toBe('{"password":"[redacted]"}');
   });
 
+  it("redacts serialized escaped-quote secret values without leaking suffix tokens", () => {
+    expect(redactString(String.raw`\"password\":\"abc\\\"def\"`)).toBe(String.raw`\"password\":\"[redacted]\"`);
+    expect(redactString(String.raw`\'client_secret\':\'abc\\\'def\'`)).toBe(String.raw`\'client_secret\':\'[redacted]\'`);
+  });
+
   it("redacts unterminated quoted secret values without leaking suffix tokens", () => {
     expect(redactString('password = "first second')).toBe("password = [redacted]");
     expect(redactString('password: "first second')).toBe("password: [redacted]");
@@ -208,6 +213,29 @@ describe("logger metadata serialization", () => {
     expect(output).toContain('password: \\"[redacted]\\"');
     expect(output).toContain('\\"password\\":\\"[redacted]\\"');
     expect(output).toContain("client_secret: '[redacted]'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+  });
+
+  it("redacts serialized escaped-quote metadata secrets without leaking suffix tokens", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-logs-"));
+    tmpDirs.push(dir);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.doMock("../../src/env", () => ({ env: { NODE_ENV: "test", LOG_FILE_PATH: dir } }));
+    const { logger } = await import("../../src/observability/logger");
+
+    logger.warn(
+      {
+        safe: String.raw`\"password\":\"abc\\\"def\"`,
+        nested: { detail: String.raw`\'client_secret\':\'abc\\\'def\'` },
+      },
+      String.raw`client sent \"password\":\"abc\\\"def\"`,
+    );
+
+    const output = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
+    expect(output).toContain("\\\\'client_secret\\\\':\\\\'[redacted]\\\\'");
     expect(output).not.toContain("abc");
     expect(output).not.toContain("def");
   });
