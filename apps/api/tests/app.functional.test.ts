@@ -1381,8 +1381,8 @@ describe("API functional routes", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         level: "info",
-        message: "client_secret = abc123",
-        userAgent: "agent password = secret",
+        message: 'client_secret = "multi word secret"',
+        userAgent: "agent password = 'correct horse battery staple'",
         context: {
           detail: "clientSecret = def456",
         },
@@ -1394,8 +1394,10 @@ describe("API functional routes", () => {
     expect(output).toContain("client_secret = [redacted]");
     expect(output).toContain("password = [redacted]");
     expect(output).toContain("clientSecret = [redacted]");
-    expect(output).not.toContain("abc123");
-    expect(output).not.toContain("password = secret");
+    expect(output).not.toContain("multi word secret");
+    expect(output).not.toContain("word secret");
+    expect(output).not.toContain("correct horse battery staple");
+    expect(output).not.toContain("horse battery staple");
     expect(output).not.toContain("def456");
     infoSpy.mockRestore();
   });

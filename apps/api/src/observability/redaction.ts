@@ -8,6 +8,7 @@ const MAX_SAFE_CONTEXT_STRING_LENGTH = 128;
 const SENSITIVE_KEY_PATTERN = /(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)/i;
 const SENSITIVE_STRING_KEY_PATTERN = String.raw`[A-Za-z0-9_-]*(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)[A-Za-z0-9_-]*`;
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
+const QUOTED_KEY_VALUE_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)(["'])(.*?)\2`, "gi");
 const KEY_VALUE_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)([^\s&#]+)`, "gi");
 const QUOTED_COLON_SECRET_PATTERN = new RegExp(String.raw`("${SENSITIVE_STRING_KEY_PATTERN}"\s*:\s*)(["'])(.*?)\2`, "gi");
 const UNQUOTED_COLON_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*:\s*)([^\s,}\]]+)`, "gi");
@@ -22,6 +23,7 @@ export function redactString(value: string) {
   return value
     .replace(BEARER_PATTERN, "Bearer [redacted]")
     .replace(JWT_PATTERN, REDACTED)
+    .replace(QUOTED_KEY_VALUE_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
     .replace(KEY_VALUE_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
     .replace(QUOTED_COLON_SECRET_PATTERN, (_match, prefix: string, quote: string) => `${prefix}${quote}${REDACTED}${quote}`)
     .replace(UNQUOTED_COLON_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)

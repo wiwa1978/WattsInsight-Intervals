@@ -101,8 +101,8 @@ describe("logger metadata serialization", () => {
 
     logger.warn(
       {
-        safe: 'nested oauth_client_secret=oauth-secret password = metadata-secret {"clientSecret":"json-secret"}',
-        nested: { detail: "clientSecret = camel-secret clientSecret: colon-secret" },
+        safe: 'nested oauth_client_secret=oauth-secret password = "correct horse battery staple" {"clientSecret":"json-secret"}',
+        nested: { detail: "clientSecret = camel-secret clientSecret: colon-secret client_secret = 'multi word secret'" },
       },
       "client sent client_secret = query-secret",
     );
@@ -112,13 +112,17 @@ describe("logger metadata serialization", () => {
     expect(output).toContain("oauth_client_secret=[redacted]");
     expect(output).toContain("password = [redacted]");
     expect(output).toContain("clientSecret = [redacted]");
+    expect(output).toContain("client_secret = [redacted]");
     expect(output).toContain("clientSecret: [redacted]");
     expect(output).toContain('\\"clientSecret\\":\\"[redacted]\\"');
     expect(output).not.toContain("query-secret");
     expect(output).not.toContain("oauth-secret");
-    expect(output).not.toContain("metadata-secret");
+    expect(output).not.toContain("correct horse battery staple");
+    expect(output).not.toContain("horse battery staple");
     expect(output).not.toContain("camel-secret");
     expect(output).not.toContain("colon-secret");
+    expect(output).not.toContain("multi word secret");
+    expect(output).not.toContain("word secret");
     expect(output).not.toContain("json-secret");
   });
 
