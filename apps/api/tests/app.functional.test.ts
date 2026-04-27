@@ -1179,6 +1179,21 @@ describe("API functional routes", () => {
     });
   });
 
+  it("routes notification user search", async () => {
+    mocks.vouchersService.searchUsers.mockResolvedValueOnce([
+      { id: "user-1", email: "a@example.com", name: "Ada" },
+    ]);
+
+    const res = await app.request("/admin/notifications/search-users?query=ada&limit=10");
+
+    expect(res.status).toBe(200);
+    expect(mocks.vouchersService.searchUsers).toHaveBeenCalledWith("ada", 10);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [{ id: "user-1", email: "a@example.com", name: "Ada" }],
+    });
+  });
+
   it("honors current user notification limit query", async () => {
     mocks.notificationsService.listForUser.mockResolvedValueOnce([{ id: "n-limited" }]);
 

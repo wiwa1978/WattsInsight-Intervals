@@ -1,5 +1,6 @@
 import {
   getNotificationSendHistoryApi,
+  searchUsersForNotificationApi,
   sendNotificationToAllUsersApi,
   sendNotificationToUsersApi,
 } from "@/lib/api/admin";
@@ -198,4 +199,8 @@ export async function getNotificationSendHistory(limit = 50) {
   } catch {
     return { success: false, error: "Failed to fetch notification send history" };
   }
+}
+
+export async function searchUsersForNotification(query: string, limit = 20) {
+  return searchUsersForNotificationApi(query, limit);
 }

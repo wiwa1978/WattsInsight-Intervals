@@ -632,6 +632,20 @@ export function createAdminRouter() {
     return c.json({ success: true, data: entries.map((entry: Record<string, unknown>) => notificationSendHistoryItem(entry)) });
   });
 
+  router.get("/notifications/search-users", async (c) => {
+    const parsedQuery = parseQuery(searchUsersQuerySchema, {
+      query: c.req.query("query"),
+      limit: c.req.query("limit"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid notification search query");
+    }
+
+    const users = await bootstrap.vouchersService.searchUsers(parsedQuery.data.query, parsedQuery.data.limit);
+    return c.json({ success: true, data: users });
+  });
+
   router.post("/notifications/send-all", async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsedBody = parseJsonBody(sendNotificationBaseSchema, body);

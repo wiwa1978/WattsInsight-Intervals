@@ -427,6 +427,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
       "200": jsonResponse("Notification send history", notificationSendHistoryResponseSchema),
     },
   }),
+  route("get", "/admin/notifications/search-users", ["Admin Notifications"], "Search users for notification recipients", { security: cookieOrBearerAuth, parameters: searchUsersParameters, responses: defaultResponses("Users", ["400", "401", "403"]) }),
   route("post", "/admin/notifications/send-all", ["Admin Notifications"], "Send notification to all users and return recipient counts", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(sendNotificationBaseSchema),

@@ -298,6 +298,13 @@ export async function getNotificationSendHistoryApi(limit = 50) {
   return result.data;
 }
 
+export async function searchUsersForNotificationApi(query: string, limit = 20) {
+  const result = await apiRequest<{ success: boolean; data: Array<{ id: string; name: string | null; email: string }> }>(
+    `/admin/notifications/search-users?query=${encodeURIComponent(query)}&limit=${limit}`,
+  );
+  return result.data;
+}
+
 export async function sendNotificationToAllUsersApi(payload: {
   title: string;
   message: string;
