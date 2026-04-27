@@ -655,7 +655,8 @@
       "active": "You are currently impersonating {email}",
       "stop": "Stop Impersonating",
       "stopped": "Impersonation stopped. Redirecting...",
-      "stopError": "Failed to stop impersonation."
+      "stopError": "Failed to stop impersonation.",
+      "adminUrlMissing": "Admin app URL is not configured. Please open the admin app manually."
     },
     "users": {
       "title": "User Management",

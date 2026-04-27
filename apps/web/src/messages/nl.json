@@ -623,7 +623,8 @@
       "active": "Je bootst momenteel {email} na",
       "stop": "Stop Nabootsen",
       "stopped": "Nabootsen gestopt. Doorsturen...",
-      "stopError": "Kon nabootsen niet stoppen."
+      "stopError": "Kon nabootsen niet stoppen.",
+      "adminUrlMissing": "De URL van de admin-app is niet geconfigureerd. Open de admin-app handmatig."
     },
     "users": {
       "title": "Gebruikersbeheer",

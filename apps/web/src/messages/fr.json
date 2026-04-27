@@ -623,7 +623,8 @@
       "active": "Vous usurpez actuellement l'identité de {email}",
       "stop": "Arrêter l'usurpation",
       "stopped": "Usurpation arrêtée. Redirection...",
-      "stopError": "Échec de l'arrêt de l'usurpation."
+      "stopError": "Échec de l'arrêt de l'usurpation.",
+      "adminUrlMissing": "L'URL de l'application admin n'est pas configurée. Ouvrez l'application admin manuellement."
     },
     "users": {
       "title": "Gestion des utilisateurs",

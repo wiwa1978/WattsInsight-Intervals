@@ -23,17 +23,7 @@ import {
 import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { signOut, useSession, updateUser } from "@/lib/auth-client";
 import { routing } from "@/i18n/routing";
-import { apiRequest } from "@/lib/api/client";
-
-async function stopAdminImpersonation() {
-  return apiRequest<{ session?: unknown; user?: unknown; error?: { message?: string } | string }>(
-    "/auth/admin/stop-impersonating",
-    {
-      method: "POST",
-      body: JSON.stringify({}),
-    }
-  );
-}
+import { stopAdminImpersonation } from "@/lib/services/admin";
 
 interface UserDropdownProps {
   /** Show only avatar (true) or avatar + name/email (false) */
@@ -94,7 +84,7 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
     if (adminAppUrl) {
       window.location.assign(new URL("/admin/overview", adminAppUrl).toString());
     } else {
-      router.push("/admin/overview");
+      toast.error(t("admin.impersonation.adminUrlMissing"));
     }
     router.refresh();
   };
