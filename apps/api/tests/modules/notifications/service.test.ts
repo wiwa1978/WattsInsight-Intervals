@@ -40,38 +40,58 @@ describe("createNotificationsService", () => {
       } as any,
     });
 
-    const count = await service.sendNotificationToAllUsers({ title: "Hi", message: "Body" });
-    expect(count).toBe(3);
+    const result = await service.sendNotificationToAllUsers({ title: "Hi", message: "Body" });
+    expect(result).toEqual({
+      sentCount: 3,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+    });
   });
 
   // Verifies targeted notifications avoid insert calls when no recipients are provided.
   it("sendNotificationToUsers handles empty input", async () => {
+    const from = vi.fn().mockResolvedValue([]);
+    const select = vi.fn().mockReturnValue({ from });
     const insert = vi.fn();
-    const service = createNotificationsService({ db: { insert } as any });
+    const service = createNotificationsService({ db: { select, insert } as any });
 
-    const count = await service.sendNotificationToUsers({
+    const result = await service.sendNotificationToUsers({
       userIds: [],
       title: "A",
       message: "B",
     });
 
-    expect(count).toBe(0);
+    expect(result).toEqual({
+      sentCount: 0,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+    });
     expect(insert).not.toHaveBeenCalled();
   });
 
-  // Verifies targeted notifications deduplicate recipients before insert.
-  it("sendNotificationToUsers deduplicates duplicate recipients", async () => {
+  // Verifies targeted notifications deduplicate recipients and report missing users without failing the request.
+  it("sendNotificationToUsers inserts valid recipients and reports invalid recipients", async () => {
     const values = vi.fn().mockResolvedValue(undefined);
     const insert = vi.fn().mockReturnValue({ values });
-    const service = createNotificationsService({ db: { insert } as any });
+    const where = vi.fn().mockResolvedValue([{ id: "u1" }, { id: "u2" }]);
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = createNotificationsService({ db: { select, insert } as any });
 
-    const count = await service.sendNotificationToUsers({
-      userIds: ["u1", "u1", "u2", "  u2  "],
+    const result = await service.sendNotificationToUsers({
+      userIds: ["u1", "u1", "u2", "  u2  ", "missing"],
       title: "A",
       message: "B",
     });
 
-    expect(count).toBe(2);
+    expect(result).toEqual({
+      sentCount: 2,
+      skippedCount: 1,
+      invalidRecipientCount: 1,
+      invalidRecipientIds: ["missing"],
+    });
     expect(values).toHaveBeenCalledWith([
       expect.objectContaining({ userId: "u1" }),
       expect.objectContaining({ userId: "u2" }),

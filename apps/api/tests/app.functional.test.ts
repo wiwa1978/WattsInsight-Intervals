@@ -521,6 +521,31 @@ describe("API functional routes", () => {
       expect(operation?.responses?.["200"]).toBeTruthy();
     }
 
+    const sendAllOperation = rootSpec.paths?.["/admin/notifications/send-all"]?.post;
+    const sendUsersOperation = rootSpec.paths?.["/admin/notifications/send-users"]?.post;
+    expect(sendAllOperation?.requestBody?.content?.["application/json"]?.schema?.properties).toEqual(
+      expect.objectContaining({ title: expect.anything(), message: expect.anything() }),
+    );
+    expect(sendUsersOperation?.requestBody?.content?.["application/json"]?.schema?.properties).toEqual(
+      expect.objectContaining({ userIds: expect.anything(), title: expect.anything(), message: expect.anything() }),
+    );
+    expect(sendAllOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).toEqual(
+      expect.objectContaining({
+        sentCount: expect.anything(),
+        skippedCount: expect.anything(),
+        invalidRecipientCount: expect.anything(),
+        invalidRecipientIds: expect.anything(),
+      }),
+    );
+    expect(sendUsersOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).toEqual(
+      expect.objectContaining({
+        sentCount: expect.anything(),
+        skippedCount: expect.anything(),
+        invalidRecipientCount: expect.anything(),
+        invalidRecipientIds: expect.anything(),
+      }),
+    );
+
     const documentedAppRoutes = APP_OWNED_API_ROUTES.map((route) => `${route.method.toUpperCase()} ${route.path}`);
     expect(new Set(documentedAppRoutes).size).toBe(documentedAppRoutes.length);
     expect(documentedAppRoutes.sort()).toEqual(getSourceDefinedAppRoutes());

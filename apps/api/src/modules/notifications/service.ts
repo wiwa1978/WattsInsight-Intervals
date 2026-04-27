@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 
 import { notification, user } from "@platform/platform-db";
 
@@ -131,7 +131,12 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       await deps.db.insert(notification).values(payload);
     }
 
-    return payload.length;
+    return {
+      sentCount: payload.length,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+    };
   }
 
   async function sendNotificationToUsers(input: {
@@ -145,7 +150,12 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
     bannerExpiresAt?: Date;
   }) {
     const userIds = dedupeUserIds(input.userIds);
-    const payload = userIds.map((userId) => ({
+    const existingUsers = userIds.length > 0
+      ? await deps.db.select({ id: user.id }).from(user).where(inArray(user.id, userIds))
+      : [];
+    const validUserIds = new Set(existingUsers.map((existingUser: { id: string }) => existingUser.id));
+    const invalidRecipientIds = userIds.filter((userId) => !validUserIds.has(userId));
+    const payload = userIds.filter((userId) => validUserIds.has(userId)).map((userId) => ({
       userId,
       title: input.title,
       message: input.message,
@@ -160,7 +170,12 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       await deps.db.insert(notification).values(payload);
     }
 
-    return payload.length;
+    return {
+      sentCount: payload.length,
+      skippedCount: invalidRecipientIds.length,
+      invalidRecipientCount: invalidRecipientIds.length,
+      invalidRecipientIds,
+    };
   }
 
   return {
