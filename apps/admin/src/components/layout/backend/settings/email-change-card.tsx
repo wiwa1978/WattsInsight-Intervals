@@ -30,9 +30,11 @@ import { Input } from "@/components/ui/input";
 import { useSession, changeEmail } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
 import { emailChangeSchema, type EmailChangeFormValues } from "@/schemas";
+import { useRouter } from "@/i18n/navigation";
 
 export function EmailChangeCard() {
   const t = useTranslations("settings.emailChange");
+  const router = useRouter();
   const { data: session, isPending } = useSession();
   const [hasPendingChange, setHasPendingChange] = React.useState(false);
 
@@ -66,6 +68,7 @@ export function EmailChangeCard() {
       toast.success(t("success"));
       setHasPendingChange(true);
       form.reset();
+      router.refresh();
     }
   }
 

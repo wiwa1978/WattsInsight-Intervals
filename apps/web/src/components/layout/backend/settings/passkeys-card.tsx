@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { passkey } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
+import { useRouter } from "@/i18n/navigation";
 
 interface Passkey {
   id: string;
@@ -44,6 +45,7 @@ interface Passkey {
 
 export function PasskeysCard() {
   const t = useTranslations("settings.passkeys");
+  const router = useRouter();
   const [passkeys, setPasskeys] = React.useState<Passkey[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
@@ -112,6 +114,7 @@ export function PasskeysCard() {
       setIsAddDialogOpen(false);
       setNewPasskeyName("");
       fetchPasskeys();
+      router.refresh();
     } catch {
       toast.error(t("addError"));
     } finally {
@@ -137,6 +140,7 @@ export function PasskeysCard() {
       setIsDeleteDialogOpen(false);
       setSelectedPasskey(null);
       fetchPasskeys();
+      router.refresh();
     } catch {
       toast.error(t("deleteError"));
     } finally {

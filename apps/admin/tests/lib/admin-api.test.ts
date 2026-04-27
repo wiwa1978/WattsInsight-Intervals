@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getAdminAllPurchasesApi, getAdminAllTransactionsApi, getAdminUsersApi } from "../../src/lib/api/admin";
+import {
+  getAdminAllPurchasesApi,
+  getAdminAllTransactionsApi,
+  getAdminUsersApi,
+  stopAdminImpersonationApi,
+} from "../../src/lib/api/admin";
 import { apiRequest } from "../../src/lib/api/client";
 
 vi.mock("../../src/lib/api/client", () => ({
@@ -34,5 +39,14 @@ describe("admin API", () => {
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/admin/billing/purchases?limit=20&offset=60&searchEmail=alice%2Badmin%40example.com",
     );
+  });
+
+  it("posts to the stop impersonation endpoint", async () => {
+    await stopAdminImpersonationApi();
+
+    expect(apiRequestMock).toHaveBeenCalledWith("/auth/admin/stop-impersonating", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
   });
 });

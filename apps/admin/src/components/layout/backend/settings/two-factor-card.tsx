@@ -39,11 +39,13 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useSession, twoFactor } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
+import { useRouter } from "@/i18n/navigation";
 
 type DialogMode = "setup" | "verify" | "backupCodes" | "disable" | null;
 
 export function TwoFactorCard() {
   const t = useTranslations("settings.twoFactor");
+  const router = useRouter();
   const { data: session, isPending } = useSession();
   const [dialogMode, setDialogMode] = React.useState<DialogMode>(null);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -104,6 +106,7 @@ export function TwoFactorCard() {
 
       toast.success(t("enableSuccess"));
       setDialogMode("backupCodes");
+      router.refresh();
     } finally {
       setIsLoading(false);
       setVerificationCode("");
@@ -125,6 +128,7 @@ export function TwoFactorCard() {
       toast.success(t("disableSuccess"));
       setDialogMode(null);
       resetState();
+      router.refresh();
     } finally {
       setIsLoading(false);
       setPassword("");
@@ -147,6 +151,7 @@ export function TwoFactorCard() {
         setBackupCodes(data.backupCodes);
         setDialogMode("backupCodes");
         toast.success(t("regenerateSuccess"));
+        router.refresh();
       }
     } finally {
       setIsLoading(false);

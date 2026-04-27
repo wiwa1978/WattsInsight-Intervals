@@ -230,7 +230,7 @@ export async function impersonateAdminUser(userId: string) {
   return impersonateAdminUserApi(userId);
 }
 
-export async function stopAdminImpersonation() {
+export async function stopAdminImpersonation(): ReturnType<typeof stopAdminImpersonationApi> {
   return stopAdminImpersonationApi();
 }
 
