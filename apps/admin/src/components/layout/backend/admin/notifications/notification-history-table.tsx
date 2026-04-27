@@ -1,21 +1,14 @@
 "use client";
 
 import * as React from "react";
-import {
-  ArrowUpDown,
-  CheckCircle,
-  AlertCircle,
-  Info,
-  X,
-  Eye,
-} from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { formatDateTime } from "@/lib/utils";
-import type { Notification } from "@/schemas/notification";
+import type { NotificationSendHistoryItem } from "@platform/contracts";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 
 interface NotificationHistoryTableProps {
-  notifications: Notification[];
+  notifications: NotificationSendHistoryItem[];
   loading?: boolean;
 }
 
@@ -34,39 +27,13 @@ export function NotificationHistoryTable({
   loading = false,
 }: NotificationHistoryTableProps) {
   const t = useTranslations("admin.notifications.history");
-  const [selectedNotification, setSelectedNotification] = React.useState<Notification | null>(null);
+  const [selectedNotification, setSelectedNotification] = React.useState<NotificationSendHistoryItem | null>(null);
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "info":
-        return <Info className="h-4 w-4 text-blue-500" />;
-      case "success":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "warning":
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
-      case "error":
-        return <X className="h-4 w-4 text-red-500" />;
-      default:
-        return <Info className="h-4 w-4 text-muted-foreground" />;
-    }
+  const getScopeBadge = (scope: NotificationSendHistoryItem["scope"]) => {
+    return scope === "all" ? <Badge variant="default">All</Badge> : <Badge variant="secondary">Selected</Badge>;
   };
 
-  const getTypeBadge = (type: string) => {
-    switch (type) {
-      case "info":
-        return <Badge variant="secondary">{t("types.info")}</Badge>;
-      case "success":
-        return <Badge variant="default">{t("types.success")}</Badge>;
-      case "warning":
-        return <Badge className="bg-yellow-500 text-white">{t("types.warning")}</Badge>;
-      case "error":
-        return <Badge variant="destructive">{t("types.error")}</Badge>;
-      default:
-        return <Badge variant="secondary">{t("types.info")}</Badge>;
-    }
-  };
-
-  const columns: ColumnDef<Notification>[] = [
+  const columns: ColumnDef<NotificationSendHistoryItem>[] = [
     {
       accessorKey: "title",
       header: ({ column }) => (
@@ -83,15 +50,29 @@ export function NotificationHistoryTable({
           onClick={() => setSelectedNotification(row.original)}
           className="flex items-center gap-2 hover:bg-muted/50 rounded-md px-2 py-2 w-full text-left transition-colors"
         >
-          {getTypeIcon(row.original.type)}
           <span className="font-medium">{row.original.title}</span>
         </button>
       ),
     },
     {
-      accessorKey: "type",
-      header: t("table.type"),
-      cell: ({ row }) => getTypeBadge(row.original.type),
+      accessorKey: "scope",
+      header: "Scope",
+      cell: ({ row }) => getScopeBadge(row.original.scope),
+    },
+    {
+      accessorKey: "sentCount",
+      header: "Sent",
+      cell: ({ row }) => <div className="text-sm">{row.original.sentCount}</div>,
+    },
+    {
+      accessorKey: "skippedCount",
+      header: "Skipped",
+      cell: ({ row }) => <div className="text-sm">{row.original.skippedCount}</div>,
+    },
+    {
+      accessorKey: "invalidRecipientCount",
+      header: "Invalid",
+      cell: ({ row }) => <div className="text-sm">{row.original.invalidRecipientCount}</div>,
     },
     {
       accessorKey: "createdAt",
@@ -125,10 +106,7 @@ export function NotificationHistoryTable({
       <Dialog open={!!selectedNotification} onOpenChange={(open) => !open && setSelectedNotification(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {selectedNotification && getTypeIcon(selectedNotification.type)}
-              {selectedNotification?.title}
-            </DialogTitle>
+            <DialogTitle>{selectedNotification?.title}</DialogTitle>
             <DialogDescription>
               {t("description")}
             </DialogDescription>
@@ -137,22 +115,18 @@ export function NotificationHistoryTable({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  {t("table.type")}
+                  Scope
                 </label>
                 <div className="mt-1">
-                  {selectedNotification && getTypeBadge(selectedNotification.type)}
+                  {selectedNotification && getScopeBadge(selectedNotification.scope)}
                 </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  {t("table.banner")}
+                  Actor
                 </label>
-                <div className="mt-1">
-                  {selectedNotification?.showAsBanner ? (
-                    <Badge variant="default">{t("table.yes")}</Badge>
-                  ) : (
-                    <Badge variant="secondary">{t("table.no")}</Badge>
-                  )}
+                <div className="mt-1 text-sm">
+                  {selectedNotification?.actorId ?? "-"}
                 </div>
               </div>
             </div>
@@ -167,11 +141,11 @@ export function NotificationHistoryTable({
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">
-                  {t("table.expiresAt")}
+                  Sent / Skipped / Invalid
                 </label>
                 <div className="mt-1 text-sm">
-                  {selectedNotification?.bannerExpiresAt
-                    ? formatDateTime(selectedNotification.bannerExpiresAt)
+                  {selectedNotification
+                    ? `${selectedNotification.sentCount} / ${selectedNotification.skippedCount} / ${selectedNotification.invalidRecipientCount}`
                     : "-"}
                 </div>
               </div>

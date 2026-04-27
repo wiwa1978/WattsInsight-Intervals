@@ -1,11 +1,11 @@
 import {
   deleteMyNotification,
+  getMyActiveBannerNotification,
   getMyNotifications,
   getMyUnreadNotificationsCount,
   markAllMyNotificationsAsRead,
   markMyNotificationAsRead,
 } from "@/lib/api/me";
-import type { Notification as NotificationRecord } from "@/schemas/notification";
 
 export async function getNotifications(limit = 20) {
   try {
@@ -17,20 +17,12 @@ export async function getNotifications(limit = 20) {
 }
 
 export async function getActiveBannerNotifications() {
-  const list = await getNotifications(20);
-
-  if (!list.success || !Array.isArray(list.data)) {
+  try {
+    const data = await getMyActiveBannerNotification();
+    return { success: true, data };
+  } catch {
     return { success: false, data: null };
   }
-
-  const now = new Date();
-  const banner = (list.data as NotificationRecord[]).find((item) => {
-    if (!item.showAsBanner || item.read) return false;
-    if (!item.bannerExpiresAt) return true;
-    return new Date(item.bannerExpiresAt) > now;
-  });
-
-  return { success: true, data: banner ?? null };
 }
 
 export async function getUnreadCount() {

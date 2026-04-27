@@ -43,7 +43,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { sendNotificationToAllUsers } from "@/lib/services/notifications";
+import { UserMultiSelect } from "@/components/layout/backend/admin/billing/user-multi-select";
+import {
+  searchUsersForNotification,
+  sendNotificationToAllUsers,
+  sendNotificationToUsers,
+} from "@/lib/services/notifications";
 import {
   sendNotificationSchema,
   type SendNotificationInput,
@@ -54,6 +59,8 @@ export function SendNotificationForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [calendarOpen, setCalendarOpen] = React.useState(false);
+  const [recipientMode, setRecipientMode] = React.useState<"all" | "selected">("all");
+  const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
 
   const form = useForm<SendNotificationInput>({
     resolver: zodResolver(sendNotificationSchema),
@@ -75,6 +82,11 @@ export function SendNotificationForm() {
   async function onSubmit(values: SendNotificationInput) {
     setIsSubmitting(true);
     try {
+      if (recipientMode === "selected" && selectedUserIds.length === 0) {
+        toast.error(t("recipients.emptyError"));
+        return;
+      }
+
       // Combine date and time for banner expiry
       let bannerExpiresDate: Date | undefined = values.bannerExpiresAt;
       if (bannerExpiresDate && values.showAsBanner) {
@@ -88,7 +100,7 @@ export function SendNotificationForm() {
         }
       }
 
-      const result = await sendNotificationToAllUsers({
+      const payload = {
         title: values.titleEn, // Fallback to English
         message: values.messageEn,
         type: values.type,
@@ -102,11 +114,17 @@ export function SendNotificationForm() {
             fr: { title: values.titleFr, message: values.messageFr },
           },
         },
-      });
+      };
+
+      const result = recipientMode === "selected"
+        ? await sendNotificationToUsers({ ...payload, userIds: selectedUserIds })
+        : await sendNotificationToAllUsers(payload);
 
       if (result.success) {
-        toast.success(t("success", { count: result.count || 0 }));
+        const successMessage = t("success", { count: result.sentCount || 0 });
+        toast.success(result.skippedCount > 0 ? `${successMessage} ${t("skipped", { count: result.skippedCount })}` : successMessage);
         form.reset();
+        setSelectedUserIds([]);
         router.refresh();
       } else {
         toast.error(result.error || t("error"));
@@ -121,12 +139,42 @@ export function SendNotificationForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("sendToAll.title")}</CardTitle>
-        <CardDescription>{t("sendToAll.description")}</CardDescription>
+        <CardTitle>{t(recipientMode === "selected" ? "sendSelected.title" : "title")}</CardTitle>
+        <CardDescription>{t(recipientMode === "selected" ? "sendSelected.description" : "description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="space-y-3 rounded-md border p-4">
+              <div className="space-y-1">
+                <FormLabel>{t("recipients.label")}</FormLabel>
+                <FormDescription>{t("recipients.description")}</FormDescription>
+              </div>
+              <Select value={recipientMode} onValueChange={(value: "all" | "selected") => setRecipientMode(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("recipients.allUsers")}</SelectItem>
+                  <SelectItem value="selected">{t("recipients.selectedUsers")}</SelectItem>
+                </SelectContent>
+              </Select>
+              {recipientMode === "selected" && (
+                <UserMultiSelect
+                  selectedUserIds={selectedUserIds}
+                  onSelectionChange={setSelectedUserIds}
+                  searchUsers={searchUsersForNotification}
+                  disabled={isSubmitting}
+                  placeholder={t("recipients.placeholder")}
+                  searchPlaceholder={t("recipients.searchPlaceholder")}
+                  loadingMessage={t("recipients.loadingMessage")}
+                  emptyMessage={t("recipients.emptyMessage")}
+                  minSearchMessage={t("recipients.minSearchMessage")}
+                  selectionSummary={(count) => t("recipients.summary", { count })}
+                />
+              )}
+            </div>
+
             <Tabs defaultValue="en" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="en">English</TabsTrigger>
@@ -432,7 +480,7 @@ export function SendNotificationForm() {
               ) : (
                 <>
                   <Send className="mr-2 h-4 w-4" />
-                  {t("form.submit")}
+                  {t(recipientMode === "selected" ? "form.submitSelected" : "form.submit")}
                 </>
               )}
             </Button>

@@ -1,16 +1,18 @@
 import {
-  getAllNotificationsApi,
+  getNotificationSendHistoryApi,
+  searchUsersForNotificationApi,
   sendNotificationToAllUsersApi,
   sendNotificationToUsersApi,
 } from "@/lib/api/admin";
 import {
   deleteMyNotification,
+  getMyActiveBannerNotification,
   getMyNotifications,
   getMyUnreadNotificationsCount,
   markAllMyNotificationsAsRead,
   markMyNotificationAsRead,
 } from "@/lib/api/me";
-import type { Notification as NotificationRecord } from "@/schemas/notification";
+import type { NotificationSendHistoryItem } from "@platform/contracts";
 
 export async function getNotifications(limit = 20) {
   try {
@@ -22,20 +24,12 @@ export async function getNotifications(limit = 20) {
 }
 
 export async function getActiveBannerNotifications() {
-  const list = await getNotifications(20);
-
-  if (!list.success || !Array.isArray(list.data)) {
+  try {
+    const data = await getMyActiveBannerNotification();
+    return { success: true, data };
+  } catch {
     return { success: false, data: null };
   }
-
-  const now = new Date();
-  const banner = (list.data as NotificationRecord[]).find((item) => {
-    if (!item.showAsBanner || item.read) return false;
-    if (!item.bannerExpiresAt) return true;
-    return new Date(item.bannerExpiresAt) > now;
-  });
-
-  return { success: true, data: banner ?? null };
 }
 
 export async function getUnreadCount() {
@@ -85,7 +79,7 @@ export async function createNotification({
   bannerExpiresAt?: Date;
 }) {
   try {
-    await sendNotificationToUsersApi({
+    const result = await sendNotificationToUsersApi({
       userIds: [userId],
       title,
       message,
@@ -95,6 +89,10 @@ export async function createNotification({
       showAsBanner,
       bannerExpiresAt,
     });
+
+    if (result.data.sentCount !== 1 || result.data.invalidRecipientCount > 0) {
+      return { success: false, error: "Failed to create notification" };
+    }
 
     return { success: true, data: null };
   } catch {
@@ -139,9 +137,9 @@ export async function sendNotificationToAllUsers({
       bannerExpiresAt,
     });
 
-    return { success: true, count: result.data.count };
+    return { success: true as const, ...result.data };
   } catch {
-    return { success: false, error: "Failed to send notification to all users" };
+    return { success: false as const, error: "Failed to send notification to all users" };
   }
 }
 
@@ -176,17 +174,25 @@ export async function sendNotificationToUsers({
       bannerExpiresAt,
     });
 
-    return { success: true, count: result.data.count };
+    return { success: true as const, ...result.data };
   } catch {
-    return { success: false, error: "Failed to send notification to users" };
+    return { success: false as const, error: "Failed to send notification to users" };
   }
 }
 
 export async function getAllNotifications(limit = 50) {
+  return getNotificationSendHistory(limit);
+}
+
+export async function getNotificationSendHistory(limit = 50) {
   try {
-    const data = (await getAllNotificationsApi(limit)) as NotificationRecord[];
+    const data = (await getNotificationSendHistoryApi(limit)) as NotificationSendHistoryItem[];
     return { success: true, data };
   } catch {
-    return { success: false, error: "Failed to fetch notifications" };
+    return { success: false, error: "Failed to fetch notification send history" };
   }
+}
+
+export async function searchUsersForNotification(query: string, limit = 20) {
+  return searchUsersForNotificationApi(query, limit);
 }

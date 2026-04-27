@@ -97,7 +97,13 @@ export function createMeRouter() {
 
   router.get("/notifications", async (c) => {
     const authUser = getAuthUser(c);
-    const list = await bootstrap.notificationsService.listForUser(authUser.id, 20);
+    const parsedQuery = parseQuery(optionalLimitQuerySchema, { limit: c.req.query("limit") });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid notifications query");
+    }
+
+    const list = await bootstrap.notificationsService.listForUser(authUser.id, parsedQuery.data.limit);
     return c.json({ success: true, data: list });
   });
 
@@ -105,6 +111,12 @@ export function createMeRouter() {
     const authUser = getAuthUser(c);
     const count = await bootstrap.notificationsService.unreadCount(authUser.id);
     return c.json({ success: true, data: { count } });
+  });
+
+  router.get("/notifications/active-banner", async (c) => {
+    const authUser = getAuthUser(c);
+    const banner = await bootstrap.notificationsService.getActiveBannerForUser(authUser.id);
+    return c.json({ success: true, data: banner });
   });
 
   router.post("/notifications/:notificationId/read", async (c) => {

@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
-import { and, desc, eq, gte, inArray, like, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, like, lt, or, sql } from "drizzle-orm";
 
 import { creditPurchases, creditTransactions, user, userCredits, vouchers } from "@platform/platform-db";
 
@@ -219,6 +219,25 @@ export function createAdminService(deps: AdminServiceDeps) {
       users,
       total: totalResult[0]?.count || 0,
     };
+  }
+
+  async function searchUsers(query: string, limit = 20) {
+    const normalizedQuery = query.trim();
+    const normalizedLimit = normalizeLimit(limit, 50);
+
+    if (normalizedQuery.length < 2) {
+      return [];
+    }
+
+    return deps.db
+      .select({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      })
+      .from(user)
+      .where(or(ilike(user.name, `%${normalizedQuery}%`), ilike(user.email, `%${normalizedQuery}%`)))
+      .limit(normalizedLimit);
   }
 
   async function getUserStats() {
@@ -541,6 +560,7 @@ export function createAdminService(deps: AdminServiceDeps) {
     getDashboardStats,
     getVoucherStats,
     getUsers,
+    searchUsers,
     getUserStats,
     getUserById,
     getUserCreditBalance,

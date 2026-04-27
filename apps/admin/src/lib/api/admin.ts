@@ -1,7 +1,15 @@
 import { apiRequest } from "./client";
 
 import type { AdminCreateDiscountInput, AdminUpdateDiscountInput, DiscountStatus } from "@/types/discounts";
-import type { VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
+import type { NotificationSendHistoryItem, VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
+import { apiRoutes } from "@platform/contracts/ts";
+
+type NotificationSendResult = {
+  sentCount: number;
+  skippedCount: number;
+  invalidRecipientCount: number;
+  invalidRecipientIds: string[];
+};
 
 export async function verifyAdminBanSecretApi(secret: string) {
   return apiRequest<{ success: boolean; error?: string }>("/admin/verify-ban-secret", {
@@ -285,6 +293,18 @@ export async function getAllNotificationsApi(limit = 50) {
   return result.data;
 }
 
+export async function getNotificationSendHistoryApi(limit = 50) {
+  const result = await apiRequest<{ success: boolean; data: NotificationSendHistoryItem[] }>(apiRoutes.admin.notificationSends(limit));
+  return result.data;
+}
+
+export async function searchUsersForNotificationApi(query: string, limit = 20) {
+  const result = await apiRequest<{ success: boolean; data: Array<{ id: string; name: string | null; email: string }> }>(
+    `/admin/notifications/search-users?query=${encodeURIComponent(query)}&limit=${limit}`,
+  );
+  return result.data;
+}
+
 export async function sendNotificationToAllUsersApi(payload: {
   title: string;
   message: string;
@@ -294,7 +314,7 @@ export async function sendNotificationToAllUsersApi(payload: {
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
 }) {
-  return apiRequest<{ success: boolean; data: { count: number } }>("/admin/notifications/send-all", {
+  return apiRequest<{ success: boolean; data: NotificationSendResult }>("/admin/notifications/send-all", {
     method: "POST",
     body: JSON.stringify({
       ...payload,
@@ -313,7 +333,7 @@ export async function sendNotificationToUsersApi(payload: {
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
 }) {
-  return apiRequest<{ success: boolean; data: { count: number } }>("/admin/notifications/send-users", {
+  return apiRequest<{ success: boolean; data: NotificationSendResult }>("/admin/notifications/send-users", {
     method: "POST",
     body: JSON.stringify({
       ...payload,

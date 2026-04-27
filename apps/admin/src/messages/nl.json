@@ -719,7 +719,25 @@
         "title": "Melding naar Alle Gebruikers Sturen",
         "description": "Dit stuurt een melding naar elke gebruiker in het systeem. Geef vertalingen voor elke taal.",
         "success": "Melding succesvol naar {count} gebruikers gestuurd.",
+        "skipped": "{count} overgeslagen.",
         "error": "Kon melding niet verzenden. Probeer het opnieuw.",
+        "sendSelected": {
+          "title": "Melding naar Geselecteerde Gebruikers Sturen",
+          "description": "Dit stuurt een melding alleen naar geselecteerde gebruikers. Geef vertalingen voor elke taal."
+        },
+        "recipients": {
+          "label": "Ontvangers",
+          "description": "Kies of je elke gebruiker of alleen geselecteerde gebruikers wilt verwittigen.",
+          "allUsers": "Alle gebruikers",
+          "selectedUsers": "Geselecteerde gebruikers",
+          "placeholder": "Selecteer ontvangers...",
+          "searchPlaceholder": "Zoek gebruikers op naam of e-mail...",
+          "loadingMessage": "Zoeken...",
+          "emptyMessage": "Geen gebruikers gevonden",
+          "minSearchMessage": "Typ minstens 2 tekens om te zoeken",
+          "summary": "{count} ontvanger(s) geselecteerd",
+          "emptyError": "Selecteer minstens één ontvanger"
+        },
         "form": {
           "title": "Titel",
           "titlePlaceholder": "Voer meldingstitel in",
@@ -749,6 +767,7 @@
           "bannerExpiresAtDescription": "Banner wordt verborgen na deze datum en tijd",
           "bannerTime": "Vervaltijd",
           "submit": "Naar Alle Gebruikers Sturen",
+          "submitSelected": "Naar Geselecteerde Gebruikers Sturen",
           "sending": "Verzenden..."
         }
       },

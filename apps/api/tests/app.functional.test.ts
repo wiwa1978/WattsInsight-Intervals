@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
     getAllPurchases: vi.fn(),
     getTransactionData: vi.fn(),
     getCreditsConsumedData: vi.fn(),
+    searchUsers: vi.fn(),
   };
 
   const notificationsService = {
@@ -35,6 +36,7 @@ const mocks = vi.hoisted(() => {
     markAsRead: vi.fn(),
     deleteNotification: vi.fn(),
     markAllAsRead: vi.fn(),
+    getActiveBannerForUser: vi.fn(),
     getAllNotifications: vi.fn(),
     sendNotificationToAllUsers: vi.fn(),
     sendNotificationToUsers: vi.fn(),
@@ -61,6 +63,10 @@ const mocks = vi.hoisted(() => {
     updateVoucher: vi.fn(),
     searchUsers: vi.fn(),
     redeemVoucher: vi.fn(),
+  };
+  const auditService = {
+    recordAuditEntry: vi.fn(),
+    listAuditEntries: vi.fn(),
   };
   const adminAuthApi = {
     setRole: vi.fn(),
@@ -101,6 +107,10 @@ const mocks = vi.hoisted(() => {
       return builder;
     }),
   };
+  const Sentry = {
+    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
+    captureMessage: vi.fn(),
+  };
 
   return {
     billingService,
@@ -108,8 +118,10 @@ const mocks = vi.hoisted(() => {
     notificationsService,
     discountsService,
     vouchersService,
+    auditService,
     adminAuthApi,
     db,
+    Sentry,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -150,6 +162,16 @@ vi.mock("../src/modules/discounts/service", () => ({
 
 vi.mock("../src/modules/vouchers/service", () => ({
   createVouchersService: () => mocks.vouchersService,
+}));
+
+vi.mock("../src/modules/audit/service", () => ({
+  createAuditService: () => mocks.auditService,
+  getAuditRequestContext: () => ({
+    actorId: "auth-user",
+    requestId: "req-test",
+    ip: "127.0.0.1",
+    userAgent: "vitest",
+  }),
 }));
 
 vi.mock("@platform/auth-core", () => ({
@@ -235,14 +257,17 @@ vi.mock("@platform/email-core", () => ({
 
 vi.mock("../src/observability/sentry", () => ({
   setupSentry: vi.fn(),
-  Sentry: {
-    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
-    captureMessage: vi.fn(),
-  },
+  Sentry: mocks.Sentry,
 }));
 
-const [{ app }, { clearRequestGuardrailStateForTests }, { API_VERSION_POLICY, APP_OWNED_API_ROUTES }] = await Promise.all([
+const [
+  { app },
+  { bootstrap },
+  { clearRequestGuardrailStateForTests },
+  { API_VERSION_POLICY, APP_OWNED_API_ROUTES },
+] = await Promise.all([
   import("../src/app"),
+  import("../src/bootstrap"),
   import("../src/middleware/request-guardrails"),
   import("../src/openapi"),
 ]);
@@ -314,7 +339,13 @@ function getSourceDefinedAppRoutes() {
 describe("API functional routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
+    mocks.auditService.listAuditEntries.mockResolvedValue([]);
     clearRequestGuardrailStateForTests();
+  });
+
+  it("exports the audit service from bootstrap", () => {
+    expect(bootstrap.auditService).toBe(mocks.auditService);
   });
 
   // Verifies the health endpoint always reports service readiness.
@@ -493,6 +524,33 @@ describe("API functional routes", () => {
       expect(operation?.tags).toEqual(route.operation.tags);
       expect(operation?.responses?.["200"]).toBeTruthy();
     }
+
+    const sendAllOperation = rootSpec.paths?.["/admin/notifications/send-all"]?.post;
+    const sendUsersOperation = rootSpec.paths?.["/admin/notifications/send-users"]?.post;
+    expect(sendAllOperation?.requestBody?.content?.["application/json"]?.schema?.properties).toEqual(
+      expect.objectContaining({ title: expect.anything(), message: expect.anything() }),
+    );
+    expect(sendUsersOperation?.requestBody?.content?.["application/json"]?.schema?.properties).toEqual(
+      expect.objectContaining({ userIds: expect.anything(), title: expect.anything(), message: expect.anything() }),
+    );
+    expect(sendAllOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).toEqual(
+      expect.objectContaining({
+        sentCount: expect.anything(),
+        skippedCount: expect.anything(),
+        invalidRecipientCount: expect.anything(),
+        invalidRecipientIds: expect.anything(),
+      }),
+    );
+    expect(sendAllOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).not.toHaveProperty("batchId");
+    expect(sendUsersOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).toEqual(
+      expect.objectContaining({
+        sentCount: expect.anything(),
+        skippedCount: expect.anything(),
+        invalidRecipientCount: expect.anything(),
+        invalidRecipientIds: expect.anything(),
+      }),
+    );
+    expect(sendUsersOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).not.toHaveProperty("batchId");
 
     const documentedAppRoutes = APP_OWNED_API_ROUTES.map((route) => `${route.method.toUpperCase()} ${route.path}`);
     expect(new Set(documentedAppRoutes).size).toBe(documentedAppRoutes.length);
@@ -1010,8 +1068,18 @@ describe("API functional routes", () => {
   // Verifies notification list and dispatch routes map to service calls.
   it("routes notifications endpoints", async () => {
     mocks.notificationsService.getAllNotifications.mockResolvedValueOnce([{ id: "n1" }]);
-    mocks.notificationsService.sendNotificationToAllUsers.mockResolvedValueOnce(5);
-    mocks.notificationsService.sendNotificationToUsers.mockResolvedValueOnce(2);
+    mocks.notificationsService.sendNotificationToAllUsers.mockResolvedValueOnce({
+      sentCount: 5,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+    });
+    mocks.notificationsService.sendNotificationToUsers.mockResolvedValueOnce({
+      sentCount: 2,
+      skippedCount: 1,
+      invalidRecipientCount: 1,
+      invalidRecipientIds: ["77777777-7777-4777-8777-777777777777"],
+    });
 
     const listRes = await app.request("/admin/notifications?limit=10");
     const sendAllRes = await app.request("/admin/notifications/send-all", {
@@ -1022,15 +1090,133 @@ describe("API functional routes", () => {
     const sendUsersRes = await app.request("/admin/notifications/send-users", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userIds: ["66666666-6666-4666-8666-666666666666"], title: "T", message: "M" }),
+      body: JSON.stringify({
+        userIds: ["66666666-6666-4666-8666-666666666666"],
+        title: "T",
+        message: "M",
+      }),
     });
 
     expect(listRes.status).toBe(200);
     expect(sendAllRes.status).toBe(200);
     expect(sendUsersRes.status).toBe(200);
     await expect(listRes.json()).resolves.toEqual({ success: true, data: [{ id: "n1" }] });
-    await expect(sendAllRes.json()).resolves.toEqual({ success: true, data: { count: 5 } });
-    await expect(sendUsersRes.json()).resolves.toEqual({ success: true, data: { count: 2 } });
+    await expect(sendAllRes.json()).resolves.toEqual({
+      success: true,
+      data: {
+        sentCount: 5,
+        skippedCount: 0,
+        invalidRecipientCount: 0,
+        invalidRecipientIds: [],
+      },
+    });
+    await expect(sendUsersRes.json()).resolves.toEqual({
+      success: true,
+      data: {
+        sentCount: 2,
+        skippedCount: 1,
+        invalidRecipientCount: 1,
+        invalidRecipientIds: ["77777777-7777-4777-8777-777777777777"],
+      },
+    });
+  });
+
+  it("records audit entries for notification sends", async () => {
+    mocks.notificationsService.sendNotificationToAllUsers.mockResolvedValueOnce({
+      sentCount: 3,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+      batchId: "11111111-1111-4111-8111-111111111111",
+    });
+
+    const res = await app.request("/admin/notifications/send-all", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Ops", message: "Maintenance" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "notification.send_all",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "notification_batch",
+      targetId: "11111111-1111-4111-8111-111111111111",
+      after: expect.objectContaining({
+        title: "Ops",
+        message: "Maintenance",
+        scope: "all",
+        type: "info",
+        category: "system",
+        showAsBanner: false,
+      }),
+      metadata: expect.objectContaining({ sentCount: 3 }),
+    }));
+
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { sentCount: 3, skippedCount: 0, invalidRecipientCount: 0, invalidRecipientIds: [] },
+    });
+  });
+
+  it("routes notification send history", async () => {
+    mocks.auditService.listAuditEntries.mockResolvedValueOnce([
+      {
+        id: "audit-1",
+        action: "notification.send_users",
+        actorId: "auth-user",
+        targetId: "11111111-1111-4111-8111-111111111111",
+        after: { title: "Hello", message: "World", scope: "selected" },
+        metadata: { sentCount: 2, skippedCount: 1, invalidRecipientCount: 1, invalidRecipientIds: ["missing-user"] },
+        createdAt: new Date("2026-04-27T10:00:00Z"),
+      },
+    ]);
+
+    const res = await app.request("/admin/notifications/sends?limit=25");
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.listAuditEntries).toHaveBeenCalledWith({ actionPrefix: "notification.", limit: 25 });
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [expect.objectContaining({ id: "audit-1", title: "Hello", scope: "selected", sentCount: 2 })],
+    });
+  });
+
+  it("routes notification user search", async () => {
+    mocks.adminService.searchUsers.mockResolvedValueOnce([
+      { id: "user-1", email: "a@example.com", name: "Ada" },
+    ]);
+
+    const res = await app.request("/admin/notifications/search-users?query=ada&limit=10");
+
+    expect(res.status).toBe(200);
+    expect(mocks.adminService.searchUsers).toHaveBeenCalledWith("ada", 10);
+    expect(mocks.vouchersService.searchUsers).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [{ id: "user-1", email: "a@example.com", name: "Ada" }],
+    });
+  });
+
+  it("honors current user notification limit query", async () => {
+    mocks.notificationsService.listForUser.mockResolvedValueOnce([{ id: "n-limited" }]);
+
+    const res = await app.request("/me/notifications?limit=7");
+
+    expect(res.status).toBe(200);
+    expect(mocks.notificationsService.listForUser).toHaveBeenCalledWith("auth-user", 7);
+    await expect(res.json()).resolves.toEqual({ success: true, data: [{ id: "n-limited" }] });
+  });
+
+  it("routes current user active banner lookup", async () => {
+    mocks.notificationsService.getActiveBannerForUser.mockResolvedValueOnce({ id: "banner-1" });
+
+    const res = await app.request("/me/notifications/active-banner");
+
+    expect(res.status).toBe(200);
+    expect(mocks.notificationsService.getActiveBannerForUser).toHaveBeenCalledWith("auth-user");
+    await expect(res.json()).resolves.toEqual({ success: true, data: { id: "banner-1" } });
   });
 
   // Verifies malformed notification payloads now return 400 instead of 500.
@@ -1153,6 +1339,295 @@ describe("API functional routes", () => {
     expect(output).not.toContain("secret-token");
     expect(output).not.toContain("abc.def.ghi");
     infoSpy.mockRestore();
+  });
+
+  // Verifies JSON-like and colon-style secrets in client strings are redacted.
+  it("redacts colon-style secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"token": abc123,"password": "password-secret"} password: "correct horse battery staple"',
+        userAgent: "agent refreshToken: refresh-secret",
+        context: {
+          detail:
+            "token: plain-secret accessToken: access-secret \"client_secret\" : bare-secret client_secret: 'single word secret' 'client_secret': 'single-secret'",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"token\\": [redacted]');
+    expect(output).toContain('\\"password\\": \\"[redacted]\\"');
+    expect(output).toContain('\\"client_secret\\" : [redacted]');
+    expect(output).toContain("'client_secret': '[redacted]'");
+    expect(output).toContain("refreshToken: [redacted]");
+    expect(output).toContain("accessToken: [redacted]");
+    expect(output).toContain('password: \\\"[redacted]\\\"');
+    expect(output).toContain("client_secret: '[redacted]'");
+    expect(output).not.toContain("abc123");
+    expect(output).not.toContain("password-secret");
+    expect(output).not.toContain("correct horse battery staple");
+    expect(output).not.toContain("horse battery staple");
+    expect(output).not.toContain("refresh-secret");
+    expect(output).not.toContain("plain-secret");
+    expect(output).not.toContain("access-secret");
+    expect(output).not.toContain("bare-secret");
+    expect(output).not.toContain("single word secret");
+    expect(output).not.toContain("word secret");
+    expect(output).not.toContain("single-secret");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies unquoted multi-token secrets do not leak trailing tokens.
+  it("redacts unquoted multi-token secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: "client payload Authorization: Basic abc123",
+        userAgent: "agent password: correct horse battery",
+        context: {
+          detail: "client_secret = correct horse battery token: plain-secret",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("Authorization: [redacted]");
+    expect(output).toContain("password: [redacted]");
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).toContain("token: [redacted]");
+    expect(output).not.toContain("Basic abc123");
+    expect(output).not.toContain("correct horse");
+    expect(output).not.toContain("horse battery");
+    expect(output).not.toContain("plain-secret");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies free-form client strings redact sensitive key/value assignments with spaced equals signs.
+  it("redacts whitespace-tolerant secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client_secret = "multi word secret"',
+        userAgent: "agent password = 'correct horse battery staple'",
+        context: {
+          detail: "clientSecret = def456",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).toContain("password = [redacted]");
+    expect(output).toContain("clientSecret = [redacted]");
+    expect(output).not.toContain("multi word secret");
+    expect(output).not.toContain("word secret");
+    expect(output).not.toContain("correct horse battery staple");
+    expect(output).not.toContain("horse battery staple");
+    expect(output).not.toContain("def456");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies quoted sensitive keys are redacted for equals assignments too.
+  it("redacts quoted equals secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload "password" = "secret value"',
+        userAgent: 'agent "client_secret" = bare-secret',
+        context: {
+          detail: '\\"password\\"=\\"secret value\\"',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\" = [redacted]');
+    expect(output).toContain('\\"client_secret\\" = [redacted]');
+    expect(output).toContain('\\\\\\"password\\\\\\"=[redacted]');
+    expect(output).not.toContain("secret value");
+    expect(output).not.toContain("bare-secret");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies escaped quote delimiters do not terminate redaction early.
+  it("redacts escaped delimiter secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"password":"abc\\"def"} password: "abc\\"def"',
+        userAgent: "agent api_key = 'abc\\'def'",
+        context: {
+          detail: "client_secret: 'abc\\'def'",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain("api_key = [redacted]");
+    expect(output).toContain("client_secret: '[redacted]'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies structural delimiters inside quoted secret values are not treated as value boundaries.
+  it("redacts quoted secret values containing structural delimiters in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload password: "abc}def" {"password":"abc}def"}',
+        userAgent: String.raw`agent client_secret = 'abc}def' \"password\":\"abc}def\"`,
+        context: {
+          detail: 'password: "abc}def"',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies serialized escaped quote delimiters inside values do not end redaction early.
+  it("redacts serialized escaped-quote client log strings without leaking suffix tokens", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: String.raw`client payload \"password\":\"abc\\\"def\"`,
+        userAgent: String.raw`agent \"password\"=\"abc\\\"def\"`,
+        context: {
+          detail: String.raw`\'client_secret\':\'abc\\\'def\'`,
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
+    expect(output).toContain('\\\\\\"password\\\\\\"=[redacted]');
+    expect(output).toContain("\\\\'client_secret\\\\':\\\\'[redacted]\\\\'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies malformed quoted assignments do not leak remaining secret tokens.
+  it("redacts unterminated quoted secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"password":"first second} password = "first second',
+        userAgent: 'agent password: "first second',
+        context: {
+          detail: '"client_secret" : "first second',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\":[redacted]');
+    expect(output).toContain("password = [redacted]");
+    expect(output).toContain("password: [redacted]");
+    expect(output).toContain('\\"client_secret\\" : [redacted]');
+    expect(output).not.toContain("first");
+    expect(output).not.toContain("second");
+    infoSpy.mockRestore();
+  });
+
+  // Verifies Sentry receives only sanitized bounded client log context.
+  it("sends only sanitized bounded client log context to Sentry", async () => {
+    mocks.Sentry.captureMessage.mockClear();
+
+    const wideContext = Object.fromEntries(Array.from({ length: 20 }, (_, index) => [`extra${index}`, `value${index}`]));
+
+    const payload = {
+      source: "web",
+      level: "error",
+      message: "failed with token=abc123 and bearer Bearer abc.def.ghi",
+      url: "https://example.com/path?token=abc&safe=yes",
+      userAgent: "Vitest",
+      context: {
+        safe: "ok",
+        password: "secret",
+        longValue: "x".repeat(600),
+        nested: { authorization: "Bearer abc.def.ghi", safe: "ok" },
+        ...wideContext,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    expect(res.status).toBe(200);
+    const sentryContext = mocks.Sentry.captureMessage.mock.calls[0]?.[1]?.extra?.context as Record<string, unknown>;
+
+    expect(Object.keys(sentryContext)).toHaveLength(8);
+    expect(String(sentryContext.longValue).length).toBeLessThanOrEqual(128);
+    expect(sentryContext.extra19).toBeUndefined();
+    expect(mocks.Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.not.stringContaining("abc.def.ghi"),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          url: expect.not.stringContaining("token=abc"),
+          context: expect.objectContaining({
+            safe: "ok",
+            password: "[redacted]",
+            nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
+          }),
+        }),
+      }),
+    );
   });
 
   // Verifies guarded endpoints reject oversized bodies before route parsing.

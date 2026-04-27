@@ -28,7 +28,7 @@ export function buildErrorCode(requestId: string) {
 }
 
 export function schemaFromZod(schema: z.ZodTypeAny) {
-  return z.toJSONSchema(schema, { target: "draft-7" });
+  return z.toJSONSchema(schema, { target: "draft-7", unrepresentable: "any" });
 }
 
 export function ok<T>(c: JsonContext, data: T, status = 200) {

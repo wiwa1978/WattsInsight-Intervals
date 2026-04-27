@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { env } from "../env";
-import { redactLogValue } from "./redaction";
+import { redactLogValue, redactString } from "./redaction";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogStream = "app" | "audit";
@@ -17,14 +17,35 @@ type ReadLogEntriesInput = {
 };
 
 const fileNamePattern = /^\d{4}-\d{2}-\d{2}(?:\.audit)?\.jsonl$/;
+const MAX_LOG_TAIL_BYTES = 256 * 1024;
+const MAX_SERIALIZE_DEPTH = 5;
+const MAX_SERIALIZE_ARRAY_LENGTH = 25;
+const MAX_SERIALIZE_KEYS = 50;
+const MAX_SERIALIZE_STRING_LENGTH = 1000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function serialize(value: unknown): unknown {
+function truncateString(value: string) {
+  return value.length > MAX_SERIALIZE_STRING_LENGTH ? `${value.slice(0, MAX_SERIALIZE_STRING_LENGTH)}...[truncated]` : value;
+}
+
+function serializeString(value: string) {
+  return truncateString(redactString(value));
+}
+
+function serialize(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return value;
+    return typeof value === "string" ? serializeString(value) : value;
+  }
+
+  if (typeof value === "bigint" || typeof value === "symbol" || typeof value === "function") {
+    return serializeString(String(value));
+  }
+
+  if (depth >= MAX_SERIALIZE_DEPTH) {
+    return "[max-depth]";
   }
 
   if (value instanceof Date) {
@@ -33,22 +54,31 @@ function serialize(value: unknown): unknown {
 
   if (value instanceof Error) {
     return {
-      name: value.name,
-      message: redactLogValue(value.message),
-      stack: value.stack ? redactLogValue(value.stack) : undefined,
-      cause: serialize(value.cause),
+      name: serializeString(value.name),
+      message: serializeString(value.message),
+      stack: value.stack ? serializeString(value.stack) : undefined,
+      cause: serialize(value.cause, depth + 1, seen),
     };
   }
 
+  if (seen.has(value)) {
+    return "[circular]";
+  }
+  seen.add(value);
+
   if (Array.isArray(value)) {
-    return value.map(serialize);
+    return value.slice(0, MAX_SERIALIZE_ARRAY_LENGTH).map((entry) => serialize(entry, depth + 1, seen));
   }
 
   if (isRecord(value)) {
-    return redactLogValue(Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, serialize(entry)])));
+    return Object.fromEntries(
+      Object.entries(value)
+        .slice(0, MAX_SERIALIZE_KEYS)
+        .map(([key, entry]) => [key, serialize(entry, depth + 1, seen)]),
+    );
   }
 
-  return redactLogValue(String(value));
+  return serializeString(String(value));
 }
 
 function normalizeArgs(arg1?: unknown, arg2?: unknown) {
@@ -149,6 +179,27 @@ function listLogFiles(stream: LogStream) {
   };
 }
 
+function readTail(filePath: string) {
+  const stats = fs.statSync(filePath);
+  const bytesToRead = Math.min(stats.size, MAX_LOG_TAIL_BYTES);
+  const buffer = Buffer.alloc(bytesToRead);
+  const fd = fs.openSync(filePath, "r");
+
+  try {
+    fs.readSync(fd, buffer, 0, bytesToRead, stats.size - bytesToRead);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  const raw = buffer.toString("utf8");
+  if (stats.size <= MAX_LOG_TAIL_BYTES) {
+    return raw;
+  }
+
+  const firstNewline = raw.indexOf("\n");
+  return firstNewline >= 0 ? raw.slice(firstNewline + 1) : raw;
+}
+
 function readLogEntries(input: ReadLogEntriesInput) {
   const stream = input.stream ?? "app";
   const available = listLogFiles(stream);
@@ -174,7 +225,7 @@ function readLogEntries(input: ReadLogEntriesInput) {
   }
 
   const limit = Math.min(Math.max(Math.trunc(input.limit ?? 100), 1), 500);
-  const raw = fs.readFileSync(filePath, "utf8");
+  const raw = readTail(filePath);
   const entries = raw
     .split("\n")
     .filter(Boolean)

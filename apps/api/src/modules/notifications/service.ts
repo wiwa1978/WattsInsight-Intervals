@@ -1,10 +1,59 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+
+import { and, count, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 
 import { notification, user } from "@platform/platform-db";
 
 type NotificationsServiceDeps = {
   db: any;
 };
+
+const SEND_BATCH_SIZE = 500;
+
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+function withBatchData(data: Record<string, unknown> | undefined, batchId: string) {
+  return {
+    ...(data ?? {}),
+    notificationBatchId: batchId,
+  };
+}
+
+function sanitizeNotificationData(data: unknown) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return data;
+  }
+
+  const { notificationBatchId: _notificationBatchId, ...publicData } = data as Record<string, unknown>;
+  return publicData;
+}
+
+function sanitizeNotificationRow<T extends { data?: unknown }>(row: T): T {
+  if (!("data" in row)) {
+    return row;
+  }
+
+  return {
+    ...row,
+    data: sanitizeNotificationData(row.data),
+  };
+}
+
+async function withTransaction<T>(db: any, callback: (tx: any) => Promise<T>) {
+  if (typeof db.transaction === "function") {
+    return db.transaction(callback);
+  }
+
+  return callback(db);
+}
 
 export function createNotificationsService(deps: NotificationsServiceDeps) {
   function normalizeLimit(limit: number, max = 100) {
@@ -49,12 +98,33 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
   async function listForUser(userId: string, limit = 20) {
     const normalizedLimit = normalizeLimit(limit, 100);
 
-    return deps.db
+    const rows = await deps.db
       .select()
       .from(notification)
       .where(eq(notification.userId, userId))
       .orderBy(desc(notification.createdAt))
       .limit(normalizedLimit);
+
+    return rows.map(sanitizeNotificationRow);
+  }
+
+  async function getActiveBannerForUser(userId: string) {
+    const now = new Date();
+    const rows = await deps.db
+      .select()
+      .from(notification)
+      .where(
+        and(
+          eq(notification.userId, userId),
+          eq(notification.showAsBanner, true),
+          eq(notification.read, false),
+          or(isNull(notification.bannerExpiresAt), gt(notification.bannerExpiresAt, now)),
+        ),
+      )
+      .orderBy(desc(notification.createdAt))
+      .limit(1);
+
+    return rows[0] ? sanitizeNotificationRow(rows[0]) : null;
   }
 
   async function unreadCount(userId: string) {
@@ -89,7 +159,7 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
   async function getAllNotifications(limit = 50) {
     const normalizedLimit = normalizeLimit(limit, 100);
 
-    return deps.db
+    const rows = await deps.db
       .select({
         id: notification.id,
         title: notification.title,
@@ -104,6 +174,8 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       .from(notification)
       .orderBy(desc(notification.createdAt))
       .limit(normalizedLimit);
+
+    return rows.map(sanitizeNotificationRow);
   }
 
   async function sendNotificationToAllUsers(input: {
@@ -116,22 +188,35 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
     bannerExpiresAt?: Date;
   }) {
     const users = await deps.db.select({ id: user.id }).from(user);
+    const batchId = randomUUID();
     const payload = users.map((u: { id: string }) => ({
       userId: u.id,
       title: input.title,
       message: input.message,
       type: input.type ?? "info",
       category: input.category ?? "system",
-      data: input.data ?? null,
+      data: withBatchData(input.data, batchId),
       showAsBanner: input.showAsBanner ?? false,
       bannerExpiresAt: input.bannerExpiresAt ?? null,
     }));
 
-    if (payload.length > 0) {
-      await deps.db.insert(notification).values(payload);
+    const payloadChunks = chunk(payload, SEND_BATCH_SIZE);
+
+    if (payloadChunks.length > 0) {
+      await withTransaction(deps.db, async (tx) => {
+        for (const payloadChunk of payloadChunks) {
+          await tx.insert(notification).values(payloadChunk);
+        }
+      });
     }
 
-    return payload.length;
+    return {
+      sentCount: payload.length,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+      batchId,
+    };
   }
 
   async function sendNotificationToUsers(input: {
@@ -145,13 +230,19 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
     bannerExpiresAt?: Date;
   }) {
     const userIds = dedupeUserIds(input.userIds);
-    const payload = userIds.map((userId) => ({
+    const existingUsers = userIds.length > 0
+      ? await deps.db.select({ id: user.id }).from(user).where(inArray(user.id, userIds))
+      : [];
+    const validUserIds = new Set(existingUsers.map((existingUser: { id: string }) => existingUser.id));
+    const invalidRecipientIds = userIds.filter((userId) => !validUserIds.has(userId));
+    const batchId = randomUUID();
+    const payload = userIds.filter((userId) => validUserIds.has(userId)).map((userId) => ({
       userId,
       title: input.title,
       message: input.message,
       type: input.type ?? "info",
       category: input.category ?? "system",
-      data: input.data ?? null,
+      data: withBatchData(input.data, batchId),
       showAsBanner: input.showAsBanner ?? false,
       bannerExpiresAt: input.bannerExpiresAt ?? null,
     }));
@@ -160,12 +251,19 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       await deps.db.insert(notification).values(payload);
     }
 
-    return payload.length;
+    return {
+      sentCount: payload.length,
+      skippedCount: invalidRecipientIds.length,
+      invalidRecipientCount: invalidRecipientIds.length,
+      invalidRecipientIds,
+      batchId,
+    };
   }
 
   return {
     createNotification,
     listForUser,
+    getActiveBannerForUser,
     unreadCount,
     markAsRead,
     markAllAsRead,

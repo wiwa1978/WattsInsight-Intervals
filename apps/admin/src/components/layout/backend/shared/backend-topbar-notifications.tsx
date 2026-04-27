@@ -63,6 +63,11 @@ export function BackendTopbarNotifications() {
     }
   }, [fetchNotifications]);
 
+  React.useEffect(() => {
+    window.addEventListener("notifications:changed", fetchNotifications);
+    return () => window.removeEventListener("notifications:changed", fetchNotifications);
+  }, [fetchNotifications]);
+
   const handleMarkAsRead = async (notificationId: string) => {
     if (!session?.user?.id) return;
     await markAsRead(notificationId);

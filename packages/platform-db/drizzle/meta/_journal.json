@@ -36,6 +36,13 @@
       "when": 1777227422083,
       "tag": "0004_unique_discount_assignments",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777278670902,
+      "tag": "0005_add_audit_entries",
+      "breakpoints": true
     }
   ]
 }
