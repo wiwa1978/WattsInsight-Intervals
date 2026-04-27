@@ -1,5 +1,5 @@
 import {
-  getAllNotificationsApi,
+  getNotificationSendHistoryApi,
   sendNotificationToAllUsersApi,
   sendNotificationToUsersApi,
 } from "@/lib/api/admin";
@@ -11,6 +11,7 @@ import {
   markMyNotificationAsRead,
 } from "@/lib/api/me";
 import type { Notification as NotificationRecord } from "@/schemas/notification";
+import type { NotificationSendHistoryItem } from "@platform/contracts";
 
 export async function getNotifications(limit = 20) {
   try {
@@ -187,10 +188,14 @@ export async function sendNotificationToUsers({
 }
 
 export async function getAllNotifications(limit = 50) {
+  return getNotificationSendHistory(limit);
+}
+
+export async function getNotificationSendHistory(limit = 50) {
   try {
-    const data = (await getAllNotificationsApi(limit)) as NotificationRecord[];
+    const data = (await getNotificationSendHistoryApi(limit)) as NotificationSendHistoryItem[];
     return { success: true, data };
   } catch {
-    return { success: false, error: "Failed to fetch notifications" };
+    return { success: false, error: "Failed to fetch notification send history" };
   }
 }

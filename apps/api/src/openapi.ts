@@ -20,6 +20,7 @@ import {
   mobileRevokeRequestSchema,
   mobileTokenRequestSchema,
   notificationIdParamSchema,
+  notificationSendHistoryItemSchema,
   notificationSendResultSchema,
   notificationsListQuerySchema,
   optionalLimitQuerySchema,
@@ -75,6 +76,10 @@ const genericObjectSchema = z.object({}).passthrough();
 const notificationSendResultResponseSchema = z.object({
   success: z.literal(true),
   data: notificationSendResultSchema,
+});
+const notificationSendHistoryResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.array(notificationSendHistoryItemSchema),
 });
 
 function jsonContent(schema: z.ZodTypeAny) {
@@ -414,6 +419,14 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/logs/files", ["Admin Logs"], "List log files", { security: cookieOrBearerAuth, parameters: [queryParameter("stream", logFilesQuerySchema.shape.stream)], responses: defaultResponses("Log files", ["400", "401", "403"]) }),
   route("get", "/admin/logs/entries", ["Admin Logs"], "Read log entries", { security: cookieOrBearerAuth, parameters: [queryParameter("stream", logEntriesQuerySchema.shape.stream), queryParameter("file", logEntriesQuerySchema.shape.file), queryParameter("limit", logEntriesQuerySchema.shape.limit)], responses: defaultResponses("Log entries", ["400", "401", "403"]) }),
   route("get", "/admin/notifications", ["Admin Notifications"], "List notifications", { security: cookieOrBearerAuth, parameters: [queryParameter("limit", notificationsListQuerySchema.shape.limit)], responses: defaultResponses("Notifications", ["400", "401", "403"]) }),
+  route("get", "/admin/notifications/sends", ["Admin Notifications"], "List notification send history", {
+    security: cookieOrBearerAuth,
+    parameters: [queryParameter("limit", notificationsListQuerySchema.shape.limit)],
+    responses: {
+      ...defaultResponses("Notification send history", ["400", "401", "403"]),
+      "200": jsonResponse("Notification send history", notificationSendHistoryResponseSchema),
+    },
+  }),
   route("post", "/admin/notifications/send-all", ["Admin Notifications"], "Send notification to all users and return recipient counts", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(sendNotificationBaseSchema),

@@ -35,7 +35,16 @@ import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
 import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
+import { getAuditRequestContext } from "../modules/audit/service";
 import { logger } from "../observability/logger";
+
+type NotificationSendResultWithBatch = {
+  sentCount: number;
+  skippedCount: number;
+  invalidRecipientCount: number;
+  invalidRecipientIds: string[];
+  batchId?: string | null;
+};
 
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
@@ -44,6 +53,51 @@ function getAuthUser(c: Context<AppEnv>) {
   }
 
   return authUser;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function publicNotificationSendResult(result: NotificationSendResultWithBatch) {
+  return {
+    sentCount: result.sentCount,
+    skippedCount: result.skippedCount,
+    invalidRecipientCount: result.invalidRecipientCount,
+    invalidRecipientIds: result.invalidRecipientIds,
+  };
+}
+
+function notificationSendHistoryItem(entry: Record<string, unknown>) {
+  const after = isRecord(entry.after) ? entry.after : {};
+  const metadata = isRecord(entry.metadata) ? entry.metadata : {};
+  const scope = after.scope === "selected" ? "selected" : "all";
+  const invalidRecipientIds = Array.isArray(metadata.invalidRecipientIds)
+    ? metadata.invalidRecipientIds.filter((id): id is string => typeof id === "string")
+    : [];
+
+  return {
+    id: stringValue(entry.id),
+    action: stringValue(entry.action),
+    batchId: typeof entry.targetId === "string" ? entry.targetId : null,
+    actorId: typeof entry.actorId === "string" ? entry.actorId : null,
+    scope,
+    title: stringValue(after.title),
+    message: stringValue(after.message),
+    sentCount: numberValue(metadata.sentCount),
+    skippedCount: numberValue(metadata.skippedCount),
+    invalidRecipientCount: numberValue(metadata.invalidRecipientCount),
+    invalidRecipientIds,
+    createdAt: entry.createdAt instanceof Date ? entry.createdAt.toISOString() : stringValue(entry.createdAt),
+  };
 }
 
 export function createAdminRouter() {
@@ -567,6 +621,17 @@ export function createAdminRouter() {
     return c.json({ success: true, data });
   });
 
+  router.get("/notifications/sends", async (c) => {
+    const parsedQuery = parseQuery(notificationsListQuerySchema, { limit: c.req.query("limit") });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid notification sends query");
+    }
+
+    const entries = await bootstrap.auditService.listAuditEntries({ actionPrefix: "notification.", limit: parsedQuery.data.limit });
+    return c.json({ success: true, data: entries.map((entry: Record<string, unknown>) => notificationSendHistoryItem(entry)) });
+  });
+
   router.post("/notifications/send-all", async (c) => {
     const body = await c.req.json().catch(() => null);
     const parsedBody = parseJsonBody(sendNotificationBaseSchema, body);
@@ -577,9 +642,27 @@ export function createAdminRouter() {
 
     const result = await bootstrap.notificationsService.sendNotificationToAllUsers({
       ...parsedBody.data,
+    }) as NotificationSendResultWithBatch;
+    const publicResult = publicNotificationSendResult(result);
+
+    await bootstrap.auditService.recordAuditEntry({
+      ...getAuditRequestContext(c),
+      action: "notification.send_all",
+      outcome: "success",
+      targetType: "notification_batch",
+      targetId: result.batchId ?? null,
+      after: {
+        scope: "all",
+        title: parsedBody.data.title,
+        message: parsedBody.data.message,
+        type: parsedBody.data.type,
+        category: parsedBody.data.category,
+        showAsBanner: parsedBody.data.showAsBanner,
+      },
+      metadata: publicResult,
     });
 
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: publicResult });
   });
 
   router.post("/notifications/send-users", async (c) => {
@@ -592,9 +675,30 @@ export function createAdminRouter() {
 
     const result = await bootstrap.notificationsService.sendNotificationToUsers({
       ...parsedBody.data,
+    }) as NotificationSendResultWithBatch;
+    const publicResult = publicNotificationSendResult(result);
+
+    await bootstrap.auditService.recordAuditEntry({
+      ...getAuditRequestContext(c),
+      action: "notification.send_users",
+      outcome: "success",
+      targetType: "notification_batch",
+      targetId: result.batchId ?? null,
+      after: {
+        scope: "selected",
+        title: parsedBody.data.title,
+        message: parsedBody.data.message,
+        type: parsedBody.data.type,
+        category: parsedBody.data.category,
+        showAsBanner: parsedBody.data.showAsBanner,
+      },
+      metadata: {
+        ...publicResult,
+        requestedRecipientCount: parsedBody.data.userIds.length,
+      },
     });
 
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: publicResult });
   });
 
   return router;

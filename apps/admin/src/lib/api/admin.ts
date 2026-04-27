@@ -1,7 +1,7 @@
 import { apiRequest } from "./client";
 
 import type { AdminCreateDiscountInput, AdminUpdateDiscountInput, DiscountStatus } from "@/types/discounts";
-import type { VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
+import type { NotificationSendHistoryItem, VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
 
 type NotificationSendResult = {
   sentCount: number;
@@ -289,6 +289,11 @@ export async function getAdminLogEntriesApi(payload: { stream?: "app" | "audit";
 
 export async function getAllNotificationsApi(limit = 50) {
   const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/notifications?limit=${limit}`);
+  return result.data;
+}
+
+export async function getNotificationSendHistoryApi(limit = 50) {
+  const result = await apiRequest<{ success: boolean; data: NotificationSendHistoryItem[] }>(`/admin/notifications/sends?limit=${limit}`);
   return result.data;
 }
 

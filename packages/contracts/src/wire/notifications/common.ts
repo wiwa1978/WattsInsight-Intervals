@@ -52,11 +52,27 @@ export const notificationSendResultSchema = z.object({
   invalidRecipientIds: z.array(z.string().uuid()),
 });
 
+export const notificationSendHistoryItemSchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  batchId: z.string().nullable(),
+  actorId: z.string().nullable(),
+  scope: z.enum(["all", "selected"]),
+  title: z.string(),
+  message: z.string(),
+  sentCount: z.number().int().min(0),
+  skippedCount: z.number().int().min(0),
+  invalidRecipientCount: z.number().int().min(0),
+  invalidRecipientIds: z.array(z.string()),
+  createdAt: z.union([z.string(), z.date()]),
+});
+
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type NotificationCategory = z.infer<typeof notificationCategorySchema>;
 export type SendNotificationInput = z.infer<typeof sendNotificationSchema>;
 export type NotificationSendResult = z.infer<typeof notificationSendResultSchema>;
+export type NotificationSendHistoryItem = z.infer<typeof notificationSendHistoryItemSchema>;
 
 export interface TranslateFunction {
   (key: string, values?: Record<string, unknown>): string;

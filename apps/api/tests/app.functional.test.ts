@@ -1115,6 +1115,61 @@ describe("API functional routes", () => {
     });
   });
 
+  it("records audit entries for notification sends", async () => {
+    mocks.notificationsService.sendNotificationToAllUsers.mockResolvedValueOnce({
+      sentCount: 3,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+      batchId: "11111111-1111-4111-8111-111111111111",
+    });
+
+    const res = await app.request("/admin/notifications/send-all", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Ops", message: "Maintenance" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "notification.send_all",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "notification_batch",
+      targetId: "11111111-1111-4111-8111-111111111111",
+      after: expect.objectContaining({ title: "Ops", message: "Maintenance", scope: "all" }),
+      metadata: expect.objectContaining({ sentCount: 3 }),
+    }));
+
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { sentCount: 3, skippedCount: 0, invalidRecipientCount: 0, invalidRecipientIds: [] },
+    });
+  });
+
+  it("routes notification send history", async () => {
+    mocks.auditService.listAuditEntries.mockResolvedValueOnce([
+      {
+        id: "audit-1",
+        action: "notification.send_users",
+        actorId: "auth-user",
+        targetId: "11111111-1111-4111-8111-111111111111",
+        after: { title: "Hello", message: "World", scope: "selected" },
+        metadata: { sentCount: 2, skippedCount: 1, invalidRecipientCount: 1, invalidRecipientIds: ["missing-user"] },
+        createdAt: new Date("2026-04-27T10:00:00Z"),
+      },
+    ]);
+
+    const res = await app.request("/admin/notifications/sends?limit=25");
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.listAuditEntries).toHaveBeenCalledWith({ actionPrefix: "notification.", limit: 25 });
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [expect.objectContaining({ id: "audit-1", title: "Hello", scope: "selected", sentCount: 2 })],
+    });
+  });
+
   it("honors current user notification limit query", async () => {
     mocks.notificationsService.listForUser.mockResolvedValueOnce([{ id: "n-limited" }]);
 
