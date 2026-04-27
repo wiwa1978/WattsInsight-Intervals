@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createNotificationsService } from "../../../src/modules/notifications/service";
 
 describe("createNotificationsService", () => {
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   // Verifies default notification properties are applied when optional fields are omitted.
   it("creates a notification with defaults", async () => {
     const returning = vi.fn().mockResolvedValue([{ id: "n1", type: "info" }]);
@@ -47,6 +49,52 @@ describe("createNotificationsService", () => {
       invalidRecipientCount: 0,
       invalidRecipientIds: [],
     });
+  });
+
+  // Verifies broadcast sends avoid oversized inserts and tag each row with shared batch metadata.
+  it("sendNotificationToAllUsers inserts users in batches with notification batch metadata", async () => {
+    const users = Array.from({ length: 1001 }, (_, index) => ({ id: `u${index + 1}` }));
+    const values = vi.fn().mockResolvedValue(undefined);
+    const service = createNotificationsService({
+      db: {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockResolvedValue(users),
+        }),
+        insert: vi.fn().mockReturnValue({ values }),
+      } as any,
+    });
+
+    const result = await service.sendNotificationToAllUsers({
+      title: "Hi",
+      message: "Body",
+      data: { source: "admin" },
+    });
+
+    expect(result).toEqual({
+      sentCount: 1001,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+    });
+    expect(values).toHaveBeenCalledTimes(3);
+    expect(values.mock.calls.map(([rows]) => rows)).toEqual([
+      expect.arrayContaining([expect.objectContaining({ userId: "u1" })]),
+      expect.arrayContaining([expect.objectContaining({ userId: "u501" })]),
+      [expect.objectContaining({ userId: "u1001" })],
+    ]);
+    expect(values.mock.calls.map(([rows]) => rows).map((rows) => rows.length)).toEqual([500, 500, 1]);
+
+    const insertedRows = values.mock.calls.flatMap(([rows]) => rows);
+    const batchIds = new Set(insertedRows.map((row) => row.data.notificationBatchId));
+
+    expect(batchIds.size).toBe(1);
+    expect([...batchIds][0]).toMatch(uuidPattern);
+    expect(insertedRows).toHaveLength(1001);
+    expect(insertedRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ data: expect.objectContaining({ source: "admin" }) }),
+      ]),
+    );
   });
 
   // Verifies targeted notifications avoid insert calls when no recipients are provided.
@@ -95,6 +143,46 @@ describe("createNotificationsService", () => {
     expect(values).toHaveBeenCalledWith([
       expect.objectContaining({ userId: "u1" }),
       expect.objectContaining({ userId: "u2" }),
+    ]);
+  });
+
+  // Verifies targeted sends preserve caller data and tag valid inserts with one shared batch ID.
+  it("sendNotificationToUsers attaches notification batch metadata to valid inserted recipients", async () => {
+    const values = vi.fn().mockResolvedValue(undefined);
+    const insert = vi.fn().mockReturnValue({ values });
+    const where = vi.fn().mockResolvedValue([{ id: "u1" }, { id: "u2" }]);
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = createNotificationsService({ db: { select, insert } as any });
+
+    const result = await service.sendNotificationToUsers({
+      userIds: ["u1", "missing", "u2"],
+      title: "A",
+      message: "B",
+      data: { action: "review" },
+    });
+
+    expect(result).toEqual({
+      sentCount: 2,
+      skippedCount: 1,
+      invalidRecipientCount: 1,
+      invalidRecipientIds: ["missing"],
+    });
+
+    const [[insertedRows]] = values.mock.calls;
+    const batchIds = new Set(insertedRows.map((row: { data: Record<string, unknown> }) => row.data.notificationBatchId));
+
+    expect(batchIds.size).toBe(1);
+    expect([...batchIds][0]).toMatch(uuidPattern);
+    expect(insertedRows).toEqual([
+      expect.objectContaining({
+        userId: "u1",
+        data: expect.objectContaining({ action: "review", notificationBatchId: [...batchIds][0] }),
+      }),
+      expect.objectContaining({
+        userId: "u2",
+        data: expect.objectContaining({ action: "review", notificationBatchId: [...batchIds][0] }),
+      }),
     ]);
   });
 

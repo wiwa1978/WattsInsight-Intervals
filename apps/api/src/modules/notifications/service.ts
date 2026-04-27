@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 
 import { notification, user } from "@platform/platform-db";
@@ -5,6 +7,25 @@ import { notification, user } from "@platform/platform-db";
 type NotificationsServiceDeps = {
   db: any;
 };
+
+const SEND_BATCH_SIZE = 500;
+
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+function withBatchData(data: Record<string, unknown> | undefined, batchId: string) {
+  return {
+    ...(data ?? {}),
+    notificationBatchId: batchId,
+  };
+}
 
 export function createNotificationsService(deps: NotificationsServiceDeps) {
   function normalizeLimit(limit: number, max = 100) {
@@ -116,19 +137,20 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
     bannerExpiresAt?: Date;
   }) {
     const users = await deps.db.select({ id: user.id }).from(user);
+    const batchId = randomUUID();
     const payload = users.map((u: { id: string }) => ({
       userId: u.id,
       title: input.title,
       message: input.message,
       type: input.type ?? "info",
       category: input.category ?? "system",
-      data: input.data ?? null,
+      data: withBatchData(input.data, batchId),
       showAsBanner: input.showAsBanner ?? false,
       bannerExpiresAt: input.bannerExpiresAt ?? null,
     }));
 
-    if (payload.length > 0) {
-      await deps.db.insert(notification).values(payload);
+    for (const payloadChunk of chunk(payload, SEND_BATCH_SIZE)) {
+      await deps.db.insert(notification).values(payloadChunk);
     }
 
     return {
@@ -155,13 +177,14 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       : [];
     const validUserIds = new Set(existingUsers.map((existingUser: { id: string }) => existingUser.id));
     const invalidRecipientIds = userIds.filter((userId) => !validUserIds.has(userId));
+    const batchId = randomUUID();
     const payload = userIds.filter((userId) => validUserIds.has(userId)).map((userId) => ({
       userId,
       title: input.title,
       message: input.message,
       type: input.type ?? "info",
       category: input.category ?? "system",
-      data: input.data ?? null,
+      data: withBatchData(input.data, batchId),
       showAsBanner: input.showAsBanner ?? false,
       bannerExpiresAt: input.bannerExpiresAt ?? null,
     }));
