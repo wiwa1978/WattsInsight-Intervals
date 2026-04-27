@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 
 import { notification, user } from "@platform/platform-db";
 
@@ -106,6 +106,25 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       .limit(normalizedLimit);
 
     return rows.map(sanitizeNotificationRow);
+  }
+
+  async function getActiveBannerForUser(userId: string) {
+    const now = new Date();
+    const rows = await deps.db
+      .select()
+      .from(notification)
+      .where(
+        and(
+          eq(notification.userId, userId),
+          eq(notification.showAsBanner, true),
+          eq(notification.read, false),
+          or(isNull(notification.bannerExpiresAt), gt(notification.bannerExpiresAt, now)),
+        ),
+      )
+      .orderBy(desc(notification.createdAt))
+      .limit(1);
+
+    return rows[0] ? sanitizeNotificationRow(rows[0]) : null;
   }
 
   async function unreadCount(userId: string) {
@@ -244,6 +263,7 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
   return {
     createNotification,
     listForUser,
+    getActiveBannerForUser,
     unreadCount,
     markAsRead,
     markAllAsRead,

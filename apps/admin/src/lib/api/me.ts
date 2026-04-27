@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import type { Notification } from "@/schemas/notification";
 
 export type CountryRecord = {
   id: string;
@@ -43,6 +44,11 @@ export async function redeemMyVoucher(code: string) {
 
 export async function getMyNotifications(limit = 20) {
   const result = await apiRequest<{ success: boolean; data: unknown }>(`/me/notifications?limit=${limit}`);
+  return result.data;
+}
+
+export async function getMyActiveBannerNotification() {
+  const result = await apiRequest<{ success: boolean; data: Notification | null }>("/me/notifications/active-banner");
   return result.data;
 }
 

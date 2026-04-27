@@ -160,6 +160,35 @@ describe("createNotificationsService", () => {
     ]);
   });
 
+  it("getActiveBannerForUser returns one unread active banner without internal batch metadata", async () => {
+    const limit = vi.fn().mockResolvedValue([
+      {
+        id: "n1",
+        title: "maintenance.title",
+        data: {
+          notificationBatchId: "11111111-1111-4111-8111-111111111111",
+          window: "tonight",
+        },
+      },
+    ]);
+    const orderBy = vi.fn().mockReturnValue({ limit });
+    const where = vi.fn().mockReturnValue({ orderBy });
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = createNotificationsService({ db: { select } as any });
+
+    const result = await service.getActiveBannerForUser("u1");
+
+    expect(where).toHaveBeenCalledTimes(1);
+    expect(orderBy).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledWith(1);
+    expect(result).toEqual({
+      id: "n1",
+      title: "maintenance.title",
+      data: { window: "tonight" },
+    });
+  });
+
   // Verifies targeted notifications deduplicate recipients and report missing users without failing the request.
   it("sendNotificationToUsers inserts valid recipients and reports invalid recipients", async () => {
     const values = vi.fn().mockResolvedValue(undefined);

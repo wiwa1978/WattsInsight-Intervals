@@ -113,6 +113,12 @@ export function createMeRouter() {
     return c.json({ success: true, data: { count } });
   });
 
+  router.get("/notifications/active-banner", async (c) => {
+    const authUser = getAuthUser(c);
+    const banner = await bootstrap.notificationsService.getActiveBannerForUser(authUser.id);
+    return c.json({ success: true, data: banner });
+  });
+
   router.post("/notifications/:notificationId/read", async (c) => {
     const authUser = getAuthUser(c);
     const parsedParams = parseParams(notificationIdParamSchema, { notificationId: c.req.param("notificationId") });

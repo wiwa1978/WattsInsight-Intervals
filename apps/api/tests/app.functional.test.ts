@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => {
     markAsRead: vi.fn(),
     deleteNotification: vi.fn(),
     markAllAsRead: vi.fn(),
+    getActiveBannerForUser: vi.fn(),
     getAllNotifications: vi.fn(),
     sendNotificationToAllUsers: vi.fn(),
     sendNotificationToUsers: vi.fn(),
@@ -1204,6 +1205,16 @@ describe("API functional routes", () => {
     expect(res.status).toBe(200);
     expect(mocks.notificationsService.listForUser).toHaveBeenCalledWith("auth-user", 7);
     await expect(res.json()).resolves.toEqual({ success: true, data: [{ id: "n-limited" }] });
+  });
+
+  it("routes current user active banner lookup", async () => {
+    mocks.notificationsService.getActiveBannerForUser.mockResolvedValueOnce({ id: "banner-1" });
+
+    const res = await app.request("/me/notifications/active-banner");
+
+    expect(res.status).toBe(200);
+    expect(mocks.notificationsService.getActiveBannerForUser).toHaveBeenCalledWith("auth-user");
+    await expect(res.json()).resolves.toEqual({ success: true, data: { id: "banner-1" } });
   });
 
   // Verifies malformed notification payloads now return 400 instead of 500.

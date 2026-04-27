@@ -20,6 +20,7 @@ import {
   mobileRevokeRequestSchema,
   mobileTokenRequestSchema,
   notificationIdParamSchema,
+  notificationSchema,
   notificationSendHistoryItemSchema,
   notificationSendResultSchema,
   notificationsListQuerySchema,
@@ -80,6 +81,10 @@ const notificationSendResultResponseSchema = z.object({
 const notificationSendHistoryResponseSchema = z.object({
   success: z.literal(true),
   data: z.array(notificationSendHistoryItemSchema),
+});
+const activeBannerNotificationResponseSchema = z.object({
+  success: z.literal(true),
+  data: notificationSchema.nullable(),
 });
 
 function jsonContent(schema: z.ZodTypeAny) {
@@ -302,6 +307,13 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/me/notifications/unread-count", ["Me"], "Get current user unread notification count", {
     security: cookieOrBearerAuth,
     responses: defaultResponses("Unread notification count", ["401"]),
+  }),
+  route("get", "/me/notifications/active-banner", ["Me"], "Get current user active banner notification", {
+    security: cookieOrBearerAuth,
+    responses: {
+      ...defaultResponses("Active banner notification", ["401"]),
+      "200": jsonResponse("Active banner notification", activeBannerNotificationResponseSchema),
+    },
   }),
   route("post", "/me/notifications/{notificationId}/read", ["Me"], "Mark notification as read", {
     security: cookieOrBearerAuth,
