@@ -59,8 +59,6 @@ export interface DiscountFormData {
   endDate: Date;
   maxUses?: number | null;
   userIds: string[];
-  sendEmail?: boolean;
-  sendNotification?: boolean;
 }
 
 export type { CreateDiscountInput, UpdateDiscountInput };

@@ -29,8 +29,6 @@ export const adminCreateDiscountSchema = z.object({
     .max(DISCOUNT_DESCRIPTION_MAX_LENGTH, `Description must be at most ${DISCOUNT_DESCRIPTION_MAX_LENGTH} characters`)
     .optional()
     .nullable(),
-  sendEmail: z.boolean().optional(),
-  sendNotification: z.boolean().optional(),
 });
 
 export const adminUpdateDiscountSchema = z.object({
@@ -50,8 +48,6 @@ export const adminUpdateDiscountSchema = z.object({
     .max(DISCOUNT_DESCRIPTION_MAX_LENGTH, `Description must be at most ${DISCOUNT_DESCRIPTION_MAX_LENGTH} characters`)
     .optional()
     .nullable(),
-  sendEmail: z.boolean().optional(),
-  sendNotification: z.boolean().optional(),
 });
 
 export const assignUsersToDiscountSchema = z.object({
