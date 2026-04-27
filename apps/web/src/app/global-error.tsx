@@ -6,7 +6,6 @@ import { useEffect } from "react";
 
 import { Logo } from "@/components/icons/logo";
 import { Button } from "@/components/ui/button";
-import { env } from "@/env";
 
 export default function GlobalError({
   error,
@@ -19,7 +18,7 @@ export default function GlobalError({
     Sentry.captureException(error);
   }, [error]);
 
-  const isDevelopment = env.NODE_ENV === "development";
+  const isDevelopment = process.env.NODE_ENV === "development";
   const diagnosticCode = error.errorCode || error.digest || error.requestId || "WEB-UNEXPECTED";
 
   return (

@@ -27,5 +27,5 @@ export { ApiRequestError };
 export const apiRequest = createApiRequest({
   baseURL: API_BASE_URL,
   getHeaders: getServerCookieHeaders,
-  nodeEnv: env.NODE_ENV,
+  nodeEnv: process.env.NODE_ENV,
 });
