@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 
 import { routing } from "./i18n/routing";
+import { getPathLocale } from "./i18n/path-locale";
 import { getSessionCookie } from "better-auth/cookies";
 
 function getMainAppLoginUrl(locale: string) {
@@ -15,9 +16,8 @@ const intlMiddleware = createMiddleware(routing);
 const ADMIN_ONLY = ["/admin", "/dashboard", "/settings", "/billing"];
 
 export async function proxy(request: NextRequest) {
-  const { pathname, search, locale } = request.nextUrl;
-  const activeLocale = locale || routing.defaultLocale;
-  const pathWithoutLocale = pathname.replace(`/${activeLocale}`, "") || "/";
+  const { pathname, search } = request.nextUrl;
+  const { activeLocale, pathWithoutLocale } = getPathLocale(pathname);
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-locale", activeLocale);
   const localizedRequest = new NextRequest(request.url, {
