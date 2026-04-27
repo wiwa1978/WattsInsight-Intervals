@@ -1051,6 +1051,107 @@ describe("API functional routes", () => {
     expect(mocks.discountsService.removeDiscountFromUsers).not.toHaveBeenCalled();
   });
 
+  it("records safe audit entries for discount mutations", async () => {
+    const discountId = "33333333-3333-4333-8333-333333333333";
+    const createdDiscount = {
+      id: "44444444-4444-4444-8444-444444444444",
+      code: "SAVE-ABC-1234",
+      type: "percentage",
+      value: 10,
+      dodoDiscountId: "provider-secret-discount-id",
+    };
+    const updatedDiscount = {
+      id: discountId,
+      code: "SAVE-ABC-1234",
+      type: "percentage",
+      value: 20,
+      status: "active",
+    };
+
+    mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: true, discount: createdDiscount });
+    mocks.discountsService.updateDiscount.mockResolvedValueOnce({ success: true, discount: updatedDiscount });
+    mocks.discountsService.deleteDiscount.mockResolvedValueOnce({ success: true });
+
+    const createRes = await app.request("/admin/discounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "SAVE-ABC-1234",
+        type: "percentage",
+        value: 10,
+        startDate: "2026-01-01T00:00:00.000Z",
+        endDate: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/discounts/${discountId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 20 }),
+    });
+    const deleteRes = await app.request(`/admin/discounts/${discountId}`, { method: "DELETE" });
+
+    expect(createRes.status).toBe(200);
+    expect(patchRes.status).toBe(200);
+    expect(deleteRes.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.create",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: createdDiscount.id,
+      after: expect.objectContaining({ id: createdDiscount.id, code: "SAVE-ABC-1234", value: 10 }),
+      metadata: { code: "SAVE-ABC-1234" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.update",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      after: expect.objectContaining({ id: discountId, code: "SAVE-ABC-1234", value: 20 }),
+      metadata: { code: "SAVE-ABC-1234" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.delete",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      metadata: { code: null },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("provider-secret-discount-id");
+  });
+
+  it("records discount mutation failures without changing response envelopes", async () => {
+    mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: false, error: "Discount code already exists" });
+
+    const res = await app.request("/admin/discounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "SAVE-ABC-1234",
+        type: "percentage",
+        value: 10,
+        startDate: "2026-01-01T00:00:00.000Z",
+        endDate: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Discount code already exists" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.create",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: null,
+      after: null,
+      metadata: { error: "Discount code already exists" },
+    }));
+  });
+
   // Verifies voucher list and search endpoints pass validated filters to the service.
   it("routes voucher listing and user search", async () => {
     mocks.vouchersService.getVouchers.mockResolvedValueOnce({
@@ -1123,6 +1224,90 @@ describe("API functional routes", () => {
       id: voucherId,
       status: "inactive",
     });
+  });
+
+  it("records safe audit entries for voucher mutations", async () => {
+    const voucherId = "77777777-7777-4777-8777-777777777777";
+    const createdVoucher = {
+      id: "88888888-8888-4888-8888-888888888888",
+      code: "WELCOME10",
+      creditAmount: 10,
+      status: "active",
+      rawPaymentPayload: "raw-provider-secret",
+    };
+    const updatedVoucher = {
+      id: voucherId,
+      code: "WELCOME10",
+      creditAmount: 25,
+      status: "inactive",
+    };
+
+    mocks.vouchersService.createVoucher.mockResolvedValueOnce({ success: true, voucher: createdVoucher });
+    mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: true, voucher: updatedVoucher });
+
+    const createRes = await app.request("/admin/vouchers", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "WELCOME10",
+        creditAmount: 10,
+        assignmentScope: "selected",
+        userIds: ["11111111-1111-4111-8111-111111111111"],
+        expiresAt: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ creditAmount: 25, status: "inactive" }),
+    });
+
+    expect(createRes.status).toBe(200);
+    expect(patchRes.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.create",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: createdVoucher.id,
+      after: expect.objectContaining({ id: createdVoucher.id, code: "WELCOME10", creditAmount: 10 }),
+      metadata: { code: "WELCOME10" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.update",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: voucherId,
+      after: expect.objectContaining({ id: voucherId, code: "WELCOME10", creditAmount: 25, status: "inactive" }),
+      metadata: { code: "WELCOME10" },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("raw-provider-secret");
+  });
+
+  it("records voucher mutation failures without changing response envelopes", async () => {
+    mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: false, error: "Voucher not found" });
+
+    const voucherId = "77777777-7777-4777-8777-777777777777";
+    const res = await app.request(`/admin/vouchers/${voucherId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "inactive" }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Voucher not found" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.update",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: voucherId,
+      after: null,
+      metadata: { error: "Voucher not found" },
+    }));
   });
 
   // Verifies voucher endpoints reject malformed identifiers, queries, and payloads.

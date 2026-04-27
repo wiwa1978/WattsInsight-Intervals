@@ -84,6 +84,43 @@ function publicNotificationSendResult(result: NotificationSendResultWithBatch) {
   };
 }
 
+function safeDiscountSummary(value: unknown) {
+  if (!isRecord(value)) return null;
+
+  return {
+    id: typeof value.id === "string" ? value.id : null,
+    code: typeof value.code === "string" ? value.code : null,
+    type: typeof value.type === "string" ? value.type : null,
+    value: typeof value.value === "number" || typeof value.value === "string" ? value.value : null,
+    status: typeof value.status === "string" ? value.status : null,
+    maxUses: typeof value.maxUses === "number" || value.maxUses === null ? value.maxUses : null,
+    currentUses: typeof value.currentUses === "number" ? value.currentUses : null,
+  };
+}
+
+function safeVoucherSummary(value: unknown) {
+  if (!isRecord(value)) return null;
+
+  return {
+    id: typeof value.id === "string" ? value.id : null,
+    code: typeof value.code === "string" ? value.code : null,
+    creditAmount: typeof value.creditAmount === "number" ? value.creditAmount : null,
+    status: typeof value.status === "string" ? value.status : null,
+    maxRedemptions: typeof value.maxRedemptions === "number" || value.maxRedemptions === null ? value.maxRedemptions : null,
+    currentRedemptions: typeof value.currentRedemptions === "number" ? value.currentRedemptions : null,
+    appliesToAllUsers: typeof value.appliesToAllUsers === "boolean" ? value.appliesToAllUsers : null,
+  };
+}
+
+function resultField(result: unknown, field: string) {
+  return isRecord(result) ? result[field] : undefined;
+}
+
+function resultError(result: unknown, fallback: string) {
+  const error = resultField(result, "error");
+  return typeof error === "string" ? error : fallback;
+}
+
 function isSuccessfulMutationResult(result: unknown) {
   return !isRecord(result) || result.success !== false;
 }
@@ -183,6 +220,24 @@ export function createAdminRouter() {
       targetId: details.targetId(body),
       after: details.after?.(body),
       metadata: details.metadata?.(body),
+    }).catch(() => undefined);
+  }
+
+  async function recordMutationAudit(
+    c: AdminContext,
+    input: {
+      action: string;
+      outcome: "success" | "failure";
+      targetType: string;
+      targetId: string | null;
+      before?: unknown;
+      after?: unknown;
+      metadata?: unknown;
+    },
+  ) {
+    await bootstrap.auditService.recordAuditEntry({
+      ...getAuditRequestContext(c),
+      ...input,
     }).catch(() => undefined);
   }
 
@@ -548,6 +603,19 @@ export function createAdminRouter() {
       endDate: bodyData.endDate,
       maxUses: bodyData.maxUses,
     });
+    const discount = resultField(result, "discount");
+    const discountSummary = safeDiscountSummary(discount);
+
+    await recordMutationAudit(c, {
+      action: "discount.create",
+      outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+      targetType: "discount",
+      targetId: isRecord(discount) && typeof discount.id === "string" ? discount.id : null,
+      after: isSuccessfulMutationResult(result) ? discountSummary : null,
+      metadata: isSuccessfulMutationResult(result)
+        ? { code: discountSummary?.code ?? null }
+        : { error: resultError(result, "Discount create failed") },
+    });
 
     return c.json(result, result.success ? 200 : 400);
   });
@@ -565,6 +633,19 @@ export function createAdminRouter() {
           maxUses: bodyData.maxUses,
           status: bodyData.status,
         });
+        const discount = resultField(result, "discount");
+        const discountSummary = safeDiscountSummary(discount);
+
+        await recordMutationAudit(c, {
+          action: "discount.update",
+          outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+          targetType: "discount",
+          targetId: discountId,
+          after: isSuccessfulMutationResult(result) ? discountSummary : null,
+          metadata: isSuccessfulMutationResult(result)
+            ? { code: discountSummary?.code ?? null }
+            : { error: resultError(result, "Discount update failed") },
+        });
 
         return c.json(result, result.success ? 200 : 400);
       });
@@ -574,6 +655,20 @@ export function createAdminRouter() {
   router.delete("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
       const result = await bootstrap.discountsService.deleteDiscount(discountId);
+      const discount = resultField(result, "discount");
+      const discountSummary = safeDiscountSummary(discount);
+
+      await recordMutationAudit(c, {
+        action: "discount.delete",
+        outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+        targetType: "discount",
+        targetId: discountId,
+        before: isSuccessfulMutationResult(result) ? discountSummary : null,
+        metadata: isSuccessfulMutationResult(result)
+          ? { code: discountSummary?.code ?? null }
+          : { error: resultError(result, "Discount delete failed") },
+      });
+
       return c.json(result, result.success ? 200 : 400);
     });
   });
@@ -629,6 +724,20 @@ export function createAdminRouter() {
     }
 
     const result = await bootstrap.vouchersService.createVoucher(parsedBody.data);
+    const voucher = resultField(result, "voucher");
+    const voucherSummary = safeVoucherSummary(voucher);
+
+    await recordMutationAudit(c, {
+      action: "voucher.create",
+      outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+      targetType: "voucher",
+      targetId: isRecord(voucher) && typeof voucher.id === "string" ? voucher.id : null,
+      after: isSuccessfulMutationResult(result) ? voucherSummary : null,
+      metadata: isSuccessfulMutationResult(result)
+        ? { code: voucherSummary?.code ?? null }
+        : { error: resultError(result, "Voucher create failed") },
+    });
+
     return c.json(result, result.success ? 200 : 400);
   });
 
@@ -639,6 +748,20 @@ export function createAdminRouter() {
           id: voucherId,
           ...bodyData,
         });
+        const voucher = resultField(result, "voucher");
+        const voucherSummary = safeVoucherSummary(voucher);
+
+        await recordMutationAudit(c, {
+          action: "voucher.update",
+          outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
+          targetType: "voucher",
+          targetId: voucherId,
+          after: isSuccessfulMutationResult(result) ? voucherSummary : null,
+          metadata: isSuccessfulMutationResult(result)
+            ? { code: voucherSummary?.code ?? null }
+            : { error: resultError(result, "Voucher update failed") },
+        });
+
         return c.json(result, result.success ? 200 : 400);
       });
     });
