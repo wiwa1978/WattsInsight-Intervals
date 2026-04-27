@@ -151,7 +151,7 @@ export default function AdminUsersPage() {
   const users = (usersQuery.data?.users ?? []) as User[];
 
   const filteredTotalUsers = usersQuery.data?.total ?? 0;
-  const statsTotalUsers = statsQuery.data?.totalUsers ?? filteredTotalUsers;
+  const statsTotalUsers = statsQuery.data?.totalUsers ?? 0;
   const totalAdmins = statsQuery.data?.totalAdmins ?? 0;
   const totalBanned = statsQuery.data?.totalBanned ?? 0;
   const displayTotal = filteredTotalUsers;

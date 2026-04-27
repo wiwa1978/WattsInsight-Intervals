@@ -25,6 +25,14 @@ describe("@platform/contracts subpath split", () => {
     expect(typeof wire.uuidSchema).toBe("object");
   });
 
+  it("admin user stats contract includes global user total", () => {
+    expect(wire.adminUserStatsSchema.parse({ totalUsers: 10, totalAdmins: 2, totalBanned: 1 })).toEqual({
+      totalUsers: 10,
+      totalAdmins: 2,
+      totalBanned: 1,
+    });
+  });
+
   it("ts exports route URL builders and form helpers, not wire-only members", () => {
     // ts surface must include the route registry and form helpers.
     expect(typeof ts.apiRoutes).toBe("object");
