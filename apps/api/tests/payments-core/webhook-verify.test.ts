@@ -486,7 +486,7 @@ describe("POST /webhooks/dodo response codes", () => {
       eventType: null,
       paymentId: null,
       outcome: "failure",
-      error: "Invalid JSON payload",
+      error: "invalid_json",
     });
     expect(JSON.stringify(onWebhookFailure.mock.calls[0]?.[0])).not.toContain("abc.def.ghi");
   });
@@ -526,7 +526,7 @@ describe("POST /webhooks/dodo response codes", () => {
       eventType: "payment.succeeded",
       paymentId: "pay_without_event_id",
       outcome: "failure",
-      error: "Missing webhook event id",
+      error: "missing_event_id",
     });
   });
 
@@ -584,12 +584,16 @@ describe("POST /webhooks/dodo response codes", () => {
     const payload = JSON.stringify({
       type: "payment.succeeded",
       id: "evt_1",
-      data: { payment_id: "pay_1" },
+      data: {
+        payment_id: "pay_1",
+        customer: { email: "buyer@example.com" },
+        token: "secret-value",
+      },
     });
     const onWebhookFailure = vi.fn(async () => {});
     const { app } = build({
       onPaymentEvent: vi.fn(async () => {
-        throw new Error("handler failed with token abc.def.ghi");
+        throw new Error(`handler failed with payload ${payload}`);
       }),
       onWebhookFailure,
     });
@@ -610,8 +614,12 @@ describe("POST /webhooks/dodo response codes", () => {
       eventType: "payment.succeeded",
       paymentId: "pay_1",
       outcome: "failure",
-      error: expect.not.stringContaining("abc.def.ghi"),
+      error: "handler_failed",
     });
+    const auditPayload = JSON.stringify(onWebhookFailure.mock.calls[0]?.[0]);
+    expect(auditPayload).not.toContain("secret-value");
+    expect(auditPayload).not.toContain("buyer@example.com");
+    expect(auditPayload).not.toContain(payload);
   });
 
   it("does not let webhook failure callback errors mask response behavior", async () => {
