@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { env } from "../env";
-import { redactLogValue } from "./redaction";
+import { redactLogValue, redactString } from "./redaction";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogStream = "app" | "audit";
@@ -33,7 +33,7 @@ function truncateString(value: string) {
 
 function serialize(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return typeof value === "string" ? truncateString(value) : value;
+    return typeof value === "string" ? truncateString(redactString(value)) : value;
   }
 
   if (typeof value === "bigint" || typeof value === "symbol" || typeof value === "function") {
