@@ -4,8 +4,8 @@ import { Container } from "@/components/ui/container";
 import { StatCard } from "@/components/layout/backend/shared/stat-card";
 import { CreditCard, Wallet, TrendingDown, DollarSign } from "lucide-react";
 import { RevenueChart } from "@/components/layout/backend/admin/billing/revenue-chart";
-import { TransactionHistoryTable } from "@/components/layout/backend/admin/shared/transaction-history-table";
-import { PurchaseHistoryTable } from "@/components/layout/backend/admin/shared/purchase-history-table";
+import { AdminTransactionHistoryTable } from "@/components/layout/backend/admin/shared/transaction-history-table";
+import { AdminPurchaseHistoryTable } from "@/components/layout/backend/admin/shared/purchase-history-table";
 import {
   getAdminAllPurchases,
   getAdminAllTransactions,
@@ -22,11 +22,13 @@ export default async function AdminBillingPage() {
   const stats = await getAdminBillingStats();
 
   // Fetch revenue data for all time ranges
-  const [dailyData, weeklyData, monthlyData, yearlyData] = await Promise.all([
+  const [dailyData, weeklyData, monthlyData, yearlyData, initialTransactions, initialPurchases] = await Promise.all([
     getAdminRevenueData("daily"),
     getAdminRevenueData("weekly"),
     getAdminRevenueData("monthly"),
     getAdminRevenueData("yearly"),
+    getAdminAllTransactions(20, 0),
+    getAdminAllPurchases(20, 0),
   ]);
 
   // Calculate stat values
@@ -39,7 +41,10 @@ export default async function AdminBillingPage() {
       icon: CreditCard,
       iconColor: "text-green-600",
       iconBgColor: "bg-green-100",
-      description: `${Number(stats.purchasedCredits).toFixed(2)} purchased credits + ${Number(stats.bonusCredits).toFixed(2)} bonus`,
+      description: statsT("totalCreditsPurchasedDescription", {
+        purchased: Number(stats.purchasedCredits).toFixed(2),
+        bonus: Number(stats.bonusCredits).toFixed(2),
+      }),
     },
     {
       title: statsT("totalAvailableCredits"),
@@ -63,7 +68,9 @@ export default async function AdminBillingPage() {
       icon: DollarSign,
       iconColor: "text-purple-600",
       iconBgColor: "bg-purple-100",
-      description: `across ${Number(stats.totalPurchases).toFixed(0)} purchases`,
+      description: statsT("totalRevenueDescription", {
+        count: Number(stats.totalPurchases).toFixed(0),
+      }),
     },
   ];
 
@@ -102,37 +109,31 @@ export default async function AdminBillingPage() {
       {/* Tables */}
       <div className="grid gap-6 lg:grid-cols-1">
         <Suspense fallback={<TableSkeleton />}>
-          <TransactionHistoryTableWrapper />
+          <TransactionHistoryTableWrapper initialData={initialTransactions} />
         </Suspense>
         <Suspense fallback={<TableSkeleton />}>
-          <PurchaseHistoryTableWrapper />
+          <PurchaseHistoryTableWrapper initialData={initialPurchases} />
         </Suspense>
       </div>
     </Container>
   );
 }
 
-async function TransactionHistoryTableWrapper() {
+async function TransactionHistoryTableWrapper({ initialData }: { initialData: Awaited<ReturnType<typeof getAdminAllTransactions>> }) {
   const t = await getTranslations("admin.billing.transactions");
-  const response = await getAdminAllTransactions();
   return (
-    <TransactionHistoryTable
-      transactions={response.transactions}
-      showUserColumns={true}
-      enableSearch={true}
+    <AdminTransactionHistoryTable
+      initialData={initialData}
       description={t("descriptionAllUsers")}
     />
   );
 }
 
-async function PurchaseHistoryTableWrapper() {
+async function PurchaseHistoryTableWrapper({ initialData }: { initialData: Awaited<ReturnType<typeof getAdminAllPurchases>> }) {
   const t = await getTranslations("admin.billing.purchases");
-  const response = await getAdminAllPurchases();
   return (
-    <PurchaseHistoryTable
-      purchases={response.purchases}
-      showUserColumns={true}
-      enableSearch={true}
+    <AdminPurchaseHistoryTable
+      initialData={initialData}
       description={t("descriptionAllUsers")}
     />
   );

@@ -841,11 +841,11 @@
         "totalPurchases": "Total Purchases",
         "totalPurchasesDescription": "All completed purchases",
         "totalCreditsPurchased": "Total Credits Received",
-        "totalCreditsPurchasedDescription": "All credits received by users (purchased + bonus)",
+        "totalCreditsPurchasedDescription": "{purchased} purchased credits + {bonus} bonus credits",
         "totalCreditsConsumed": "Total Credits Consumed",
         "totalCreditsConsumedDescription": "All credits used by users",
         "totalRevenue": "Total Revenue",
-        "totalRevenueDescription": "Total revenue from all purchases",
+        "totalRevenueDescription": "Across {count} purchases",
         "totalAvailableCredits": "Total Available Credits",
         "totalAvailableCreditsDescription": "Total credits currently available across all users"
       },

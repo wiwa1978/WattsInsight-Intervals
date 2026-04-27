@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import {
   Card,
@@ -16,6 +17,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Search, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+import { getAdminAllTransactions } from "@/lib/services/admin";
 import { TransactionDetailsDialog } from "../users/transaction-details-dialog";
 
 export type Transaction = {
@@ -34,6 +36,18 @@ export type Transaction = {
   userEmail?: string;
 };
 
+export type SearchPageState = {
+  searchEmail?: string;
+  limit: number;
+  offset: number;
+};
+
+type TransactionHistoryResponse = {
+  transactions: Transaction[];
+  total: number;
+  hasMore: boolean;
+};
+
 interface TransactionHistoryTableProps {
   transactions: Transaction[];
   // Optional: show user columns (default: true)
@@ -47,6 +61,43 @@ interface TransactionHistoryTableProps {
   // Optional: custom title and description
   title?: string;
   description?: string;
+  // Optional: server pagination/search state
+  total?: number;
+  loading?: boolean;
+  onSearchPageChange?: (state: SearchPageState) => void;
+}
+
+interface AdminTransactionHistoryTableProps {
+  initialData: TransactionHistoryResponse;
+  description?: string;
+}
+
+const TRANSACTIONS_LIMIT = 20;
+
+export function AdminTransactionHistoryTable({ initialData, description }: AdminTransactionHistoryTableProps) {
+  const [searchState, setSearchState] = React.useState<SearchPageState>({
+    limit: TRANSACTIONS_LIMIT,
+    offset: 0,
+  });
+
+  const transactionsQuery = useQuery({
+    queryKey: ["admin-billing-transactions", searchState.limit, searchState.offset, searchState.searchEmail ?? ""],
+    queryFn: () => getAdminAllTransactions(searchState.limit, searchState.offset, searchState.searchEmail),
+    initialData: searchState.offset === 0 && !searchState.searchEmail ? initialData : undefined,
+  });
+  const data = transactionsQuery.data ?? { transactions: [], total: 0, hasMore: false };
+
+  return (
+    <TransactionHistoryTable
+      transactions={data.transactions}
+      total={data.total}
+      loading={transactionsQuery.isFetching}
+      showUserColumns={true}
+      enableSearch={true}
+      description={description}
+      onSearchPageChange={setSearchState}
+    />
+  );
 }
 
 export function TransactionHistoryTable({
@@ -57,6 +108,9 @@ export function TransactionHistoryTable({
   enableRowClick = true,
   title,
   description,
+  total: serverTotal,
+  loading = false,
+  onSearchPageChange,
 }: TransactionHistoryTableProps) {
   const t = useTranslations("admin.billing.transactions");
 
@@ -95,35 +149,35 @@ export function TransactionHistoryTable({
     React.useState<Transaction | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
-  const limit = 20;
-
-  // Filter transactions based on search query
-  const filteredTransactions = React.useMemo(() => {
-    if (!searchQuery) return transactions;
-
-    const query = searchQuery.toLowerCase();
-    return transactions.filter((transaction) => {
-      return (
-        transaction.userName?.toLowerCase().includes(query) ||
-        transaction.userEmail?.toLowerCase().includes(query) ||
-        transaction.type.toLowerCase().includes(query) ||
-        transaction.description?.toLowerCase().includes(query)
-      );
-    });
-  }, [transactions, searchQuery]);
-
-  const total = filteredTransactions.length;
+  const limit = TRANSACTIONS_LIMIT;
+  const isServerBacked = Boolean(onSearchPageChange);
+  const total = serverTotal ?? transactions.length;
   const totalPages = Math.ceil(total / limit);
 
-  // Paginate transactions
-  const paginatedTransactions = React.useMemo(() => {
+  const visibleTransactions = React.useMemo(() => {
+    if (isServerBacked) return transactions;
     const start = (currentPage - 1) * limit;
-    return filteredTransactions.slice(start, start + limit);
-  }, [filteredTransactions, currentPage, limit]);
+    return transactions.slice(start, start + limit);
+  }, [currentPage, isServerBacked, limit, transactions]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
+    onSearchPageChange?.({
+      limit,
+      offset: 0,
+      searchEmail: searchQuery.trim() || undefined,
+    });
+  };
+
+  const handlePageChange = (page: number) => {
+    const nextPage = Math.min(Math.max(1, page), Math.max(1, totalPages));
+    setCurrentPage(nextPage);
+    onSearchPageChange?.({
+      limit,
+      offset: (nextPage - 1) * limit,
+      searchEmail: searchQuery.trim() || undefined,
+    });
   };
 
   const handleRowClick = (transaction: Transaction) => {
@@ -279,8 +333,8 @@ export function TransactionHistoryTable({
       {/* Table */}
       <DataTable
         columns={columns}
-        data={paginatedTransactions}
-        loading={false}
+        data={visibleTransactions}
+        loading={loading}
         loadingText={t("loading")}
         emptyText={t("noTransactions")}
         onRowClick={enableRowClick ? handleRowClick : undefined}
@@ -296,7 +350,7 @@ export function TransactionHistoryTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
@@ -308,7 +362,7 @@ export function TransactionHistoryTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
               {t("pagination.next")}

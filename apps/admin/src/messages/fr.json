@@ -809,11 +809,11 @@
         "totalPurchases": "Total des Achats",
         "totalPurchasesDescription": "Tous les achats terminés",
         "totalCreditsPurchased": "Total des Crédits Reçus",
-        "totalCreditsPurchasedDescription": "Tous les crédits reçus par les utilisateurs (achetés + bonus)",
+        "totalCreditsPurchasedDescription": "{purchased} credits achetes + {bonus} credits bonus",
         "totalCreditsConsumed": "Total des Crédits Consommés",
         "totalCreditsConsumedDescription": "Tous les crédits utilisés par les utilisateurs",
         "totalRevenue": "Revenus Totaux",
-        "totalRevenueDescription": "Revenus totaux de tous les achats",
+        "totalRevenueDescription": "Sur {count} achats",
         "totalAvailableCredits": "Total des Crédits Disponibles",
         "totalAvailableCreditsDescription": "Total des crédits actuellement disponibles pour tous les utilisateurs"
       },

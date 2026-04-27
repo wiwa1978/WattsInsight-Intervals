@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getAdminUsersApi } from "../../src/lib/api/admin";
+import { getAdminAllPurchasesApi, getAdminAllTransactionsApi, getAdminUsersApi } from "../../src/lib/api/admin";
 import { apiRequest } from "../../src/lib/api/client";
 
 vi.mock("../../src/lib/api/client", () => ({
@@ -18,5 +18,21 @@ describe("admin API", () => {
     await getAdminUsersApi(50, 100, " alice@example.com ");
 
     expect(apiRequestMock).toHaveBeenCalledWith("/admin/users?limit=50&offset=100&search=alice%40example.com");
+  });
+
+  it("encodes search email when fetching admin billing transactions", async () => {
+    await getAdminAllTransactionsApi(20, 40, "alice+admin@example.com");
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/admin/billing/transactions?limit=20&offset=40&searchEmail=alice%2Badmin%40example.com",
+    );
+  });
+
+  it("encodes search email when fetching admin billing purchases", async () => {
+    await getAdminAllPurchasesApi(20, 60, "alice+admin@example.com");
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/admin/billing/purchases?limit=20&offset=60&searchEmail=alice%2Badmin%40example.com",
+    );
   });
 });
