@@ -107,6 +107,10 @@ const mocks = vi.hoisted(() => {
       return builder;
     }),
   };
+  const Sentry = {
+    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
+    captureMessage: vi.fn(),
+  };
 
   return {
     billingService,
@@ -117,6 +121,7 @@ const mocks = vi.hoisted(() => {
     auditService,
     adminAuthApi,
     db,
+    Sentry,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -252,10 +257,7 @@ vi.mock("@platform/email-core", () => ({
 
 vi.mock("../src/observability/sentry", () => ({
   setupSentry: vi.fn(),
-  Sentry: {
-    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
-    captureMessage: vi.fn(),
-  },
+  Sentry: mocks.Sentry,
 }));
 
 const [
@@ -1337,6 +1339,44 @@ describe("API functional routes", () => {
     expect(output).not.toContain("secret-token");
     expect(output).not.toContain("abc.def.ghi");
     infoSpy.mockRestore();
+  });
+
+  // Verifies Sentry receives only sanitized bounded client log context.
+  it("sends only sanitized bounded client log context to Sentry", async () => {
+    mocks.Sentry.captureMessage.mockClear();
+
+    const payload = {
+      source: "web",
+      level: "error",
+      message: "failed with token=abc123 and bearer Bearer abc.def.ghi",
+      url: "https://example.com/path?token=abc&safe=yes",
+      userAgent: "Vitest",
+      context: {
+        password: "secret",
+        nested: { authorization: "Bearer abc.def.ghi", safe: "ok" },
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.Sentry.captureMessage).toHaveBeenCalledWith(
+      expect.not.stringContaining("abc.def.ghi"),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          url: expect.not.stringContaining("token=abc"),
+          context: expect.objectContaining({
+            password: "[redacted]",
+            nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
+          }),
+        }),
+      }),
+    );
   });
 
   // Verifies guarded endpoints reject oversized bodies before route parsing.

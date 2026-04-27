@@ -3,14 +3,20 @@ const MAX_REDACTION_DEPTH = 5;
 const MAX_REDACTION_ARRAY_LENGTH = 25;
 const SENSITIVE_KEY_PATTERN = /(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)/i;
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
+const KEY_VALUE_SECRET_PATTERN = /\b(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)=([^\s&#]+)/gi;
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
+const JWT_PATTERN = /\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export function redactString(value: string) {
-  return value.replace(BEARER_PATTERN, "Bearer [redacted]").replace(URL_SECRET_PARAM_PATTERN, `$1${REDACTED}`);
+  return value
+    .replace(BEARER_PATTERN, "Bearer [redacted]")
+    .replace(JWT_PATTERN, REDACTED)
+    .replace(KEY_VALUE_SECRET_PATTERN, (match) => `${match.slice(0, Math.max(0, match.indexOf("=") + 1))}${REDACTED}`)
+    .replace(URL_SECRET_PARAM_PATTERN, `$1${REDACTED}`);
 }
 
 export function redactLogValue(value: unknown, depth = 0): unknown {

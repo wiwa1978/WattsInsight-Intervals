@@ -17,6 +17,7 @@ type ReadLogEntriesInput = {
 };
 
 const fileNamePattern = /^\d{4}-\d{2}-\d{2}(?:\.audit)?\.jsonl$/;
+const MAX_LOG_TAIL_BYTES = 256 * 1024;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -149,6 +150,27 @@ function listLogFiles(stream: LogStream) {
   };
 }
 
+function readTail(filePath: string) {
+  const stats = fs.statSync(filePath);
+  const bytesToRead = Math.min(stats.size, MAX_LOG_TAIL_BYTES);
+  const buffer = Buffer.alloc(bytesToRead);
+  const fd = fs.openSync(filePath, "r");
+
+  try {
+    fs.readSync(fd, buffer, 0, bytesToRead, stats.size - bytesToRead);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  const raw = buffer.toString("utf8");
+  if (stats.size <= MAX_LOG_TAIL_BYTES) {
+    return raw;
+  }
+
+  const firstNewline = raw.indexOf("\n");
+  return firstNewline >= 0 ? raw.slice(firstNewline + 1) : raw;
+}
+
 function readLogEntries(input: ReadLogEntriesInput) {
   const stream = input.stream ?? "app";
   const available = listLogFiles(stream);
@@ -174,7 +196,7 @@ function readLogEntries(input: ReadLogEntriesInput) {
   }
 
   const limit = Math.min(Math.max(Math.trunc(input.limit ?? 100), 1), 500);
-  const raw = fs.readFileSync(filePath, "utf8");
+  const raw = readTail(filePath);
   const entries = raw
     .split("\n")
     .filter(Boolean)

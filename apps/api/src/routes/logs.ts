@@ -52,14 +52,20 @@ export function createLogsRouter() {
     const payload = parsed.data;
     const requestId = c.get("requestId");
     const message = redactString(payload.message);
+    const context = redactLogValue(payload.context);
+    const sentryExtra = {
+      url: payload.url ? redactString(payload.url) : undefined,
+      userAgent: payload.userAgent ? redactString(payload.userAgent) : undefined,
+      context,
+    };
     const logRecord = {
       requestId,
       source: "web",
       ip,
-      url: payload.url ? redactString(payload.url) : undefined,
-      userAgent: payload.userAgent ? redactString(payload.userAgent) : undefined,
+      url: sentryExtra.url,
+      userAgent: sentryExtra.userAgent,
       timestamp: payload.timestamp,
-      context: redactLogValue(payload.context),
+      context,
     };
 
     if (payload.level === "error") {
@@ -69,7 +75,7 @@ export function createLogsRouter() {
         tags: {
           source: "web",
         },
-        extra: logRecord,
+        extra: sentryExtra,
       });
     } else if (payload.level === "warn") {
       logger.warn(logRecord, message);
@@ -78,7 +84,7 @@ export function createLogsRouter() {
         tags: {
           source: "web",
         },
-        extra: logRecord,
+        extra: sentryExtra,
       });
     } else if (payload.level === "info") {
       logger.info(logRecord, message);
