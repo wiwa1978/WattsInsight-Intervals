@@ -46,6 +46,14 @@ type NotificationSendResultWithBatch = {
   batchId?: string | null;
 };
 
+type AdminAuthAuditDetails<T> = {
+  action: string;
+  targetType: string;
+  targetId: (body: T) => string | null;
+  after?: (body: T) => unknown;
+  metadata?: (body: T) => unknown;
+};
+
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
   if (!authUser) {
@@ -74,6 +82,10 @@ function publicNotificationSendResult(result: NotificationSendResultWithBatch) {
     invalidRecipientCount: result.invalidRecipientCount,
     invalidRecipientIds: result.invalidRecipientIds,
   };
+}
+
+function isSuccessfulMutationResult(result: unknown) {
+  return !isRecord(result) || result.success !== false;
 }
 
 function notificationSendHistoryItem(entry: Record<string, unknown>) {
@@ -162,6 +174,18 @@ export function createAdminRouter() {
     return handler(parsedParams.data);
   }
 
+  async function recordAdminAuthAudit<T>(c: AdminContext, body: T, details: AdminAuthAuditDetails<T>) {
+    await bootstrap.auditService.recordAuditEntry({
+      ...getAuditRequestContext(c),
+      action: details.action,
+      outcome: "success",
+      targetType: details.targetType,
+      targetId: details.targetId(body),
+      after: details.after?.(body),
+      metadata: details.metadata?.(body),
+    }).catch(() => undefined);
+  }
+
   function withUserIdParam(c: AdminContext, handler: (userId: string) => Response | Promise<Response>) {
     return withParams(c, userIdParamSchema, { userId: c.req.param("userId") ?? "" }, "Invalid user id", ({ userId }) => handler(userId));
   }
@@ -179,10 +203,14 @@ export function createAdminRouter() {
     schema: z.ZodSchema<T>,
     errorMessage: string,
     action: (body: T, headers: Headers) => Promise<unknown>,
+    auditDetails?: AdminAuthAuditDetails<T>,
   ) {
     router.post(path, (c) => {
       return withJsonBody(c, schema, errorMessage, async (body) => {
         const result = await action(body, c.req.raw.headers);
+        if (auditDetails && isSuccessfulMutationResult(result)) {
+          await recordAdminAuthAudit(c, body, auditDetails);
+        }
         return c.json(result);
       });
     });
@@ -194,11 +222,17 @@ export function createAdminRouter() {
     errorMessage: string,
     fallbackError: string,
     action: (body: T, headers: Headers) => Promise<Response>,
+    auditDetails?: AdminAuthAuditDetails<T>,
   ) {
     router.post(path, (c) => {
       return withJsonBody(c, schema, errorMessage, async (body) => {
         const response = await action(body, c.req.raw.headers);
-        return createJsonResponseFromAuthResponse(response, fallbackError);
+        const jsonResponse = await createJsonResponseFromAuthResponse(response, fallbackError);
+        const payload = await jsonResponse.clone().json().catch(() => null);
+        if (auditDetails && jsonResponse.ok && isSuccessfulMutationResult(payload)) {
+          await recordAdminAuthAudit(c, body, auditDetails);
+        }
+        return jsonResponse;
       });
     });
   }
@@ -255,10 +289,20 @@ export function createAdminRouter() {
 
   registerAdminAuthJsonAction("/users/set-role", setRoleSchema, "Invalid role payload", (body, headers) => {
     return requireAdminAuthApi().setRole({ body, headers });
+  }, {
+    action: "admin.user.set_role",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: (body) => ({ role: body.role }),
   });
 
   registerAdminAuthJsonAction("/users/unban", userOnlySchema, "Invalid unban payload", (body, headers) => {
     return requireAdminAuthApi().unbanUser({ body, headers });
+  }, {
+    action: "admin.user.unban",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: () => ({ banned: false }),
   });
 
   router.post("/users/ban", (c) => {
@@ -268,8 +312,20 @@ export function createAdminRouter() {
         return forbidden(c, secretResult.error ?? "Invalid admin ban secret");
       }
 
-      const { secret: _secret, ...banBody } = body;
+      const { secret: _secret, banExpires: _banExpires, ...banBody } = body;
       const result = await requireAdminAuthApi().banUser({ body: banBody, headers: c.req.raw.headers });
+      if (isSuccessfulMutationResult(result)) {
+        await recordAdminAuthAudit(c, body, {
+          action: "admin.user.ban",
+          targetType: "user",
+          targetId: (body) => body.userId,
+          after: (body) => ({
+            banned: true,
+            banReason: body.banReason ?? null,
+            banExpires: body.banExpires ?? null,
+          }),
+        });
+      }
       return c.json(result);
     });
   });
@@ -286,6 +342,11 @@ export function createAdminRouter() {
         asResponse: true,
       })) as Response;
     },
+    {
+      action: "admin.impersonation.start",
+      targetType: "user",
+      targetId: (body) => body.userId,
+    },
   );
 
   registerAdminAuthJsonAction("/users/revoke-sessions", userOnlySchema, "Invalid session revoke payload", (body, headers) => {
@@ -294,6 +355,11 @@ export function createAdminRouter() {
 
   registerAdminAuthJsonAction("/users/set-password", setUserPasswordSchema, "Invalid password payload", (body, headers) => {
     return requireAdminAuthApi().setUserPassword({ body, headers });
+  }, {
+    action: "admin.user.set_password",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: () => ({ passwordUpdated: true }),
   });
 
   router.get("/users/stats", async (c) => {

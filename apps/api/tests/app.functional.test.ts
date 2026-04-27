@@ -835,6 +835,111 @@ describe("API functional routes", () => {
     expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
   });
 
+  it("records audit entries for admin auth mutations", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.setRole.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.banUser.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.unbanUser.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.impersonateUser.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    mocks.adminAuthApi.setUserPassword.mockResolvedValueOnce({ success: true });
+
+    const setRoleRes = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, role: "admin" }),
+    });
+    const banRes = await app.request("/admin/users/ban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        banReason: "policy violation",
+        banExpires: "2026-05-01T00:00:00.000Z",
+        secret: "ban-secret-value",
+      }),
+    });
+    const unbanRes = await app.request("/admin/users/unban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    const impersonateRes = await app.request("/admin/users/impersonate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    const setPasswordRes = await app.request("/admin/users/set-password", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, newPassword: "correct horse battery staple" }),
+    });
+
+    expect(setRoleRes.status).toBe(200);
+    expect(banRes.status).toBe(200);
+    expect(unbanRes.status).toBe(200);
+    expect(impersonateRes.status).toBe(200);
+    expect(setPasswordRes.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.set_role",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { role: "admin" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.ban",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { banned: true, banReason: "policy violation", banExpires: "2026-05-01T00:00:00.000Z" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.unban",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { banned: false },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.impersonation.start",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.set_password",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { passwordUpdated: true },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("ban-secret-value");
+    expect(JSON.stringify(auditPayloads)).not.toContain("correct horse battery staple");
+  });
+
+  it("records audit entry when stopping admin impersonation", async () => {
+    mocks.adminAuthApi.stopImpersonating.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+    const res = await app.request("/auth/admin/stop-impersonating", { method: "POST" });
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.impersonation.stop",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "session",
+      metadata: { stopped: true },
+    }));
+  });
+
   // Verifies admin-set passwords follow the same minimum policy as normal password flows.
   it("rejects weak admin-set passwords", async () => {
     const res = await app.request("/admin/users/set-password", {

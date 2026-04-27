@@ -25,6 +25,7 @@ export const banUserSchema = z.object({
   userId: z.string().uuid(),
   secret: z.string().trim().min(1).max(255),
   banReason: z.string().trim().min(1).max(1000).optional(),
+  banExpires: z.string().datetime().optional(),
   banExpiresIn: z.number().int().positive().optional(),
 });
 
