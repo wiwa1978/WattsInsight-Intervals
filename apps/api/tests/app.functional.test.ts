@@ -1164,6 +1164,62 @@ describe("API functional routes", () => {
     }));
   });
 
+  it("records safe failure audit entries when discount mutations throw", async () => {
+    const discountId = "33333333-3333-4333-8333-333333333333";
+    mocks.discountsService.createDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
+    mocks.discountsService.updateDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
+    mocks.discountsService.deleteDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
+
+    const createRes = await app.request("/admin/discounts", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "SAVE-ABC-1234",
+        type: "percentage",
+        value: 10,
+        startDate: "2026-01-01T00:00:00.000Z",
+        endDate: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/discounts/${discountId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ value: 20 }),
+    });
+    const deleteRes = await app.request(`/admin/discounts/${discountId}`, { method: "DELETE" });
+
+    expect(createRes.status).toBe(500);
+    expect(patchRes.status).toBe(500);
+    expect(deleteRes.status).toBe(500);
+    await expect(createRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(patchRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(deleteRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.create",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: null,
+      metadata: { error: "Dodo provider request failed" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.update",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      metadata: { error: "Dodo provider request failed" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "discount.delete",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "discount",
+      targetId: discountId,
+      metadata: { error: "Dodo provider request failed" },
+    }));
+  });
+
   // Verifies voucher list and search endpoints pass validated filters to the service.
   it("routes voucher listing and user search", async () => {
     mocks.vouchersService.getVouchers.mockResolvedValueOnce({

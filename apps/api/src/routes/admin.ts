@@ -121,6 +121,10 @@ function resultError(result: unknown, fallback: string) {
   return typeof error === "string" ? error : fallback;
 }
 
+function safeErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 function publicMutationResult(result: unknown, internalFields: string[]) {
   if (!isRecord(result)) return result;
 
@@ -605,14 +609,27 @@ export function createAdminRouter() {
     }
 
     const bodyData = parsedBody.data;
-    const result = await bootstrap.discountsService.createDiscount({
-      code: bodyData.code,
-      type: bodyData.type,
-      value: bodyData.value,
-      startDate: bodyData.startDate,
-      endDate: bodyData.endDate,
-      maxUses: bodyData.maxUses,
-    });
+    let result: Awaited<ReturnType<typeof bootstrap.discountsService.createDiscount>>;
+    try {
+      result = await bootstrap.discountsService.createDiscount({
+        code: bodyData.code,
+        type: bodyData.type,
+        value: bodyData.value,
+        startDate: bodyData.startDate,
+        endDate: bodyData.endDate,
+        maxUses: bodyData.maxUses,
+      });
+    } catch (error) {
+      await recordMutationAudit(c, {
+        action: "discount.create",
+        outcome: "failure",
+        targetType: "discount",
+        targetId: null,
+        after: null,
+        metadata: { error: safeErrorMessage(error, "Discount create failed") },
+      });
+      throw error;
+    }
     const discount = resultField(result, "discount");
     const discountSummary = safeDiscountSummary(discount);
 
@@ -633,16 +650,30 @@ export function createAdminRouter() {
   router.patch("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
       return withJsonBody(c, updateDiscountSchema, "Invalid discount update payload", async (bodyData) => {
-        const result = await bootstrap.discountsService.updateDiscount({
-          id: discountId,
-          code: bodyData.code,
-          type: bodyData.type,
-          value: bodyData.value,
-          startDate: bodyData.startDate,
-          endDate: bodyData.endDate,
-          maxUses: bodyData.maxUses,
-          status: bodyData.status,
-        });
+        let result: Awaited<ReturnType<typeof bootstrap.discountsService.updateDiscount>>;
+        try {
+          result = await bootstrap.discountsService.updateDiscount({
+            id: discountId,
+            code: bodyData.code,
+            type: bodyData.type,
+            value: bodyData.value,
+            startDate: bodyData.startDate,
+            endDate: bodyData.endDate,
+            maxUses: bodyData.maxUses,
+            status: bodyData.status,
+          });
+        } catch (error) {
+          await recordMutationAudit(c, {
+            action: "discount.update",
+            outcome: "failure",
+            targetType: "discount",
+            targetId: discountId,
+            before: null,
+            after: null,
+            metadata: { error: safeErrorMessage(error, "Discount update failed") },
+          });
+          throw error;
+        }
         const discount = resultField(result, "discount");
         const previousDiscount = resultField(result, "previousDiscount");
         const discountSummary = safeDiscountSummary(discount);
@@ -667,7 +698,20 @@ export function createAdminRouter() {
 
   router.delete("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
-      const result = await bootstrap.discountsService.deleteDiscount(discountId);
+      let result: Awaited<ReturnType<typeof bootstrap.discountsService.deleteDiscount>>;
+      try {
+        result = await bootstrap.discountsService.deleteDiscount(discountId);
+      } catch (error) {
+        await recordMutationAudit(c, {
+          action: "discount.delete",
+          outcome: "failure",
+          targetType: "discount",
+          targetId: discountId,
+          before: null,
+          metadata: { error: safeErrorMessage(error, "Discount delete failed") },
+        });
+        throw error;
+      }
       const previousDiscount = resultField(result, "previousDiscount");
       const previousDiscountSummary = safeDiscountSummary(previousDiscount);
 
