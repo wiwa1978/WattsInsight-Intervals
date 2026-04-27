@@ -6,7 +6,7 @@ import { clientLogSchema } from "@platform/contracts";
 import type { AppEnv } from "../context";
 import { fail } from "../lib/http";
 import { logger } from "../observability/logger";
-import { redactLogValue, redactString } from "../observability/redaction";
+import { redactLogValue, redactSafeContext, redactString } from "../observability/redaction";
 import { Sentry } from "../observability/sentry";
 
 const MAX_CLIENT_LOG_BYTES = 4 * 1024;
@@ -53,10 +53,11 @@ export function createLogsRouter() {
     const requestId = c.get("requestId");
     const message = redactString(payload.message);
     const context = redactLogValue(payload.context);
+    const sentryContext = redactSafeContext(payload.context);
     const sentryExtra = {
       url: payload.url ? redactString(payload.url) : undefined,
       userAgent: payload.userAgent ? redactString(payload.userAgent) : undefined,
-      context,
+      context: sentryContext,
     };
     const logRecord = {
       requestId,

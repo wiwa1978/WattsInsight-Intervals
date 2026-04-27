@@ -1345,6 +1345,8 @@ describe("API functional routes", () => {
   it("sends only sanitized bounded client log context to Sentry", async () => {
     mocks.Sentry.captureMessage.mockClear();
 
+    const wideContext = Object.fromEntries(Array.from({ length: 20 }, (_, index) => [`extra${index}`, `value${index}`]));
+
     const payload = {
       source: "web",
       level: "error",
@@ -1352,8 +1354,11 @@ describe("API functional routes", () => {
       url: "https://example.com/path?token=abc&safe=yes",
       userAgent: "Vitest",
       context: {
+        safe: "ok",
         password: "secret",
+        longValue: "x".repeat(600),
         nested: { authorization: "Bearer abc.def.ghi", safe: "ok" },
+        ...wideContext,
       },
       timestamp: new Date().toISOString(),
     };
@@ -1365,12 +1370,18 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(200);
+    const sentryContext = mocks.Sentry.captureMessage.mock.calls[0]?.[1]?.extra?.context as Record<string, unknown>;
+
+    expect(Object.keys(sentryContext)).toHaveLength(8);
+    expect(String(sentryContext.longValue).length).toBeLessThanOrEqual(128);
+    expect(sentryContext.extra19).toBeUndefined();
     expect(mocks.Sentry.captureMessage).toHaveBeenCalledWith(
       expect.not.stringContaining("abc.def.ghi"),
       expect.objectContaining({
         extra: expect.objectContaining({
           url: expect.not.stringContaining("token=abc"),
           context: expect.objectContaining({
+            safe: "ok",
             password: "[redacted]",
             nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
           }),
