@@ -27,8 +27,6 @@ export const createDiscountSchema = z.object({
   endDate: z.coerce.date(),
   maxUses: z.number().int().min(1).max(100000).nullable().optional(),
   userIds: z.array(z.string().uuid()).max(500).optional(),
-  sendEmail: z.boolean().optional(),
-  sendNotification: z.boolean().optional(),
 });
 
 export const updateDiscountSchema = z.object({
@@ -41,8 +39,6 @@ export const updateDiscountSchema = z.object({
   maxUses: z.number().int().min(1).max(100000).nullable().optional(),
   userIds: z.array(z.string().uuid()).max(500).optional(),
   status: discountStatusSchema.optional(),
-  sendEmail: z.boolean().optional(),
-  sendNotification: z.boolean().optional(),
 });
 
 export const discountUserAssignmentSchema = z.object({

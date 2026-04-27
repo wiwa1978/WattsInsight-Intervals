@@ -19,7 +19,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Popover,
   PopoverContent,
@@ -78,8 +77,6 @@ export function DiscountForm({
       endDate: initialData?.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       maxUses: initialData?.maxUses || null,
       userIds: initialData?.userIds || [],
-      sendEmail: initialData?.sendEmail ?? false,
-      sendNotification: initialData?.sendNotification ?? false,
     },
   });
 
@@ -434,53 +431,6 @@ export function DiscountForm({
             </FormItem>
           )}
         />
-
-        {/* Send Email and Send Notification */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <FormField
-            control={form.control}
-            name="sendEmail"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <FormLabel className="text-base">Send Email with Discount Code</FormLabel>
-                  <FormDescription className="text-sm">
-                    Send an email to selected users with their discount code
-                  </FormDescription>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={isSubmitting}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="sendNotification"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <FormLabel className="text-base">Send In-App Notification</FormLabel>
-                  <FormDescription className="text-sm">
-                    Send an in-app notification to selected users with their discount code
-                  </FormDescription>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={isSubmitting}
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
-        </div>
 
         {/* Form Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t">
