@@ -144,6 +144,7 @@ export function TransactionHistoryTable({
 
   // State
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [submittedSearchQuery, setSubmittedSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [selectedTransaction, setSelectedTransaction] =
     React.useState<Transaction | null>(null);
@@ -152,16 +153,16 @@ export function TransactionHistoryTable({
   const limit = TRANSACTIONS_LIMIT;
   const isServerBacked = Boolean(onSearchPageChange);
   const filteredTransactions = React.useMemo(() => {
-    if (isServerBacked || !searchQuery) return transactions;
+    if (isServerBacked || !submittedSearchQuery) return transactions;
 
-    const query = searchQuery.toLowerCase();
+    const query = submittedSearchQuery.toLowerCase();
     return transactions.filter((transaction) => (
       transaction.userName?.toLowerCase().includes(query) ||
       transaction.userEmail?.toLowerCase().includes(query) ||
       transaction.type.toLowerCase().includes(query) ||
       transaction.description?.toLowerCase().includes(query)
     ));
-  }, [isServerBacked, searchQuery, transactions]);
+  }, [isServerBacked, submittedSearchQuery, transactions]);
   const total = serverTotal ?? filteredTransactions.length;
   const totalPages = Math.ceil(total / limit);
 
@@ -173,11 +174,13 @@ export function TransactionHistoryTable({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    const nextSearchQuery = searchQuery.trim();
+    setSubmittedSearchQuery(nextSearchQuery);
     setCurrentPage(1);
     onSearchPageChange?.({
       limit,
       offset: 0,
-      searchEmail: searchQuery.trim() || undefined,
+      searchEmail: nextSearchQuery || undefined,
     });
   };
 
@@ -187,7 +190,7 @@ export function TransactionHistoryTable({
     onSearchPageChange?.({
       limit,
       offset: (nextPage - 1) * limit,
-      searchEmail: searchQuery.trim() || undefined,
+      searchEmail: submittedSearchQuery || undefined,
     });
   };
 

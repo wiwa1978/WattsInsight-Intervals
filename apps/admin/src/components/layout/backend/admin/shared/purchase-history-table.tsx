@@ -123,6 +123,7 @@ export function PurchaseHistoryTable({
 
   // State
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [submittedSearchQuery, setSubmittedSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [selectedPurchase, setSelectedPurchase] =
     React.useState<Purchase | null>(null);
@@ -132,9 +133,9 @@ export function PurchaseHistoryTable({
   const limit = PURCHASES_LIMIT;
   const isServerBacked = Boolean(onSearchPageChange);
   const filteredPurchases = React.useMemo(() => {
-    if (isServerBacked || !searchQuery) return purchases;
+    if (isServerBacked || !submittedSearchQuery) return purchases;
 
-    const query = searchQuery.toLowerCase();
+    const query = submittedSearchQuery.toLowerCase();
     return purchases.filter((purchase) => (
       purchase.userName?.toLowerCase().includes(query) ||
       purchase.userEmail?.toLowerCase().includes(query) ||
@@ -142,7 +143,7 @@ export function PurchaseHistoryTable({
       purchase.paymentStatus.toLowerCase().includes(query) ||
       purchase.paymentId?.toLowerCase().includes(query)
     ));
-  }, [isServerBacked, purchases, searchQuery]);
+  }, [isServerBacked, purchases, submittedSearchQuery]);
   const total = serverTotal ?? filteredPurchases.length;
   const totalPages = Math.ceil(total / limit);
 
@@ -154,11 +155,13 @@ export function PurchaseHistoryTable({
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    const nextSearchQuery = searchQuery.trim();
+    setSubmittedSearchQuery(nextSearchQuery);
     setCurrentPage(1);
     onSearchPageChange?.({
       limit,
       offset: 0,
-      searchEmail: searchQuery.trim() || undefined,
+      searchEmail: nextSearchQuery || undefined,
     });
   };
 
@@ -168,7 +171,7 @@ export function PurchaseHistoryTable({
     onSearchPageChange?.({
       limit,
       offset: (nextPage - 1) * limit,
-      searchEmail: searchQuery.trim() || undefined,
+      searchEmail: submittedSearchQuery || undefined,
     });
   };
 
