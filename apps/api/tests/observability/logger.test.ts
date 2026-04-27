@@ -40,6 +40,13 @@ describe("redactString", () => {
     expect(redactString("client_secret: 'single word secret'")).toBe("client_secret: '[redacted]'");
   });
 
+  it("redacts quoted multiline secret values", () => {
+    expect(redactString('password = "line1\nline2"')).toBe("password = [redacted]");
+    expect(redactString("api_key = 'line1\nline2'")).toBe("api_key = [redacted]");
+    expect(redactString('password: "line1\nline2"')).toBe('password: "[redacted]"');
+    expect(redactString("client_secret: 'line1\nline2'")).toBe("client_secret: '[redacted]'");
+  });
+
   it("keeps redacting existing colon-style secret variants", () => {
     expect(redactString('"token": abc123')).toBe('"token": [redacted]');
     expect(redactString('"client_secret" : bare-secret')).toBe('"client_secret" : [redacted]');
