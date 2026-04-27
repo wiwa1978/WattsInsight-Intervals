@@ -141,6 +141,33 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
 
+  it("401 reports safe webhook failure metadata for signature rejection", async () => {
+    const onWebhookFailure = vi.fn(async () => {});
+    const { app, onPaymentEvent } = build({ onWebhookFailure });
+    const payload = JSON.stringify({
+      id: "evt_signature_1",
+      type: "payment.succeeded",
+      data: { payment_id: "pay_signature_1", token: "abc.def.ghi" },
+    });
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      body: payload,
+    });
+
+    expect(res.status).toBe(401);
+    expect(onPaymentEvent).not.toHaveBeenCalled();
+    expect(onWebhookFailure).toHaveBeenCalledWith({
+      provider: "dodo",
+      providerEventId: "evt_signature_1",
+      eventType: "payment.succeeded",
+      paymentId: "pay_signature_1",
+      outcome: "failure",
+      error: "missing_header",
+    });
+    expect(JSON.stringify(onWebhookFailure.mock.calls[0]?.[0])).not.toContain("abc.def.ghi");
+  });
+
   it("401 WEBHOOK_SIGNATURE_INVALID with malformed header", async () => {
     const { app, onPaymentEvent } = build();
     const res = await app.request("/webhooks/dodo", {
@@ -438,6 +465,71 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
 
+  it("400 reports safe webhook failure metadata for invalid JSON", async () => {
+    const onWebhookFailure = vi.fn(async () => {});
+    const { app, onPaymentEvent } = build({ onWebhookFailure });
+    const invalidPayload = '{"id":"evt_bad_json","token":"abc.def.ghi"';
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(invalidPayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: invalidPayload,
+    });
+
+    expect(res.status).toBe(400);
+    expect(onPaymentEvent).not.toHaveBeenCalled();
+    expect(onWebhookFailure).toHaveBeenCalledWith({
+      provider: "dodo",
+      providerEventId: null,
+      eventType: null,
+      paymentId: null,
+      outcome: "failure",
+      error: "Invalid JSON payload",
+    });
+    expect(JSON.stringify(onWebhookFailure.mock.calls[0]?.[0])).not.toContain("abc.def.ghi");
+  });
+
+  it("400 reports safe webhook failure metadata when DB-backed event id is missing", async () => {
+    const store = {
+      claim: vi.fn(async () => ({ claimed: true as const })),
+      markProcessed: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const onWebhookFailure = vi.fn(async () => {});
+    const { app, onPaymentEvent } = build({ webhookEventStore: store, onWebhookFailure });
+    const payloadWithoutEventId = JSON.stringify({
+      type: "payment.succeeded",
+      data: {
+        payment_id: "pay_without_event_id",
+        customer: { email: "buyer@example.com" },
+        product_cart: [{ product_id: "prod_credits_100" }],
+        metadata: { userId: "11111111-1111-1111-1111-111111111111" },
+      },
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(payloadWithoutEventId, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: payloadWithoutEventId,
+    });
+
+    expect(res.status).toBe(400);
+    expect(store.claim).not.toHaveBeenCalled();
+    expect(onPaymentEvent).not.toHaveBeenCalled();
+    expect(onWebhookFailure).toHaveBeenCalledWith({
+      provider: "dodo",
+      providerEventId: null,
+      eventType: "payment.succeeded",
+      paymentId: "pay_without_event_id",
+      outcome: "failure",
+      error: "Missing webhook event id",
+    });
+  });
+
   it("marks claimed events processed after handler success", async () => {
     const store = {
       claim: vi.fn(async () => ({ claimed: true as const })),
@@ -486,6 +578,61 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(onPaymentEvent).toHaveBeenCalledOnce();
     expect(store.markProcessed).not.toHaveBeenCalled();
     expect(store.markFailed).toHaveBeenCalledWith({ provider: "dodo", providerEventId: "evt_test_123", error: handlerError });
+  });
+
+  it("500 reports safe webhook failure metadata when handler throws", async () => {
+    const payload = JSON.stringify({
+      type: "payment.succeeded",
+      id: "evt_1",
+      data: { payment_id: "pay_1" },
+    });
+    const onWebhookFailure = vi.fn(async () => {});
+    const { app } = build({
+      onPaymentEvent: vi.fn(async () => {
+        throw new Error("handler failed with token abc.def.ghi");
+      }),
+      onWebhookFailure,
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(payload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: payload,
+    });
+
+    expect(res.status).toBe(500);
+    expect(onWebhookFailure).toHaveBeenCalledOnce();
+    expect(onWebhookFailure).toHaveBeenCalledWith({
+      provider: "dodo",
+      providerEventId: "evt_1",
+      eventType: "payment.succeeded",
+      paymentId: "pay_1",
+      outcome: "failure",
+      error: expect.not.stringContaining("abc.def.ghi"),
+    });
+  });
+
+  it("does not let webhook failure callback errors mask response behavior", async () => {
+    const { app } = build({
+      onPaymentEvent: vi.fn(async () => {
+        throw new Error("handler failed");
+      }),
+      onWebhookFailure: vi.fn(async () => {
+        throw new Error("audit failed");
+      }),
+    });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(samplePayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header },
+      body: samplePayload,
+    });
+
+    expect(res.status).toBe(500);
   });
 
   it("legacy boolean-returning verifier still works (backward compat)", async () => {

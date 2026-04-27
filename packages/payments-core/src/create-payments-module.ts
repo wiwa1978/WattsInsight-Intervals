@@ -7,7 +7,11 @@ import {
   type WebhookVerifyResult,
   verifyDodoWebhookSignatureDetailed,
 } from "./providers/dodo/webhook-verify";
-import type { CreatePaymentsModuleOptions } from "./types";
+import type { CreatePaymentsModuleOptions, WebhookFailureAuditEvent } from "./types";
+
+type SafeDodoMetadata = Pick<WebhookFailureAuditEvent, "providerEventId" | "eventType" | "paymentId">;
+
+const SENSITIVE_TOKEN_PATTERN = /\b(?:bearer\s+)?(?:[a-z0-9_-]+\.){2,}[a-z0-9_-]+\b|\b(?:token|secret|password|api[_-]?key)=\S+/gi;
 
 function failureToResponse(reason: Exclude<WebhookVerifyResult, { ok: true }>["reason"]) {
   switch (reason) {
@@ -73,6 +77,52 @@ function signatureTimestamp(signatureHeader: string | null) {
   return new Date(timestampSeconds * 1000);
 }
 
+function sanitizeError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(SENSITIVE_TOKEN_PATTERN, "[redacted]");
+}
+
+function extractSafeDodoMetadata(payload: unknown): SafeDodoMetadata {
+  if (!payload || typeof payload !== "object") {
+    return { providerEventId: null, eventType: null, paymentId: null };
+  }
+
+  const record = payload as Record<string, unknown>;
+  const data = record.data && typeof record.data === "object" ? (record.data as Record<string, unknown>) : undefined;
+  return {
+    providerEventId: typeof record.id === "string" ? record.id : typeof record.event_id === "string" ? record.event_id : null,
+    eventType: typeof record.type === "string" ? record.type : null,
+    paymentId: typeof data?.payment_id === "string" ? data.payment_id : null,
+  };
+}
+
+function tryParseSafeDodoMetadata(rawBody: string): SafeDodoMetadata {
+  try {
+    return extractSafeDodoMetadata(JSON.parse(rawBody));
+  } catch {
+    return { providerEventId: null, eventType: null, paymentId: null };
+  }
+}
+
+async function recordWebhookFailure(
+  options: CreatePaymentsModuleOptions,
+  metadata: SafeDodoMetadata,
+  error: unknown,
+) {
+  try {
+    await options.onWebhookFailure?.({
+      provider: "dodo",
+      providerEventId: metadata.providerEventId ?? null,
+      eventType: metadata.eventType ?? null,
+      paymentId: metadata.paymentId ?? null,
+      outcome: "failure",
+      error: sanitizeError(error),
+    });
+  } catch {
+    // Webhook failure auditing is best-effort and must not alter webhook responses.
+  }
+}
+
 export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
   const router = new Hono();
 
@@ -99,6 +149,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
         );
 
     if (!verification.ok) {
+      await recordWebhookFailure(options, tryParseSafeDodoMetadata(rawBody), verification.reason);
       const { status, body } = failureToResponse(verification.reason);
       return c.json(body, status);
     }
@@ -107,17 +158,20 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     try {
       payload = JSON.parse(rawBody);
     } catch {
+      await recordWebhookFailure(options, { providerEventId: null, eventType: null, paymentId: null }, "Invalid JSON payload");
       return c.json({ success: false, error: "Invalid JSON payload" }, 400);
     }
 
     const event = mapDodoEvent(payload);
     if (!event) {
+      await recordWebhookFailure(options, extractSafeDodoMetadata(payload), "Unsupported webhook payload");
       return c.json({ success: false, error: "Unsupported webhook payload" }, 400);
     }
 
     if (options.webhookEventStore) {
       const providerEventId = event.providerEventId;
       if (!providerEventId) {
+        await recordWebhookFailure(options, event, "Missing webhook event id");
         return c.json({ success: false, error: "Missing webhook event id" }, 400);
       }
 
@@ -139,11 +193,17 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
         return c.json({ success: true, data: { processed: true } }, 200);
       } catch (error) {
         await options.webhookEventStore.markFailed({ provider: event.provider, providerEventId, error });
+        await recordWebhookFailure(options, event, error);
         throw error;
       }
     }
 
-    await options.onPaymentEvent(event);
+    try {
+      await options.onPaymentEvent(event);
+    } catch (error) {
+      await recordWebhookFailure(options, event, error);
+      throw error;
+    }
     return c.json({ success: true, data: { processed: true } }, 200);
   });
 

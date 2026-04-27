@@ -335,6 +335,25 @@ const authModule = createAuthModule({
 const paymentsModule = createPaymentsModule({
   dodoWebhookSecret: env.DODO_PAYMENTS_WEBHOOK_SECRET,
   webhookEventStore: paymentWebhookEventStore,
+  async onWebhookFailure(event) {
+    try {
+      await auditService.recordAuditEntry({
+        action: "billing.webhook.failure",
+        outcome: "failure",
+        targetType: "payment_webhook_event",
+        targetId: event.providerEventId ?? null,
+        metadata: {
+          provider: event.provider,
+          providerEventId: event.providerEventId ?? null,
+          eventType: event.eventType ?? null,
+          paymentId: event.paymentId ?? null,
+          error: event.error,
+        },
+      });
+    } catch {
+      // Webhook audit failures must not mask webhook response behavior.
+    }
+  },
   onPaymentEvent: createPaymentEventHandler({
     creditPackages,
     billing: billingService,
