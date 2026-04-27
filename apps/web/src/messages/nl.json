@@ -1239,6 +1239,12 @@
   "billing": {
     "title": "Facturatieportaal",
     "description": "Beheer je tegoed, bekijk aankoopgeschiedenis en volg gebruik.",
+    "checkout": {
+      "successTitle": "Betaling ontvangen",
+      "successDescription": "Je credits verschijnen zodra de betaling is verwerkt.",
+      "cancelTitle": "Afrekenen geannuleerd",
+      "cancelDescription": "Er zijn geen credits gekocht."
+    },
     "stats": {
       "available": "Totaal Beschikbaar Tegoed",
       "availableDescription": "Tegoed klaar voor gebruik",

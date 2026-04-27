@@ -1172,6 +1172,12 @@
   "billing": {
     "title": "Portail de facturation",
     "description": "Gérez vos crédits, consultez l'historique des achats et suivez l'utilisation.",
+    "checkout": {
+      "successTitle": "Paiement recu",
+      "successDescription": "Vos credits apparaitront une fois le paiement traite.",
+      "cancelTitle": "Paiement annule",
+      "cancelDescription": "Aucun credit n'a ete achete."
+    },
     "stats": {
       "available": "Crédits Disponibles Totaux",
       "availableDescription": "Crédits prêts à utiliser",

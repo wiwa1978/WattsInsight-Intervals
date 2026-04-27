@@ -13,16 +13,37 @@ import {
 } from "@/components/layout/backend/billing/transaction-history";
 import { BillingClientWrapper } from "./client-wrapper";
 
-export default async function BillingPage() {
+type BillingPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+type CheckoutOutcome = "success" | "cancel" | null;
+
+export function getCheckoutOutcome(
+  searchParams?: Record<string, string | string[] | undefined>
+): CheckoutOutcome {
+  const success = Array.isArray(searchParams?.success)
+    ? searchParams.success[0]
+    : searchParams?.success;
+  const cancel = Array.isArray(searchParams?.cancel)
+    ? searchParams.cancel[0]
+    : searchParams?.cancel;
+
+  return success === "true" ? "success" : cancel === "true" ? "cancel" : null;
+}
+
+export default async function BillingPage({ searchParams }: BillingPageProps) {
   const session = await getServerSession();
   if (!session?.user) {
     redirect("/login");
   }
 
+  const resolvedSearchParams = await searchParams;
+  const checkoutOutcome = getCheckoutOutcome(resolvedSearchParams);
   const t = await getTranslations("billing");
 
   return (
-    <BillingClientWrapper>
+    <BillingClientWrapper checkoutOutcome={checkoutOutcome}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>

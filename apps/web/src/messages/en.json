@@ -1155,6 +1155,12 @@
   "billing": {
     "title": "Billing Portal",
     "description": "Manage your credits, view purchase history, and track usage.",
+    "checkout": {
+      "successTitle": "Payment received",
+      "successDescription": "Your credits will appear once payment processing completes.",
+      "cancelTitle": "Checkout canceled",
+      "cancelDescription": "No credits were purchased."
+    },
     "stats": {
       "available": "Total Available Credits",
       "availableDescription": "Credits ready to use",
