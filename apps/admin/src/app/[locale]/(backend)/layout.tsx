@@ -30,7 +30,7 @@ export default async function DashboardLayout({
   return (
     <DashboardNavProvider>
       <DashboardSidebar>
-        <BackendBannerNotification />
+        <BackendBannerNotification locale={locale} />
         {children}
       </DashboardSidebar>
     </DashboardNavProvider>
