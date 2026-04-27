@@ -50,7 +50,6 @@ export const notificationSendResultSchema = z.object({
   skippedCount: z.number().int().min(0),
   invalidRecipientCount: z.number().int().min(0),
   invalidRecipientIds: z.array(z.string().uuid()),
-  batchId: z.string().uuid().optional(),
 });
 
 export type Notification = z.infer<typeof notificationSchema>;

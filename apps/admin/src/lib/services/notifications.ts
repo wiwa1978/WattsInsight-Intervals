@@ -85,7 +85,7 @@ export async function createNotification({
   bannerExpiresAt?: Date;
 }) {
   try {
-    await sendNotificationToUsersApi({
+    const result = await sendNotificationToUsersApi({
       userIds: [userId],
       title,
       message,
@@ -95,6 +95,10 @@ export async function createNotification({
       showAsBanner,
       bannerExpiresAt,
     });
+
+    if (result.data.sentCount !== 1 || result.data.invalidRecipientCount > 0) {
+      return { success: false, error: "Failed to create notification" };
+    }
 
     return { success: true, data: null };
   } catch {

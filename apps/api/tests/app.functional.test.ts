@@ -1067,14 +1067,12 @@ describe("API functional routes", () => {
       skippedCount: 0,
       invalidRecipientCount: 0,
       invalidRecipientIds: [],
-      batchId: "11111111-1111-4111-8111-111111111111",
     });
     mocks.notificationsService.sendNotificationToUsers.mockResolvedValueOnce({
       sentCount: 2,
       skippedCount: 1,
       invalidRecipientCount: 1,
       invalidRecipientIds: ["77777777-7777-4777-8777-777777777777"],
-      batchId: "22222222-2222-4222-8222-222222222222",
     });
 
     const listRes = await app.request("/admin/notifications?limit=10");
@@ -1104,7 +1102,6 @@ describe("API functional routes", () => {
         skippedCount: 0,
         invalidRecipientCount: 0,
         invalidRecipientIds: [],
-        batchId: "11111111-1111-4111-8111-111111111111",
       },
     });
     await expect(sendUsersRes.json()).resolves.toEqual({
@@ -1114,7 +1111,6 @@ describe("API functional routes", () => {
         skippedCount: 1,
         invalidRecipientCount: 1,
         invalidRecipientIds: ["77777777-7777-4777-8777-777777777777"],
-        batchId: "22222222-2222-4222-8222-222222222222",
       },
     });
   });

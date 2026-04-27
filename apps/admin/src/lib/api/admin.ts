@@ -8,7 +8,6 @@ type NotificationSendResult = {
   skippedCount: number;
   invalidRecipientCount: number;
   invalidRecipientIds: string[];
-  batchId?: string;
 };
 
 export async function verifyAdminBanSecretApi(secret: string) {
