@@ -55,12 +55,15 @@ describe("createNotificationsService", () => {
   it("sendNotificationToAllUsers inserts users in batches with notification batch metadata", async () => {
     const users = Array.from({ length: 1001 }, (_, index) => ({ id: `u${index + 1}` }));
     const values = vi.fn().mockResolvedValue(undefined);
+    const insert = vi.fn().mockReturnValue({ values });
+    const transaction = vi.fn(async (callback) => callback({ insert }));
     const service = createNotificationsService({
       db: {
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockResolvedValue(users),
         }),
-        insert: vi.fn().mockReturnValue({ values }),
+        insert: vi.fn(),
+        transaction,
       } as any,
     });
 
@@ -76,6 +79,8 @@ describe("createNotificationsService", () => {
       invalidRecipientCount: 0,
       invalidRecipientIds: [],
     });
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledTimes(3);
     expect(values).toHaveBeenCalledTimes(3);
     expect(values.mock.calls.map(([rows]) => rows)).toEqual([
       expect.arrayContaining([expect.objectContaining({ userId: "u1" })]),

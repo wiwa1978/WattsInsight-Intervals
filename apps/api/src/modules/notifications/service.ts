@@ -27,6 +27,14 @@ function withBatchData(data: Record<string, unknown> | undefined, batchId: strin
   };
 }
 
+async function withTransaction<T>(db: any, callback: (tx: any) => Promise<T>) {
+  if (typeof db.transaction === "function") {
+    return db.transaction(callback);
+  }
+
+  return callback(db);
+}
+
 export function createNotificationsService(deps: NotificationsServiceDeps) {
   function normalizeLimit(limit: number, max = 100) {
     if (!Number.isFinite(limit)) {
@@ -149,8 +157,14 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       bannerExpiresAt: input.bannerExpiresAt ?? null,
     }));
 
-    for (const payloadChunk of chunk(payload, SEND_BATCH_SIZE)) {
-      await deps.db.insert(notification).values(payloadChunk);
+    const payloadChunks = chunk(payload, SEND_BATCH_SIZE);
+
+    if (payloadChunks.length > 0) {
+      await withTransaction(deps.db, async (tx) => {
+        for (const payloadChunk of payloadChunks) {
+          await tx.insert(notification).values(payloadChunk);
+        }
+      });
     }
 
     return {
