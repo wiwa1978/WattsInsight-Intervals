@@ -15,7 +15,7 @@ const SECRET_ASSIGNMENT_PREFIX_PATTERN = new RegExp(
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
 const JWT_PATTERN = /\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
-function findQuotedValueEnd(value: string, start: number, quote: string) {
+function findQuotedValueEnd(value: string, start: number, quote: string, stopAtStructuralDelimiter = false) {
   for (let index = start + 1; index < value.length; index += 1) {
     if (value[index] === "\\") {
       index += 1;
@@ -26,7 +26,7 @@ function findQuotedValueEnd(value: string, start: number, quote: string) {
       return index;
     }
 
-    if (value[index] === "}") {
+    if (stopAtStructuralDelimiter && value[index] === "}") {
       return -1;
     }
   }
@@ -34,14 +34,22 @@ function findQuotedValueEnd(value: string, start: number, quote: string) {
   return -1;
 }
 
-function findEscapedQuotedValueEnd(value: string, start: number, quote: string) {
+function findEscapedQuotedValueEnd(value: string, start: number, quote: string, stopAtStructuralDelimiter = false) {
   for (let index = start + 2; index < value.length; index += 1) {
     if (value[index] === "\\" && value[index + 1] === quote && value[index - 1] !== "\\") {
       return index;
     }
+
+    if (stopAtStructuralDelimiter && value[index] === "}") {
+      return -1;
+    }
   }
 
   return -1;
+}
+
+function isStructuralColonAssignment(prefix: string) {
+  return prefix.includes(":") && /^\\?["']/.test(prefix.trimStart());
 }
 
 function findUnterminatedQuotedValueEnd(value: string, start: number, extraDelimiters: string) {
@@ -83,6 +91,7 @@ function redactSecretAssignments(value: string) {
     const prefix = match[0];
     const matchIndex = match.index ?? 0;
     const separator = prefix.includes(":") ? ":" : "=";
+    const stopAtStructuralDelimiter = isStructuralColonAssignment(prefix);
     const valueStart = matchIndex + prefix.length;
     if (valueStart < readIndex) {
       continue;
@@ -92,7 +101,7 @@ function redactSecretAssignments(value: string) {
     const valueQuote = value[valueStart];
     if (valueQuote === "\\" && (value[valueStart + 1] === '"' || value[valueStart + 1] === "'")) {
       const quote = value[valueStart + 1] ?? "";
-      const quotedEnd = findEscapedQuotedValueEnd(value, valueStart, quote);
+      const quotedEnd = findEscapedQuotedValueEnd(value, valueStart, quote, stopAtStructuralDelimiter);
       if (quotedEnd === -1) {
         const valueEnd = findUnterminatedQuotedValueEnd(value, valueStart + 2, separator === ":" ? ",}]" : "&#,}]\n");
         redacted += REDACTED;
@@ -108,7 +117,7 @@ function redactSecretAssignments(value: string) {
     }
 
     if (valueQuote === '"' || valueQuote === "'") {
-      const quotedEnd = findQuotedValueEnd(value, valueStart, valueQuote);
+      const quotedEnd = findQuotedValueEnd(value, valueStart, valueQuote, stopAtStructuralDelimiter);
       if (quotedEnd === -1) {
         const valueEnd = findUnterminatedQuotedValueEnd(value, valueStart + 1, separator === ":" ? ",}]" : "&#,}]\n");
         redacted += REDACTED;

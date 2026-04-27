@@ -1498,6 +1498,32 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies structural delimiters inside quoted secret values are not treated as value boundaries.
+  it("redacts quoted secret values containing structural delimiters in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload password: "abc}def"',
+        userAgent: "agent client_secret = 'abc}def'",
+        context: {
+          detail: 'password: "abc}def"',
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
   // Verifies serialized escaped quote delimiters inside values do not end redaction early.
   it("redacts serialized escaped-quote client log strings without leaking suffix tokens", async () => {
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
