@@ -31,13 +31,17 @@ function truncateString(value: string) {
   return value.length > MAX_SERIALIZE_STRING_LENGTH ? `${value.slice(0, MAX_SERIALIZE_STRING_LENGTH)}...[truncated]` : value;
 }
 
+function serializeString(value: string) {
+  return truncateString(redactString(value));
+}
+
 function serialize(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return typeof value === "string" ? truncateString(redactString(value)) : value;
+    return typeof value === "string" ? serializeString(value) : value;
   }
 
   if (typeof value === "bigint" || typeof value === "symbol" || typeof value === "function") {
-    return truncateString(String(value));
+    return serializeString(String(value));
   }
 
   if (depth >= MAX_SERIALIZE_DEPTH) {
@@ -50,9 +54,9 @@ function serialize(value: unknown, depth = 0, seen = new WeakSet<object>()): unk
 
   if (value instanceof Error) {
     return {
-      name: value.name,
-      message: value.message,
-      stack: value.stack ? truncateString(value.stack) : undefined,
+      name: serializeString(value.name),
+      message: serializeString(value.message),
+      stack: value.stack ? serializeString(value.stack) : undefined,
       cause: serialize(value.cause, depth + 1, seen),
     };
   }
@@ -74,7 +78,7 @@ function serialize(value: unknown, depth = 0, seen = new WeakSet<object>()): unk
     );
   }
 
-  return truncateString(String(value));
+  return serializeString(String(value));
 }
 
 function normalizeArgs(arg1?: unknown, arg2?: unknown) {
