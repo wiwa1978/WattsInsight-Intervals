@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Outfit } from "next/font/google";
+import { headers } from "next/headers";
 import { ClientLogBridgeProvider } from "@/components/providers/client-log-bridge-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToasterProvider } from "@/components/providers/toaster-provider";
@@ -15,13 +16,15 @@ export const metadata: Metadata = {
   description: "Single Tenant with API SaaS boilerplate",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = (await headers()).get("x-locale") || "en";
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body className={`${outfit.className} antialiased`}>
         <ThemeProvider
           attribute="class"

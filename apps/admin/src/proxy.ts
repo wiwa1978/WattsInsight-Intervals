@@ -1,6 +1,5 @@
 // Keep proxy fast: only check presence of session cookie
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 
 import { routing } from "./i18n/routing";
@@ -19,6 +18,11 @@ export async function proxy(request: NextRequest) {
   const { pathname, search, locale } = request.nextUrl;
   const activeLocale = locale || routing.defaultLocale;
   const pathWithoutLocale = pathname.replace(`/${activeLocale}`, "") || "/";
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-locale", activeLocale);
+  const localizedRequest = new NextRequest(request.url, {
+    headers: requestHeaders,
+  });
 
   // fast cookie-only check (no DB)
   const rawCookie = getSessionCookie(request);
@@ -45,13 +49,13 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL(`/${activeLocale}/login`, request.url));
       }
 
-      return intlMiddleware(request as unknown as Parameters<typeof intlMiddleware>[0]);
+      return intlMiddleware(localizedRequest as unknown as Parameters<typeof intlMiddleware>[0]);
     } catch {
       return NextResponse.redirect(getMainAppLoginUrl(activeLocale));
     }
   }
 
-  return intlMiddleware(request as unknown as Parameters<typeof intlMiddleware>[0]);
+  return intlMiddleware(localizedRequest as unknown as Parameters<typeof intlMiddleware>[0]);
 }
 
 export const config = {
