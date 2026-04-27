@@ -27,4 +27,23 @@ describe("discount wire contracts", () => {
     expect(updateResult).not.toHaveProperty("sendEmail");
     expect(updateResult).not.toHaveProperty("sendNotification");
   });
+
+  // Verifies selected-user assignment fields are not part of provider-wide discount mutations.
+  it("strips unsupported selected-user fields from discount mutations", () => {
+    const createResult = createDiscountSchema.parse({
+      code: "SAVE-ABC-1234",
+      type: "percentage",
+      value: 10,
+      startDate: new Date("2026-01-01"),
+      endDate: new Date("2026-02-01"),
+      userIds: ["11111111-1111-4111-8111-111111111111"],
+    });
+
+    const updateResult = updateDiscountSchema.parse({
+      userIds: ["11111111-1111-4111-8111-111111111111"],
+    });
+
+    expect(createResult).not.toHaveProperty("userIds");
+    expect(updateResult).not.toHaveProperty("userIds");
+  });
 });

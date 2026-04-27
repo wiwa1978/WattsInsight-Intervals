@@ -206,33 +206,6 @@ export async function deleteDiscountApi(id: string) {
   });
 }
 
-export async function assignDiscountToUsersApi(discountId: string, userIds: string[]) {
-  return apiRequest<{ success: boolean; assignedCount?: number; error?: string }>(
-    `/admin/discounts/${discountId}/assign`,
-    {
-      method: "POST",
-      body: JSON.stringify({ userIds }),
-    },
-  );
-}
-
-export async function removeDiscountFromUsersApi(discountId: string, userIds: string[]) {
-  return apiRequest<{ success: boolean; removedCount?: number; error?: string }>(
-    `/admin/discounts/${discountId}/remove`,
-    {
-      method: "POST",
-      body: JSON.stringify({ userIds }),
-    },
-  );
-}
-
-export async function searchUsersForDiscountApi(query: string, limit = 20) {
-  const result = await apiRequest<{ success: boolean; data: Array<{ id: string; name: string; email: string }> }>(
-    `/admin/discounts/search-users?query=${encodeURIComponent(query)}&limit=${limit}`,
-  );
-  return result.data;
-}
-
 export async function getVouchersApi(limit = 20, offset = 0, search?: string, status?: VoucherStatus) {
   const params = new URLSearchParams({
     limit: String(limit),

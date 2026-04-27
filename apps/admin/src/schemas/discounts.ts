@@ -3,13 +3,11 @@ import {
   createDiscountSchema,
   discountStatusSchema,
   discountTypeSchema,
-  discountUserAssignmentSchema,
   updateDiscountSchema,
   validateDiscountCodeSchema,
 } from "@platform/contracts";
 
-export { createDiscountSchema, discountUserAssignmentSchema as assignDiscountSchema };
-export { discountUserAssignmentSchema as removeDiscountSchema, updateDiscountSchema, validateDiscountCodeSchema };
+export { createDiscountSchema, updateDiscountSchema, validateDiscountCodeSchema };
 
 // Admin billing schemas
 const DISCOUNT_DESCRIPTION_MAX_LENGTH = 500;
@@ -48,16 +46,6 @@ export const adminUpdateDiscountSchema = z.object({
     .max(DISCOUNT_DESCRIPTION_MAX_LENGTH, `Description must be at most ${DISCOUNT_DESCRIPTION_MAX_LENGTH} characters`)
     .optional()
     .nullable(),
-});
-
-export const assignUsersToDiscountSchema = z.object({
-  discountId: z.string().uuid(),
-  userIds: z.array(z.string().uuid()).min(1, "At least one user must be selected"),
-});
-
-export const removeUsersFromDiscountSchema = z.object({
-  discountId: z.string().uuid(),
-  userIds: z.array(z.string().uuid()).min(1, "At least one user must be selected"),
 });
 
 // ============================================================================

@@ -8,7 +8,6 @@ import {
   billingRangeQuerySchema,
   discountIdParamSchema,
   discountListQuerySchema,
-  discountUserAssignmentSchema,
   generateDiscountCodeSchema,
   logEntriesQuerySchema,
   logFilesQuerySchema,
@@ -432,7 +431,6 @@ export function createAdminRouter() {
       startDate: bodyData.startDate,
       endDate: bodyData.endDate,
       maxUses: bodyData.maxUses,
-      userIds: bodyData.userIds,
     });
 
     return c.json(result, result.success ? 200 : 400);
@@ -449,7 +447,6 @@ export function createAdminRouter() {
           startDate: bodyData.startDate,
           endDate: bodyData.endDate,
           maxUses: bodyData.maxUses,
-          userIds: bodyData.userIds,
           status: bodyData.status,
         });
 
@@ -463,38 +460,6 @@ export function createAdminRouter() {
       const result = await bootstrap.discountsService.deleteDiscount(discountId);
       return c.json(result, result.success ? 200 : 400);
     });
-  });
-
-  router.post("/discounts/:discountId/assign", async (c) => {
-    return withDiscountIdParam(c, async (discountId) => {
-      return withJsonBody(c, discountUserAssignmentSchema, "Invalid discount assignment payload", async (bodyData) => {
-        const result = await bootstrap.discountsService.assignDiscountToUsers(discountId, bodyData.userIds);
-        return c.json(result, result.success ? 200 : 400);
-      });
-    });
-  });
-
-  router.post("/discounts/:discountId/remove", async (c) => {
-    return withDiscountIdParam(c, async (discountId) => {
-      return withJsonBody(c, discountUserAssignmentSchema, "Invalid discount removal payload", async (bodyData) => {
-        const result = await bootstrap.discountsService.removeDiscountFromUsers(discountId, bodyData.userIds);
-        return c.json(result, result.success ? 200 : 400);
-      });
-    });
-  });
-
-  router.get("/discounts/search-users", async (c) => {
-    const parsedQuery = parseQuery(searchUsersQuerySchema, {
-      query: c.req.query("query"),
-      limit: c.req.query("limit"),
-    });
-
-    if (!parsedQuery.success) {
-      return validationError(c, "Invalid discount search query");
-    }
-
-    const users = await bootstrap.discountsService.searchUsersForDiscount(parsedQuery.data.query, parsedQuery.data.limit);
-    return c.json({ success: true, data: users });
   });
 
   router.get("/vouchers", async (c) => {

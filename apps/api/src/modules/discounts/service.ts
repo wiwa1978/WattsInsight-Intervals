@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 
-import { and, desc, eq, gt, gte, ilike, inArray, like, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, like, lt, lte, sql } from "drizzle-orm";
 
-import { discounts, user, userDiscounts } from "@platform/platform-db";
+import { discounts } from "@platform/platform-db";
 
 import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
 
@@ -38,7 +38,6 @@ type CreateDiscountInput = {
   startDate: Date;
   endDate: Date;
   maxUses?: number | null;
-  userIds?: string[];
 };
 
 type UpdateDiscountInput = {
@@ -49,7 +48,6 @@ type UpdateDiscountInput = {
   startDate?: Date;
   endDate?: Date;
   maxUses?: number | null;
-  userIds?: string[];
   status?: DiscountStatus;
 };
 
@@ -102,10 +100,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     return Math.max(Math.trunc(offset), 0);
   }
 
-  function dedupeIds(ids: string[]) {
-    return [...new Set(ids.map((value) => value.trim()).filter(Boolean))];
-  }
-
   async function refreshDiscountStatus<T extends { id: string; status: DiscountStatus; startDate: Date; endDate: Date }>(
     discount: T,
     now = new Date(),
@@ -121,24 +115,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       .where(eq(discounts.id, discount.id));
 
     return { ...discount, status: refreshedStatus };
-  }
-
-  async function replaceDiscountAssignments(tx: DiscountsServiceDeps["db"], discountId: string, userIds: string[]) {
-    await tx.delete(userDiscounts).where(eq(userDiscounts.discountId, discountId));
-
-    if (userIds.length === 0) {
-      return;
-    }
-
-    await tx
-      .insert(userDiscounts)
-      .values(
-        userIds.map((userId) => ({
-          discountId,
-          userId,
-        })),
-      )
-      .onConflictDoNothing();
   }
 
   async function dodoRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -354,7 +330,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
     const dodoDiscount = await createDodoDiscount(dodoDiscountData);
     const status = inferDiscountStatus(input.startDate, input.endDate);
-    const dedupedUserIds = dedupeIds(input.userIds ?? []);
 
     let created;
     try {
@@ -373,15 +348,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
             status,
           })
           .returning();
-
-        if (dedupedUserIds.length > 0) {
-          await tx.insert(userDiscounts).values(
-            dedupedUserIds.map((userId) => ({
-              discountId: createdDiscount.id,
-              userId,
-            })),
-          );
-        }
 
         return createdDiscount;
       });
@@ -453,23 +419,11 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       }
     }
 
-    const updateLocalDiscount = async (tx: DiscountsServiceDeps["db"]) => {
-      const [updated] = await tx
-        .update(discounts)
-        .set(updateData)
-        .where(eq(discounts.id, input.id))
-        .returning();
-
-      if (input.userIds !== undefined) {
-        await replaceDiscountAssignments(tx, input.id, dedupeIds(input.userIds));
-      }
-
-      return updated;
-    };
-
-    const updated = input.userIds === undefined
-      ? await updateLocalDiscount(deps.db)
-      : await deps.db.transaction(updateLocalDiscount);
+    const [updated] = await deps.db
+      .update(discounts)
+      .set(updateData)
+      .where(eq(discounts.id, input.id))
+      .returning();
 
     return discountSuccess({ discount: updated });
   }
@@ -491,82 +445,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     return discountSuccess({});
   }
 
-  async function assignDiscountToUsers(discountId: string, userIds: string[]) {
-    const dedupedUserIds = dedupeIds(userIds);
-    const discount = await deps.db.query.discounts.findFirst({
-      where: eq(discounts.id, discountId),
-    });
-    if (!discount) {
-      return discountFailure("Discount not found");
-    }
-
-    if (dedupedUserIds.length === 0) {
-      return discountSuccess({ assignedCount: 0 });
-    }
-
-    const existingAssociations = await deps.db.query.userDiscounts.findMany({
-      where: and(eq(userDiscounts.discountId, discountId), inArray(userDiscounts.userId, dedupedUserIds)),
-    });
-
-    const existingIds = new Set(existingAssociations.map((item: any) => item.userId));
-    const newIds = dedupedUserIds.filter((id) => !existingIds.has(id));
-
-    if (newIds.length === 0) {
-      return discountSuccess({ message: "All selected users already have this discount" });
-    }
-
-    await deps.db
-      .insert(userDiscounts)
-      .values(
-        newIds.map((userId) => ({
-          discountId,
-          userId,
-        })),
-      )
-      .onConflictDoNothing();
-
-    return discountSuccess({ assignedCount: newIds.length });
-  }
-
-  async function removeDiscountFromUsers(discountId: string, userIds: string[]) {
-    const dedupedUserIds = dedupeIds(userIds);
-    const discount = await deps.db.query.discounts.findFirst({
-      where: eq(discounts.id, discountId),
-    });
-    if (!discount) {
-      return discountFailure("Discount not found");
-    }
-
-    if (dedupedUserIds.length === 0) {
-      return discountSuccess({ removedCount: 0 });
-    }
-
-    await deps.db
-      .delete(userDiscounts)
-      .where(and(eq(userDiscounts.discountId, discountId), inArray(userDiscounts.userId, dedupedUserIds)));
-
-    return discountSuccess({ removedCount: dedupedUserIds.length });
-  }
-
-  async function searchUsersForDiscount(query: string, limit = 20) {
-    const normalizedQuery = query.trim();
-    const normalizedLimit = normalizeLimit(limit, 50);
-
-    if (!normalizedQuery || normalizedQuery.length < 2) {
-      return [];
-    }
-
-    return deps.db
-      .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      })
-      .from(user)
-      .where(or(ilike(user.name, `%${normalizedQuery}%`), ilike(user.email, `%${normalizedQuery}%`)))
-      .limit(normalizedLimit);
-  }
-
   return {
     generateDiscountCode,
     validateDiscountCode,
@@ -575,8 +453,5 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     getDiscountById,
     updateDiscount,
     deleteDiscount,
-    assignDiscountToUsers,
-    removeDiscountFromUsers,
-    searchUsersForDiscount,
   };
 }
