@@ -1387,6 +1387,50 @@ describe("API functional routes", () => {
     }));
   });
 
+  it("records safe failure audit entries when voucher mutations throw", async () => {
+    const voucherId = "77777777-7777-4777-8777-777777777777";
+    mocks.vouchersService.createVoucher.mockRejectedValueOnce(new Error("Voucher provider request failed"));
+    mocks.vouchersService.updateVoucher.mockRejectedValueOnce(new Error("Voucher provider request failed"));
+
+    const createRes = await app.request("/admin/vouchers", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        code: "WELCOME10",
+        creditAmount: 10,
+        assignmentScope: "selected",
+        userIds: ["11111111-1111-4111-8111-111111111111"],
+        expiresAt: "2026-12-31T00:00:00.000Z",
+      }),
+    });
+    const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "inactive" }),
+    });
+
+    expect(createRes.status).toBe(500);
+    expect(patchRes.status).toBe(500);
+    await expect(createRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(patchRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.create",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: null,
+      metadata: { error: "Voucher provider request failed" },
+    }));
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "voucher.update",
+      outcome: "failure",
+      actorId: "auth-user",
+      targetType: "voucher",
+      targetId: voucherId,
+      metadata: { error: "Voucher provider request failed" },
+    }));
+  });
+
   // Verifies voucher endpoints reject malformed identifiers, queries, and payloads.
   it("validates voucher route inputs", async () => {
     const [listRes, getRes, createRes, patchRes, searchRes] = await Promise.all([

@@ -780,7 +780,20 @@ export function createAdminRouter() {
       return validationError(c, "Invalid voucher payload");
     }
 
-    const result = await bootstrap.vouchersService.createVoucher(parsedBody.data);
+    let result: Awaited<ReturnType<typeof bootstrap.vouchersService.createVoucher>>;
+    try {
+      result = await bootstrap.vouchersService.createVoucher(parsedBody.data);
+    } catch (error) {
+      await recordMutationAudit(c, {
+        action: "voucher.create",
+        outcome: "failure",
+        targetType: "voucher",
+        targetId: null,
+        after: null,
+        metadata: { error: safeErrorMessage(error, "Voucher create failed") },
+      });
+      throw error;
+    }
     const voucher = resultField(result, "voucher");
     const voucherSummary = safeVoucherSummary(voucher);
 
@@ -801,10 +814,24 @@ export function createAdminRouter() {
   router.patch("/vouchers/:voucherId", async (c) => {
     return withVoucherIdParam(c, async (voucherId) => {
       return withJsonBody(c, updateVoucherSchema, "Invalid voucher update payload", async (bodyData) => {
-        const result = await bootstrap.vouchersService.updateVoucher({
-          id: voucherId,
-          ...bodyData,
-        });
+        let result: Awaited<ReturnType<typeof bootstrap.vouchersService.updateVoucher>>;
+        try {
+          result = await bootstrap.vouchersService.updateVoucher({
+            id: voucherId,
+            ...bodyData,
+          });
+        } catch (error) {
+          await recordMutationAudit(c, {
+            action: "voucher.update",
+            outcome: "failure",
+            targetType: "voucher",
+            targetId: voucherId,
+            before: null,
+            after: null,
+            metadata: { error: safeErrorMessage(error, "Voucher update failed") },
+          });
+          throw error;
+        }
         const voucher = resultField(result, "voucher");
         const previousVoucher = resultField(result, "previousVoucher");
         const voucherSummary = safeVoucherSummary(voucher);
