@@ -7,7 +7,7 @@ const MAX_SAFE_CONTEXT_KEYS = 8;
 const MAX_SAFE_CONTEXT_STRING_LENGTH = 128;
 const SENSITIVE_KEY_PATTERN = /(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)/i;
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
-const KEY_VALUE_SECRET_PATTERN = /\b(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)=([^\s&#]+)/gi;
+const KEY_VALUE_SECRET_PATTERN = /\b(?:password|passcode|secret|[A-Za-z0-9_-]*token|authorization|cookie|api[-_]?key|session|credential|signature)=([^\s&#]+)/gi;
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
 const JWT_PATTERN = /\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 

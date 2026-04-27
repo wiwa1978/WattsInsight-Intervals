@@ -34,6 +34,33 @@ describe("logger.readLogEntries", () => {
 });
 
 describe("logger metadata serialization", () => {
+  it("redacts token-like key-value pairs in messages and nested metadata strings", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-logs-"));
+    tmpDirs.push(dir);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.doMock("../../src/env", () => ({ env: { NODE_ENV: "test", LOG_FILE_PATH: dir } }));
+    const { logger } = await import("../../src/observability/logger");
+
+    logger.warn(
+      {
+        safe: "accessToken=abc123 refreshToken=def456",
+        nested: { detail: "lowercase accesstoken=ghi789 refreshtoken=jkl012" },
+      },
+      "client sent accessToken=abc123 and refreshToken=def456",
+    );
+
+    const output = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("accessToken=[redacted]");
+    expect(output).toContain("refreshToken=[redacted]");
+    expect(output).toContain("accesstoken=[redacted]");
+    expect(output).toContain("refreshtoken=[redacted]");
+    expect(output).not.toContain("abc123");
+    expect(output).not.toContain("def456");
+    expect(output).not.toContain("ghi789");
+    expect(output).not.toContain("jkl012");
+  });
+
   it("tolerates circular deep unusual metadata while redacting and bounding output", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-logs-"));
     tmpDirs.push(dir);
