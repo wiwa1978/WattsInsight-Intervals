@@ -531,6 +531,80 @@ describe("createDiscountsService", () => {
     expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ code: "SAVE-NEW-1234" }));
   });
 
+  // Verifies detail responses return the recomputed status instead of a stale stored status.
+  it("refreshes stale discount status in detail responses", async () => {
+    const now = Date.now();
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const db = {
+      query: {
+        discounts: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: "d1",
+            code: "SAVE-ABC-1234",
+            status: "active",
+            startDate: new Date(now - 20_000),
+            endDate: new Date(now - 10_000),
+            userDiscounts: [],
+          }),
+        },
+      },
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+    };
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+    });
+
+    const result = await service.getDiscountById("d1");
+
+    expect(result).toEqual({
+      success: true,
+      discount: expect.objectContaining({ id: "d1", status: "expired" }),
+    });
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ status: "expired" }));
+  });
+
+  // Verifies list responses refresh statuses and filter by the date-derived status, not stale stored status.
+  it("refreshes stale discount statuses in list responses", async () => {
+    const now = Date.now();
+    const updateWhere = vi.fn().mockResolvedValue(undefined);
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        id: "d1",
+        code: "SAVE-ABC-1234",
+        status: "inactive",
+        startDate: new Date(now - 10_000),
+        endDate: new Date(now + 10_000),
+        userDiscounts: [],
+      },
+    ]);
+    const selectWhere = vi.fn().mockResolvedValue([{ count: 1 }]);
+    const db = {
+      query: {
+        discounts: { findMany },
+      },
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({ where: selectWhere }),
+      }),
+      update: vi.fn().mockReturnValue({ set: updateSet }),
+    };
+
+    const service = createDiscountsService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+    });
+
+    const result = await service.getDiscounts(20, 0, undefined, "active");
+
+    expect(result.discounts).toEqual([expect.objectContaining({ id: "d1", status: "active" })]);
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.anything() }));
+    expect(selectWhere).toHaveBeenCalledWith(expect.anything());
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ status: "active" }));
+  });
+
   // Verifies code generation retries when a generated code already exists.
   it("generates unique codes and retries on collision", async () => {
     const findFirst = vi
