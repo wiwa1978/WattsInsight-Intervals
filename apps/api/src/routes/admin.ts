@@ -312,18 +312,14 @@ export function createAdminRouter() {
         return forbidden(c, secretResult.error ?? "Invalid admin ban secret");
       }
 
-      const { secret: _secret, banExpires: _banExpires, ...banBody } = body;
+      const { secret: _secret, ...banBody } = body;
       const result = await requireAdminAuthApi().banUser({ body: banBody, headers: c.req.raw.headers });
       if (isSuccessfulMutationResult(result)) {
-        await recordAdminAuthAudit(c, body, {
+        await recordAdminAuthAudit(c, banBody, {
           action: "admin.user.ban",
           targetType: "user",
           targetId: (body) => body.userId,
-          after: (body) => ({
-            banned: true,
-            banReason: body.banReason ?? null,
-            banExpires: body.banExpires ?? null,
-          }),
+          after: (body) => ({ banned: true, ...body }),
         });
       }
       return c.json(result);

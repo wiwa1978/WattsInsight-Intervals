@@ -21,11 +21,10 @@ export const setUserPasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
 });
 
-export const banUserSchema = z.object({
+export const banUserSchema = z.strictObject({
   userId: z.string().uuid(),
   secret: z.string().trim().min(1).max(255),
   banReason: z.string().trim().min(1).max(1000).optional(),
-  banExpires: z.string().datetime().optional(),
   banExpiresIn: z.number().int().positive().optional(),
 });
 

@@ -855,7 +855,7 @@ describe("API functional routes", () => {
       body: JSON.stringify({
         userId,
         banReason: "policy violation",
-        banExpires: "2026-05-01T00:00:00.000Z",
+        banExpiresIn: 3600,
         secret: "ban-secret-value",
       }),
     });
@@ -894,7 +894,10 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "user",
       targetId: userId,
-      after: { banned: true, banReason: "policy violation", banExpires: "2026-05-01T00:00:00.000Z" },
+      after: { banned: true, userId, banReason: "policy violation", banExpiresIn: 3600 },
+    }));
+    expect(mocks.adminAuthApi.banUser).toHaveBeenCalledWith(expect.objectContaining({
+      body: { userId, banReason: "policy violation", banExpiresIn: 3600 },
     }));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "admin.user.unban",
@@ -923,6 +926,27 @@ describe("API functional routes", () => {
     const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
     expect(JSON.stringify(auditPayloads)).not.toContain("ban-secret-value");
     expect(JSON.stringify(auditPayloads)).not.toContain("correct horse battery staple");
+  });
+
+  it("rejects unsupported absolute admin ban expiry without auditing it", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+
+    const res = await app.request("/admin/users/ban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        banReason: "policy violation",
+        banExpires: "2026-05-01T00:00:00.000Z",
+        secret: "ban-secret-value",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid ban payload");
+    expect(mocks.adminService.verifyAdminBanSecret).not.toHaveBeenCalled();
+    expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
+    expect(mocks.auditService.recordAuditEntry).not.toHaveBeenCalled();
   });
 
   it("records audit entry when stopping admin impersonation", async () => {
