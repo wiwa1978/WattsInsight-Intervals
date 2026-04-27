@@ -500,18 +500,6 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       return discountFailure("Discount not found");
     }
 
-    if (discount.maxUses !== null) {
-      const currentCount = await deps.db
-        .select({ count: sql<number>`COUNT(*)` })
-        .from(userDiscounts)
-        .where(eq(userDiscounts.discountId, discountId));
-
-      const currentUses = currentCount[0]?.count || 0;
-      if (currentUses + dedupedUserIds.length > discount.maxUses) {
-        return discountFailure(`Cannot assign discount: would exceed maximum uses (${discount.maxUses})`);
-      }
-    }
-
     if (dedupedUserIds.length === 0) {
       return discountSuccess({ assignedCount: 0 });
     }
