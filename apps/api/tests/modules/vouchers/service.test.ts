@@ -119,20 +119,22 @@ describe("createVouchersService", () => {
     const set = vi.fn().mockReturnValue({ where });
     const update = vi.fn().mockReturnValue({ set });
 
+    const previousVoucher = {
+      id: "11111111-1111-4111-8111-111111111111",
+      code: "WELCOME",
+      creditAmount: 10,
+      status: "active",
+      currentRedemptions: 3,
+      maxRedemptions: 5,
+      appliesToAllUsers: true,
+      expiresAt: null,
+      assignments: [],
+    };
+
     const db = {
       query: {
         vouchers: {
-          findFirst: vi.fn().mockResolvedValueOnce({
-            id: "11111111-1111-4111-8111-111111111111",
-            code: "WELCOME",
-            creditAmount: 10,
-            status: "active",
-            currentRedemptions: 3,
-            maxRedemptions: 5,
-            appliesToAllUsers: true,
-            expiresAt: null,
-            assignments: [],
-          }),
+          findFirst: vi.fn().mockResolvedValueOnce(previousVoucher),
         },
       },
       transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb({ update })),
@@ -148,8 +150,51 @@ describe("createVouchersService", () => {
       maxRedemptions: 3,
     });
 
-    expect(result).toEqual({ success: true, voucher: updatedVoucher });
+    expect(result).toEqual({ success: true, voucher: updatedVoucher, previousVoucher });
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ maxRedemptions: 3, status: "redeemed" }));
+  });
+
+  // Verifies audit callers can compare the pre-update state to the persisted update.
+  it("returns the previous voucher when an update succeeds", async () => {
+    const previousVoucher = {
+      id: "11111111-1111-4111-8111-111111111111",
+      code: "WELCOME",
+      creditAmount: 10,
+      status: "active",
+      currentRedemptions: 1,
+      maxRedemptions: 5,
+      appliesToAllUsers: true,
+      expiresAt: null,
+      assignments: [],
+    };
+    const updatedVoucher = { ...previousVoucher, code: "SPRING", creditAmount: 25 };
+    const returning = vi.fn().mockResolvedValue([updatedVoucher]);
+    const where = vi.fn().mockReturnValue({ returning });
+    const set = vi.fn().mockReturnValue({ where });
+    const update = vi.fn().mockReturnValue({ set });
+
+    const db = {
+      query: {
+        vouchers: {
+          findFirst: vi.fn().mockResolvedValueOnce(previousVoucher).mockResolvedValueOnce(null),
+        },
+      },
+      transaction: vi.fn(async (cb: (tx: unknown) => unknown) => cb({ update })),
+    };
+
+    const service = createVouchersService({
+      db,
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.updateVoucher({
+      id: "11111111-1111-4111-8111-111111111111",
+      code: "spring",
+      creditAmount: 25,
+    });
+
+    expect(result).toEqual({ success: true, voucher: updatedVoucher, previousVoucher });
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ code: "SPRING", creditAmount: 25 }));
   });
 
   // Verifies committed redemptions are not reported as failed when only notification delivery fails.

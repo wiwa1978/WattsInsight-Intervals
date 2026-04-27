@@ -346,7 +346,7 @@ export function createVouchersService(deps: VouchersServiceDeps) {
       return createdVoucher;
     });
 
-    return voucherSuccess({ voucher, previousVoucher: existing });
+    return voucherSuccess({ voucher });
   }
 
   async function updateVoucher(input: UpdateVoucherInput & { id: string }) {
@@ -417,7 +417,7 @@ export function createVouchersService(deps: VouchersServiceDeps) {
       return updatedVoucher;
     });
 
-    return voucherSuccess({ voucher });
+    return voucherSuccess({ voucher, previousVoucher: existing });
   }
 
   async function getVouchers(limit = 20, offset = 0, search?: string, status?: string) {
