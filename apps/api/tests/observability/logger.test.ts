@@ -47,6 +47,14 @@ describe("redactString", () => {
     expect(redactString("client_secret: 'line1\nline2'")).toBe("client_secret: '[redacted]'");
   });
 
+  it("redacts quoted secret values containing escaped delimiters", () => {
+    expect(redactString('password = "abc\\"def"')).toBe("password = [redacted]");
+    expect(redactString("api_key = 'abc\\'def'")).toBe("api_key = [redacted]");
+    expect(redactString('password: "abc\\"def"')).toBe('password: "[redacted]"');
+    expect(redactString("client_secret: 'abc\\'def'")).toBe("client_secret: '[redacted]'");
+    expect(redactString('{"password":"abc\\"def"}')).toBe('{"password":"[redacted]"}');
+  });
+
   it("keeps redacting existing colon-style secret variants", () => {
     expect(redactString('"token": abc123')).toBe('"token": [redacted]');
     expect(redactString('"client_secret" : bare-secret')).toBe('"client_secret" : [redacted]');
@@ -158,6 +166,30 @@ describe("logger metadata serialization", () => {
     expect(output).not.toContain("multi word secret");
     expect(output).not.toContain("word secret");
     expect(output).not.toContain("json-secret");
+  });
+
+  it("redacts escaped delimiter secret values in messages and nested metadata strings", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-logs-"));
+    tmpDirs.push(dir);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.doMock("../../src/env", () => ({ env: { NODE_ENV: "test", LOG_FILE_PATH: dir } }));
+    const { logger } = await import("../../src/observability/logger");
+
+    logger.warn(
+      {
+        safe: '{"password":"abc\\"def"}',
+        nested: { detail: "client_secret: 'abc\\'def'" },
+      },
+      'client sent password: "abc\\"def"',
+    );
+
+    const output = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain("client_secret: '[redacted]'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
   });
 
   it("tolerates circular deep unusual metadata while redacting and bounding output", async () => {

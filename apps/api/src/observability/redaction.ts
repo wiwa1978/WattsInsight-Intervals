@@ -8,10 +8,13 @@ const MAX_SAFE_CONTEXT_STRING_LENGTH = 128;
 const SENSITIVE_KEY_PATTERN = /(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)/i;
 const SENSITIVE_STRING_KEY_PATTERN = String.raw`[A-Za-z0-9_-]*(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)[A-Za-z0-9_-]*`;
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
-const QUOTED_KEY_VALUE_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)(["'])([\s\S]*?)\2`, "gi");
+const QUOTED_KEY_VALUE_SECRET_PATTERN = new RegExp(
+  String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)(["'])(?:\\[\s\S]|(?!\2)[\s\S])*?\2`,
+  "gi",
+);
 const KEY_VALUE_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)([^\s&#]+)`, "gi");
 const COLON_SECRET_PATTERN = new RegExp(
-  String.raw`((?:(["'])${SENSITIVE_STRING_KEY_PATTERN}\2|\b${SENSITIVE_STRING_KEY_PATTERN})\s*:\s*)(?:(["'])([\s\S]*?)\3|([^\s,}\]]+))`,
+  String.raw`((?:(["'])${SENSITIVE_STRING_KEY_PATTERN}\2|\b${SENSITIVE_STRING_KEY_PATTERN})\s*:\s*)(?:(["'])(?:\\[\s\S]|(?!\3)[\s\S])*?\3|([^\s,}\]]+))`,
   "gi",
 );
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;

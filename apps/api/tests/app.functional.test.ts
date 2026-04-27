@@ -1413,6 +1413,34 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies escaped quote delimiters do not terminate redaction early.
+  it("redacts escaped delimiter secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"password":"abc\\"def"} password: "abc\\"def"',
+        userAgent: "agent api_key = 'abc\\'def'",
+        context: {
+          detail: "client_secret: 'abc\\'def'",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"password\\":\\"[redacted]\\"');
+    expect(output).toContain('password: \\"[redacted]\\"');
+    expect(output).toContain("api_key = [redacted]");
+    expect(output).toContain("client_secret: '[redacted]'");
+    expect(output).not.toContain("abc");
+    expect(output).not.toContain("def");
+    infoSpy.mockRestore();
+  });
+
   // Verifies Sentry receives only sanitized bounded client log context.
   it("sends only sanitized bounded client log context to Sentry", async () => {
     mocks.Sentry.captureMessage.mockClear();
