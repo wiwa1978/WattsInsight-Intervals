@@ -416,6 +416,11 @@ export function createAdminRouter() {
 
   registerAdminAuthJsonAction("/users/revoke-sessions", userOnlySchema, "Invalid session revoke payload", (body, headers) => {
     return requireAdminAuthApi().revokeUserSessions({ body, headers });
+  }, {
+    action: "admin.user.revoke_sessions",
+    targetType: "user",
+    targetId: (body) => body.userId,
+    after: () => ({ sessionsRevoked: true }),
   });
 
   registerAdminAuthJsonAction("/users/set-password", setUserPasswordSchema, "Invalid password payload", (body, headers) => {
@@ -878,8 +883,15 @@ export function createAdminRouter() {
       return validationError(c, "Invalid log entries query");
     }
 
-    const data = logger.readLogEntries(parsedQuery.data);
-    return c.json({ success: true, data });
+    try {
+      const data = logger.readLogEntries(parsedQuery.data);
+      return c.json({ success: true, data });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Invalid log file") {
+        return validationError(c, "Invalid log entries query");
+      }
+      throw error;
+    }
   });
 
   router.get("/notifications", async (c) => {

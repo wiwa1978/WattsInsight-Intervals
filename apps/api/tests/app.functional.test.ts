@@ -928,6 +928,39 @@ describe("API functional routes", () => {
     expect(JSON.stringify(auditPayloads)).not.toContain("correct horse battery staple");
   });
 
+  it("records a safe audit entry when revoking user sessions", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminAuthApi.revokeUserSessions.mockResolvedValue({ success: true });
+
+    const res = await app.request("/admin/users/revoke-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer raw-admin-token" },
+      body: JSON.stringify({ userId }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "admin.user.revoke_sessions",
+      outcome: "success",
+      actorId: "auth-user",
+      targetType: "user",
+      targetId: userId,
+      after: { sessionsRevoked: true },
+    }));
+
+    const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
+    expect(JSON.stringify(auditPayloads)).not.toContain("raw-admin-token");
+
+    mocks.auditService.recordAuditEntry.mockRejectedValueOnce(new Error("audit unavailable"));
+    const auditFailureRes = await app.request("/admin/users/revoke-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    expect(auditFailureRes.status).toBe(200);
+  });
+
   it("rejects unsupported absolute admin ban expiry without auditing it", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
 
@@ -1747,6 +1780,13 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
+  });
+
+  it("rejects invalid admin log entry file names with validation error", async () => {
+    const res = await app.request("/admin/logs/entries?file=../bad");
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid log entries query");
   });
 
   // Verifies client log endpoint redacts common secrets before writing logs.
