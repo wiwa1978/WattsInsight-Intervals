@@ -105,7 +105,7 @@ export function SendNotificationForm() {
       });
 
       if (result.success) {
-        toast.success(t("success", { count: result.count || 0 }));
+        toast.success(t("success", { count: result.sentCount || 0 }));
         form.reset();
         router.refresh();
       } else {

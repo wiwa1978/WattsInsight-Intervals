@@ -139,9 +139,9 @@ export async function sendNotificationToAllUsers({
       bannerExpiresAt,
     });
 
-    return { success: true, count: result.data.count };
+    return { success: true as const, ...result.data };
   } catch {
-    return { success: false, error: "Failed to send notification to all users" };
+    return { success: false as const, error: "Failed to send notification to all users" };
   }
 }
 
@@ -176,9 +176,9 @@ export async function sendNotificationToUsers({
       bannerExpiresAt,
     });
 
-    return { success: true, count: result.data.count };
+    return { success: true as const, ...result.data };
   } catch {
-    return { success: false, error: "Failed to send notification to users" };
+    return { success: false as const, error: "Failed to send notification to users" };
   }
 }
 

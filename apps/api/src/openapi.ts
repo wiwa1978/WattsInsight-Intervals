@@ -407,8 +407,8 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/logs/files", ["Admin Logs"], "List log files", { security: cookieOrBearerAuth, parameters: [queryParameter("stream", logFilesQuerySchema.shape.stream)], responses: defaultResponses("Log files", ["400", "401", "403"]) }),
   route("get", "/admin/logs/entries", ["Admin Logs"], "Read log entries", { security: cookieOrBearerAuth, parameters: [queryParameter("stream", logEntriesQuerySchema.shape.stream), queryParameter("file", logEntriesQuerySchema.shape.file), queryParameter("limit", logEntriesQuerySchema.shape.limit)], responses: defaultResponses("Log entries", ["400", "401", "403"]) }),
   route("get", "/admin/notifications", ["Admin Notifications"], "List notifications", { security: cookieOrBearerAuth, parameters: [queryParameter("limit", notificationsListQuerySchema.shape.limit)], responses: defaultResponses("Notifications", ["400", "401", "403"]) }),
-  route("post", "/admin/notifications/send-all", ["Admin Notifications"], "Send notification to all users", { security: cookieOrBearerAuth, requestBody: requestBody(genericObjectSchema), responses: defaultResponses("Notification sent", ["400", "401", "403"]) }),
-  route("post", "/admin/notifications/send-users", ["Admin Notifications"], "Send notification to selected users", { security: cookieOrBearerAuth, requestBody: requestBody(genericObjectSchema), responses: defaultResponses("Notification sent", ["400", "401", "403"]) }),
+  route("post", "/admin/notifications/send-all", ["Admin Notifications"], "Send notification to all users and return recipient counts", { security: cookieOrBearerAuth, requestBody: requestBody(genericObjectSchema), responses: defaultResponses("Notification recipient counts", ["400", "401", "403"]) }),
+  route("post", "/admin/notifications/send-users", ["Admin Notifications"], "Send notification to selected users and return recipient counts", { security: cookieOrBearerAuth, requestBody: requestBody(genericObjectSchema), responses: defaultResponses("Notification recipient counts", ["400", "401", "403"]) }),
 ];
 
 const customPaths = buildOpenApiPaths(APP_OWNED_API_ROUTES);

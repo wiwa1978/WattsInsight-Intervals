@@ -575,11 +575,11 @@ export function createAdminRouter() {
       return validationError(c, "Invalid notification payload");
     }
 
-    const count = await bootstrap.notificationsService.sendNotificationToAllUsers({
+    const result = await bootstrap.notificationsService.sendNotificationToAllUsers({
       ...parsedBody.data,
     });
 
-    return c.json({ success: true, data: { count } });
+    return c.json({ success: true, data: result });
   });
 
   router.post("/notifications/send-users", async (c) => {
@@ -590,11 +590,11 @@ export function createAdminRouter() {
       return validationError(c, "Invalid notification payload");
     }
 
-    const count = await bootstrap.notificationsService.sendNotificationToUsers({
+    const result = await bootstrap.notificationsService.sendNotificationToUsers({
       ...parsedBody.data,
     });
 
-    return c.json({ success: true, data: { count } });
+    return c.json({ success: true, data: result });
   });
 
   return router;

@@ -45,10 +45,19 @@ export const sendNotificationToUsersSchema = sendNotificationBaseSchema.extend({
   userIds: z.array(z.string().uuid()).min(1).max(500),
 });
 
+export const notificationSendResultSchema = z.object({
+  sentCount: z.number().int().min(0),
+  skippedCount: z.number().int().min(0),
+  invalidRecipientCount: z.number().int().min(0),
+  invalidRecipientIds: z.array(z.string().uuid()),
+  batchId: z.string().uuid().optional(),
+});
+
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type NotificationCategory = z.infer<typeof notificationCategorySchema>;
 export type SendNotificationInput = z.infer<typeof sendNotificationSchema>;
+export type NotificationSendResult = z.infer<typeof notificationSendResultSchema>;
 
 export interface TranslateFunction {
   (key: string, values?: Record<string, unknown>): string;

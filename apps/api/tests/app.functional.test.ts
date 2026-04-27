@@ -1037,8 +1037,20 @@ describe("API functional routes", () => {
   // Verifies notification list and dispatch routes map to service calls.
   it("routes notifications endpoints", async () => {
     mocks.notificationsService.getAllNotifications.mockResolvedValueOnce([{ id: "n1" }]);
-    mocks.notificationsService.sendNotificationToAllUsers.mockResolvedValueOnce(5);
-    mocks.notificationsService.sendNotificationToUsers.mockResolvedValueOnce(2);
+    mocks.notificationsService.sendNotificationToAllUsers.mockResolvedValueOnce({
+      sentCount: 5,
+      skippedCount: 0,
+      invalidRecipientCount: 0,
+      invalidRecipientIds: [],
+      batchId: "11111111-1111-4111-8111-111111111111",
+    });
+    mocks.notificationsService.sendNotificationToUsers.mockResolvedValueOnce({
+      sentCount: 2,
+      skippedCount: 1,
+      invalidRecipientCount: 1,
+      invalidRecipientIds: ["77777777-7777-4777-8777-777777777777"],
+      batchId: "22222222-2222-4222-8222-222222222222",
+    });
 
     const listRes = await app.request("/admin/notifications?limit=10");
     const sendAllRes = await app.request("/admin/notifications/send-all", {
@@ -1049,15 +1061,47 @@ describe("API functional routes", () => {
     const sendUsersRes = await app.request("/admin/notifications/send-users", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userIds: ["66666666-6666-4666-8666-666666666666"], title: "T", message: "M" }),
+      body: JSON.stringify({
+        userIds: ["66666666-6666-4666-8666-666666666666"],
+        title: "T",
+        message: "M",
+      }),
     });
 
     expect(listRes.status).toBe(200);
     expect(sendAllRes.status).toBe(200);
     expect(sendUsersRes.status).toBe(200);
     await expect(listRes.json()).resolves.toEqual({ success: true, data: [{ id: "n1" }] });
-    await expect(sendAllRes.json()).resolves.toEqual({ success: true, data: { count: 5 } });
-    await expect(sendUsersRes.json()).resolves.toEqual({ success: true, data: { count: 2 } });
+    await expect(sendAllRes.json()).resolves.toEqual({
+      success: true,
+      data: {
+        sentCount: 5,
+        skippedCount: 0,
+        invalidRecipientCount: 0,
+        invalidRecipientIds: [],
+        batchId: "11111111-1111-4111-8111-111111111111",
+      },
+    });
+    await expect(sendUsersRes.json()).resolves.toEqual({
+      success: true,
+      data: {
+        sentCount: 2,
+        skippedCount: 1,
+        invalidRecipientCount: 1,
+        invalidRecipientIds: ["77777777-7777-4777-8777-777777777777"],
+        batchId: "22222222-2222-4222-8222-222222222222",
+      },
+    });
+  });
+
+  it("honors current user notification limit query", async () => {
+    mocks.notificationsService.listForUser.mockResolvedValueOnce([{ id: "n-limited" }]);
+
+    const res = await app.request("/me/notifications?limit=7");
+
+    expect(res.status).toBe(200);
+    expect(mocks.notificationsService.listForUser).toHaveBeenCalledWith("auth-user", 7);
+    await expect(res.json()).resolves.toEqual({ success: true, data: [{ id: "n-limited" }] });
   });
 
   // Verifies malformed notification payloads now return 400 instead of 500.

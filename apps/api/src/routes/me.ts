@@ -97,7 +97,13 @@ export function createMeRouter() {
 
   router.get("/notifications", async (c) => {
     const authUser = getAuthUser(c);
-    const list = await bootstrap.notificationsService.listForUser(authUser.id, 20);
+    const parsedQuery = parseQuery(optionalLimitQuerySchema, { limit: c.req.query("limit") });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid notifications query");
+    }
+
+    const list = await bootstrap.notificationsService.listForUser(authUser.id, parsedQuery.data.limit);
     return c.json({ success: true, data: list });
   });
 

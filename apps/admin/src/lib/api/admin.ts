@@ -3,6 +3,14 @@ import { apiRequest } from "./client";
 import type { AdminCreateDiscountInput, AdminUpdateDiscountInput, DiscountStatus } from "@/types/discounts";
 import type { VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
 
+type NotificationSendResult = {
+  sentCount: number;
+  skippedCount: number;
+  invalidRecipientCount: number;
+  invalidRecipientIds: string[];
+  batchId?: string;
+};
+
 export async function verifyAdminBanSecretApi(secret: string) {
   return apiRequest<{ success: boolean; error?: string }>("/admin/verify-ban-secret", {
     method: "POST",
@@ -294,7 +302,7 @@ export async function sendNotificationToAllUsersApi(payload: {
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
 }) {
-  return apiRequest<{ success: boolean; data: { count: number } }>("/admin/notifications/send-all", {
+  return apiRequest<{ success: boolean; data: NotificationSendResult }>("/admin/notifications/send-all", {
     method: "POST",
     body: JSON.stringify({
       ...payload,
@@ -313,7 +321,7 @@ export async function sendNotificationToUsersApi(payload: {
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
 }) {
-  return apiRequest<{ success: boolean; data: { count: number } }>("/admin/notifications/send-users", {
+  return apiRequest<{ success: boolean; data: NotificationSendResult }>("/admin/notifications/send-users", {
     method: "POST",
     body: JSON.stringify({
       ...payload,
