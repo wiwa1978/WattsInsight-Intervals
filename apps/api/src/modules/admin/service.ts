@@ -251,7 +251,8 @@ export function createAdminService(deps: AdminServiceDeps) {
   }
 
   async function getUserStats() {
-    const [admins, banned] = await Promise.all([
+    const [totalUsers, admins, banned] = await Promise.all([
+      deps.db.select({ count: sql<number>`COUNT(*)` }).from(user),
       deps.db
         .select({ count: sql<number>`COUNT(*)` })
         .from(user)
@@ -260,6 +261,7 @@ export function createAdminService(deps: AdminServiceDeps) {
     ]);
 
     return {
+      totalUsers: totalUsers[0]?.count || 0,
       totalAdmins: admins[0]?.count || 0,
       totalBanned: banned[0]?.count || 0,
     };

@@ -150,13 +150,14 @@ export default function AdminUsersPage() {
 
   const users = (usersQuery.data?.users ?? []) as User[];
 
-  const totalUsers = usersQuery.data?.total ?? 0;
+  const filteredTotalUsers = usersQuery.data?.total ?? 0;
+  const statsTotalUsers = statsQuery.data?.totalUsers ?? filteredTotalUsers;
   const totalAdmins = statsQuery.data?.totalAdmins ?? 0;
   const totalBanned = statsQuery.data?.totalBanned ?? 0;
-  const displayTotal = totalUsers;
-  const totalPages = Math.max(1, Math.ceil(totalUsers / limit));
-  const from = totalUsers > 0 ? offset + 1 : 0;
-  const to = Math.min(offset + users.length, totalUsers);
+  const displayTotal = filteredTotalUsers;
+  const totalPages = Math.max(1, Math.ceil(filteredTotalUsers / limit));
+  const from = filteredTotalUsers > 0 ? offset + 1 : 0;
+  const to = Math.min(offset + users.length, filteredTotalUsers);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,7 +172,7 @@ export default function AdminUsersPage() {
         <p className="mt-2 text-muted-foreground">{t("description")}</p>
       </div>
 
-      <UserStatsCard totalUsers={totalUsers} totalAdmins={totalAdmins} totalBanned={totalBanned} />
+      <UserStatsCard totalUsers={statsTotalUsers} totalAdmins={totalAdmins} totalBanned={totalBanned} />
 
       <UsersTable
         users={users}

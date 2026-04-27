@@ -78,6 +78,7 @@ export async function getAdminDashboardStats() {
 export async function getAdminUserStats() {
   try {
     const stats = (await getAdminUserStatsApi()) as {
+      totalUsers: number;
       totalAdmins: number;
       totalBanned: number;
     };
@@ -85,6 +86,7 @@ export async function getAdminUserStats() {
     return stats;
   } catch {
     return {
+      totalUsers: 0,
       totalAdmins: 0,
       totalBanned: 0,
     };

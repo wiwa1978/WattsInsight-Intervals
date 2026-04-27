@@ -58,6 +58,29 @@ describe("createAdminService", () => {
     });
   });
 
+  // Verifies user stats expose global totals for admin summary cards.
+  it("returns global user stats", async () => {
+    const counts = [10, 2, 1];
+    const select = vi.fn(() => ({
+      from: vi.fn(() => {
+        const count = counts.shift() ?? 0;
+        return {
+          then: (resolve: (value: Array<{ count: number }>) => void) => resolve([{ count }]),
+          where: vi.fn().mockResolvedValue([{ count }]),
+        };
+      }),
+    }));
+
+    const service = createAdminService({
+      db: { select } as any,
+      adminBanSecret: "secret",
+    });
+
+    const result = await service.getUserStats();
+
+    expect(result).toEqual({ totalUsers: 10, totalAdmins: 2, totalBanned: 1 });
+  });
+
   // Verifies unknown users return null rather than throwing.
   it("returns null for unknown user in getUserById", async () => {
     const service = createAdminService({
