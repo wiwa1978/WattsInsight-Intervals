@@ -817,23 +817,6 @@
         "totalAvailableCredits": "Total des Crédits Disponibles",
         "totalAvailableCreditsDescription": "Total des crédits actuellement disponibles pour tous les utilisateurs"
       },
-      "transactionsChart": {
-        "title": "Transactions au Fil du Temps",
-        "description": "Suivez les tendances des transactions sur différentes périodes",
-        "daily": "Quotidien",
-        "weekly": "Hebdomadaire",
-        "monthly": "Mensuel",
-        "transactions": "Transactions",
-        "revenue": "Revenus"
-      },
-      "creditsConsumedChart": {
-        "title": "Crédits Consommés au Fil du Temps",
-        "description": "Suivez l'utilisation des crédits sur différentes périodes",
-        "daily": "Quotidien",
-        "weekly": "Hebdomadaire",
-        "monthly": "Mensuel",
-        "credits": "Crédits"
-      },
       "revenueChart": {
         "title": "Revenus au Fil du Temps",
         "description": "Suivez les tendances des revenus sur différentes périodes",
