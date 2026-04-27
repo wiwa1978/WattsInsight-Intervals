@@ -527,6 +527,12 @@ describe("API functional routes", () => {
 
     const sendAllOperation = rootSpec.paths?.["/admin/notifications/send-all"]?.post;
     const sendUsersOperation = rootSpec.paths?.["/admin/notifications/send-users"]?.post;
+    const adminUsersOperation = rootSpec.paths?.["/admin/users"]?.get;
+    expect(adminUsersOperation?.parameters?.map((parameter: { name?: string }) => parameter.name)).toEqual([
+      "limit",
+      "offset",
+      "search",
+    ]);
     expect(sendAllOperation?.requestBody?.content?.["application/json"]?.schema?.properties).toEqual(
       expect.objectContaining({ title: expect.anything(), message: expect.anything() }),
     );
@@ -744,7 +750,7 @@ describe("API functional routes", () => {
   // Verifies user listing and stats endpoints both return service payloads.
   it("returns admin users list and stats", async () => {
     mocks.adminService.getUsers.mockResolvedValueOnce([{ id: "u1" }]);
-    mocks.adminService.getUserStats.mockResolvedValueOnce({ totalAdmins: 2, totalBanned: 1 });
+    mocks.adminService.getUserStats.mockResolvedValueOnce({ totalUsers: 10, totalAdmins: 2, totalBanned: 1 });
 
     const usersRes = await app.request("/admin/users");
     const statsRes = await app.request("/admin/users/stats");
@@ -752,7 +758,7 @@ describe("API functional routes", () => {
     expect(usersRes.status).toBe(200);
     expect(statsRes.status).toBe(200);
     await expect(usersRes.json()).resolves.toEqual({ success: true, data: [{ id: "u1" }] });
-    await expect(statsRes.json()).resolves.toEqual({ success: true, data: { totalAdmins: 2, totalBanned: 1 } });
+    await expect(statsRes.json()).resolves.toEqual({ success: true, data: { totalUsers: 10, totalAdmins: 2, totalBanned: 1 } });
   });
 
   // Verifies admin user listing forwards submitted server-side search.

@@ -203,6 +203,7 @@ const paginationParameters = [
   queryParameter("limit", paginationQuerySchema.shape.limit),
   queryParameter("offset", paginationQuerySchema.shape.offset),
 ];
+const adminUsersParameters = [...paginationParameters, queryParameter("search", z.string().optional())];
 const optionalLimitParameters = [queryParameter("limit", optionalLimitQuerySchema.shape.limit)];
 const billingRangeParameters = [queryParameter("timeRange", billingRangeQuerySchema.shape.timeRange)];
 const billingListParameters = [
@@ -349,7 +350,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   }),
   route("get", "/admin/users", ["Admin Users"], "List users", {
     security: cookieOrBearerAuth,
-    parameters: paginationParameters,
+    parameters: adminUsersParameters,
     responses: defaultResponses("Users", ["400", "401", "403"]),
   }),
   route("post", "/admin/users/set-role", ["Admin Users"], "Set user role", {
