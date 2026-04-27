@@ -10,11 +10,10 @@ const SENSITIVE_STRING_KEY_PATTERN = String.raw`[A-Za-z0-9_-]*(?:password|passco
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
 const QUOTED_KEY_VALUE_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)(["'])(.*?)\2`, "gi");
 const KEY_VALUE_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*=\s*)([^\s&#]+)`, "gi");
-const QUOTED_COLON_SECRET_PATTERN = new RegExp(
-  String.raw`((["'])${SENSITIVE_STRING_KEY_PATTERN}\2\s*:\s*)(?:(["'])(.*?)\3|([^\s,}\]]+))`,
+const COLON_SECRET_PATTERN = new RegExp(
+  String.raw`((?:(["'])${SENSITIVE_STRING_KEY_PATTERN}\2|\b${SENSITIVE_STRING_KEY_PATTERN})\s*:\s*)(?:(["'])(.*?)\3|([^\s,}\]]+))`,
   "gi",
 );
-const UNQUOTED_COLON_SECRET_PATTERN = new RegExp(String.raw`(\b${SENSITIVE_STRING_KEY_PATTERN}\s*:\s*)([^\s,}\]]+)`, "gi");
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
 const JWT_PATTERN = /\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
@@ -28,10 +27,9 @@ export function redactString(value: string) {
     .replace(JWT_PATTERN, REDACTED)
     .replace(QUOTED_KEY_VALUE_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
     .replace(KEY_VALUE_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
-    .replace(QUOTED_COLON_SECRET_PATTERN, (_match, prefix: string, _keyQuote: string, valueQuote?: string) =>
+    .replace(COLON_SECRET_PATTERN, (_match, prefix: string, _keyQuote: string, valueQuote?: string) =>
       valueQuote ? `${prefix}${valueQuote}${REDACTED}${valueQuote}` : `${prefix}${REDACTED}`,
     )
-    .replace(UNQUOTED_COLON_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
     .replace(URL_SECRET_PARAM_PATTERN, `$1${REDACTED}`);
 }
 

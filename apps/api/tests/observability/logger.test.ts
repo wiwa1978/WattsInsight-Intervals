@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { redactString } from "../../src/observability/redaction";
 
 const tmpDirs: string[] = [];
 
@@ -30,6 +31,19 @@ describe("logger.readLogEntries", () => {
     expect(result.entries).toHaveLength(5);
     expect(result.entries[0]?.message).toBe("line-999");
     expect(readFileSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("redactString", () => {
+  it("redacts quoted multi-word colon-style secret values", () => {
+    expect(redactString('password: "correct horse battery staple"')).toBe('password: "[redacted]"');
+    expect(redactString("client_secret: 'single word secret'")).toBe("client_secret: '[redacted]'");
+  });
+
+  it("keeps redacting existing colon-style secret variants", () => {
+    expect(redactString('"token": abc123')).toBe('"token": [redacted]');
+    expect(redactString('"client_secret" : bare-secret')).toBe('"client_secret" : [redacted]');
+    expect(redactString("'client_secret': 'single-secret'")).toBe("'client_secret': '[redacted]'");
   });
 });
 
@@ -72,7 +86,10 @@ describe("logger metadata serialization", () => {
     logger.warn(
       {
         safe: '{"password":"json-secret","accessToken": "access-secret", "client_secret" : bare-secret}',
-        nested: { detail: "refreshToken: refresh-secret token: plain-secret 'client_secret': 'single-secret'" },
+        nested: {
+          detail:
+            "password: \"correct horse battery staple\" refreshToken: refresh-secret token: plain-secret client_secret: 'single word secret' 'client_secret': 'single-secret'",
+        },
       },
       'client sent {"token": abc123,"password": "secret"}',
     );
@@ -85,6 +102,8 @@ describe("logger metadata serialization", () => {
     expect(output).toContain("'client_secret': '[redacted]'");
     expect(output).toContain("refreshToken: [redacted]");
     expect(output).toContain("token: [redacted]");
+    expect(output).toContain('password: \\\"[redacted]\\\"');
+    expect(output).toContain("client_secret: '[redacted]'");
     expect(output).not.toContain("abc123");
     expect(output).not.toContain('"secret"');
     expect(output).not.toContain("json-secret");
@@ -92,6 +111,10 @@ describe("logger metadata serialization", () => {
     expect(output).not.toContain("bare-secret");
     expect(output).not.toContain("refresh-secret");
     expect(output).not.toContain("plain-secret");
+    expect(output).not.toContain("correct horse battery staple");
+    expect(output).not.toContain("horse battery staple");
+    expect(output).not.toContain("single word secret");
+    expect(output).not.toContain("word secret");
     expect(output).not.toContain("single-secret");
   });
 
