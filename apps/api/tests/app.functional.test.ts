@@ -1341,6 +1341,37 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies JSON-like and colon-style secrets in client strings are redacted.
+  it("redacts colon-style secrets in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: 'client payload {"token":"json-secret","password": "password-secret"}',
+        userAgent: "agent refreshToken: refresh-secret",
+        context: {
+          detail: "token: plain-secret accessToken: access-secret",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"token\\":\\"[redacted]\\"');
+    expect(output).toContain('\\"password\\": \\"[redacted]\\"');
+    expect(output).toContain("refreshToken: [redacted]");
+    expect(output).toContain("accessToken: [redacted]");
+    expect(output).not.toContain("json-secret");
+    expect(output).not.toContain("password-secret");
+    expect(output).not.toContain("refresh-secret");
+    expect(output).not.toContain("plain-secret");
+    expect(output).not.toContain("access-secret");
+    infoSpy.mockRestore();
+  });
+
   // Verifies Sentry receives only sanitized bounded client log context.
   it("sends only sanitized bounded client log context to Sentry", async () => {
     mocks.Sentry.captureMessage.mockClear();

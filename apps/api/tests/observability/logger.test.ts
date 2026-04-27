@@ -61,6 +61,36 @@ describe("logger metadata serialization", () => {
     expect(output).not.toContain("jkl012");
   });
 
+  it("redacts JSON-like and colon-style secrets in messages and nested metadata strings", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-logs-"));
+    tmpDirs.push(dir);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    vi.doMock("../../src/env", () => ({ env: { NODE_ENV: "test", LOG_FILE_PATH: dir } }));
+    const { logger } = await import("../../src/observability/logger");
+
+    logger.warn(
+      {
+        safe: '{"password":"json-secret","accessToken": "access-secret"}',
+        nested: { detail: "refreshToken: refresh-secret token: plain-secret" },
+      },
+      'client sent {"token":"abc123","password": "secret"}',
+    );
+
+    const output = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain('\\"token\\":\\"[redacted]\\"');
+    expect(output).toContain('\\"password\\": \\"[redacted]\\"');
+    expect(output).toContain('\\"accessToken\\": \\"[redacted]\\"');
+    expect(output).toContain("refreshToken: [redacted]");
+    expect(output).toContain("token: [redacted]");
+    expect(output).not.toContain("abc123");
+    expect(output).not.toContain("secret");
+    expect(output).not.toContain("json-secret");
+    expect(output).not.toContain("access-secret");
+    expect(output).not.toContain("refresh-secret");
+    expect(output).not.toContain("plain-secret");
+  });
+
   it("tolerates circular deep unusual metadata while redacting and bounding output", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "api-logs-"));
     tmpDirs.push(dir);

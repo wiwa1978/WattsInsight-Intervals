@@ -8,6 +8,8 @@ const MAX_SAFE_CONTEXT_STRING_LENGTH = 128;
 const SENSITIVE_KEY_PATTERN = /(?:password|passcode|secret|token|authorization|cookie|api[-_]?key|session|credential|signature)/i;
 const URL_SECRET_PARAM_PATTERN = /([?&][^=]*(?:token|secret|code|key|signature|session)[^=]*=)[^&#]*/gi;
 const KEY_VALUE_SECRET_PATTERN = /\b(?:password|passcode|secret|[A-Za-z0-9_-]*token|authorization|cookie|api[-_]?key|session|credential|signature)=([^\s&#]+)/gi;
+const QUOTED_COLON_SECRET_PATTERN = /("(?:password|passcode|secret|[A-Za-z0-9_-]*token|authorization|cookie|api[-_]?key|session|credential|signature)"\s*:\s*)(["'])(.*?)\2/gi;
+const UNQUOTED_COLON_SECRET_PATTERN = /(\b(?:password|passcode|secret|[A-Za-z0-9_-]*token|authorization|cookie|api[-_]?key|session|credential|signature)\s*:\s*)([^\s,}\]]+)/gi;
 const BEARER_PATTERN = /\bBearer\s+[-._~+/A-Za-z0-9]+=*/gi;
 const JWT_PATTERN = /\b[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 
@@ -20,6 +22,8 @@ export function redactString(value: string) {
     .replace(BEARER_PATTERN, "Bearer [redacted]")
     .replace(JWT_PATTERN, REDACTED)
     .replace(KEY_VALUE_SECRET_PATTERN, (match) => `${match.slice(0, Math.max(0, match.indexOf("=") + 1))}${REDACTED}`)
+    .replace(QUOTED_COLON_SECRET_PATTERN, (_match, prefix: string, quote: string) => `${prefix}${quote}${REDACTED}${quote}`)
+    .replace(UNQUOTED_COLON_SECRET_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`)
     .replace(URL_SECRET_PARAM_PATTERN, `$1${REDACTED}`);
 }
 
