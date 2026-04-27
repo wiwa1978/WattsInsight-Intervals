@@ -1372,6 +1372,34 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
+  // Verifies free-form client strings redact sensitive key/value assignments with spaced equals signs.
+  it("redacts whitespace-tolerant secret assignments in client log strings", async () => {
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const res = await app.request("/logs/client", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        level: "info",
+        message: "client_secret = abc123",
+        userAgent: "agent password = secret",
+        context: {
+          detail: "clientSecret = def456",
+        },
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).toContain("client_secret = [redacted]");
+    expect(output).toContain("password = [redacted]");
+    expect(output).toContain("clientSecret = [redacted]");
+    expect(output).not.toContain("abc123");
+    expect(output).not.toContain("password = secret");
+    expect(output).not.toContain("def456");
+    infoSpy.mockRestore();
+  });
+
   // Verifies Sentry receives only sanitized bounded client log context.
   it("sends only sanitized bounded client log context to Sentry", async () => {
     mocks.Sentry.captureMessage.mockClear();
