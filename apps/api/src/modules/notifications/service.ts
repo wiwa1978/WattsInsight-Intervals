@@ -172,6 +172,7 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       skippedCount: 0,
       invalidRecipientCount: 0,
       invalidRecipientIds: [],
+      batchId,
     };
   }
 
@@ -212,6 +213,7 @@ export function createNotificationsService(deps: NotificationsServiceDeps) {
       skippedCount: invalidRecipientIds.length,
       invalidRecipientCount: invalidRecipientIds.length,
       invalidRecipientIds,
+      batchId,
     };
   }
 

@@ -48,6 +48,7 @@ describe("createNotificationsService", () => {
       skippedCount: 0,
       invalidRecipientCount: 0,
       invalidRecipientIds: [],
+      batchId: expect.stringMatching(uuidPattern),
     });
   });
 
@@ -78,6 +79,7 @@ describe("createNotificationsService", () => {
       skippedCount: 0,
       invalidRecipientCount: 0,
       invalidRecipientIds: [],
+      batchId: expect.stringMatching(uuidPattern),
     });
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(insert).toHaveBeenCalledTimes(3);
@@ -94,6 +96,7 @@ describe("createNotificationsService", () => {
 
     expect(batchIds.size).toBe(1);
     expect([...batchIds][0]).toMatch(uuidPattern);
+    expect(result.batchId).toBe([...batchIds][0]);
     expect(insertedRows).toHaveLength(1001);
     expect(insertedRows).toEqual(
       expect.arrayContaining([
@@ -120,6 +123,7 @@ describe("createNotificationsService", () => {
       skippedCount: 0,
       invalidRecipientCount: 0,
       invalidRecipientIds: [],
+      batchId: expect.stringMatching(uuidPattern),
     });
     expect(insert).not.toHaveBeenCalled();
   });
@@ -144,6 +148,7 @@ describe("createNotificationsService", () => {
       skippedCount: 1,
       invalidRecipientCount: 1,
       invalidRecipientIds: ["missing"],
+      batchId: expect.stringMatching(uuidPattern),
     });
     expect(values).toHaveBeenCalledWith([
       expect.objectContaining({ userId: "u1" }),
@@ -172,6 +177,7 @@ describe("createNotificationsService", () => {
       skippedCount: 1,
       invalidRecipientCount: 1,
       invalidRecipientIds: ["missing"],
+      batchId: expect.stringMatching(uuidPattern),
     });
 
     const [[insertedRows]] = values.mock.calls;
@@ -179,6 +185,7 @@ describe("createNotificationsService", () => {
 
     expect(batchIds.size).toBe(1);
     expect([...batchIds][0]).toMatch(uuidPattern);
+    expect(result.batchId).toBe([...batchIds][0]);
     expect(insertedRows).toEqual([
       expect.objectContaining({
         userId: "u1",

@@ -81,6 +81,7 @@ export const apiRoutes = {
     logEntries: (payload: { stream?: "app" | "audit"; file?: string; limit?: number }) =>
       withQuery("/admin/logs/entries", payload),
     notifications: (limit = 50) => withQuery("/admin/notifications", { limit }),
+    notificationSends: (limit = 50) => withQuery("/admin/notifications/sends", { limit }),
     sendNotificationToAllUsers: "/admin/notifications/send-all",
     sendNotificationToUsers: "/admin/notifications/send-users",
   },

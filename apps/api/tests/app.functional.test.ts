@@ -537,6 +537,7 @@ describe("API functional routes", () => {
         invalidRecipientIds: expect.anything(),
       }),
     );
+    expect(sendAllOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).not.toHaveProperty("batchId");
     expect(sendUsersOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).toEqual(
       expect.objectContaining({
         sentCount: expect.anything(),
@@ -545,6 +546,7 @@ describe("API functional routes", () => {
         invalidRecipientIds: expect.anything(),
       }),
     );
+    expect(sendUsersOperation?.responses?.["200"]?.content?.["application/json"]?.schema?.properties?.data?.properties).not.toHaveProperty("batchId");
 
     const documentedAppRoutes = APP_OWNED_API_ROUTES.map((route) => `${route.method.toUpperCase()} ${route.path}`);
     expect(new Set(documentedAppRoutes).size).toBe(documentedAppRoutes.length);

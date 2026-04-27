@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 
 import type { AdminCreateDiscountInput, AdminUpdateDiscountInput, DiscountStatus } from "@/types/discounts";
 import type { NotificationSendHistoryItem, VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
+import { apiRoutes } from "@platform/contracts/ts";
 
 type NotificationSendResult = {
   sentCount: number;
@@ -293,7 +294,7 @@ export async function getAllNotificationsApi(limit = 50) {
 }
 
 export async function getNotificationSendHistoryApi(limit = 50) {
-  const result = await apiRequest<{ success: boolean; data: NotificationSendHistoryItem[] }>(`/admin/notifications/sends?limit=${limit}`);
+  const result = await apiRequest<{ success: boolean; data: NotificationSendHistoryItem[] }>(apiRoutes.admin.notificationSends(limit));
   return result.data;
 }
 
