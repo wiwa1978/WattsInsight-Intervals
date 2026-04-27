@@ -62,6 +62,10 @@ const mocks = vi.hoisted(() => {
     searchUsers: vi.fn(),
     redeemVoucher: vi.fn(),
   };
+  const auditService = {
+    recordAuditEntry: vi.fn(),
+    listAuditEntries: vi.fn(),
+  };
   const adminAuthApi = {
     setRole: vi.fn(),
     banUser: vi.fn(),
@@ -108,6 +112,7 @@ const mocks = vi.hoisted(() => {
     notificationsService,
     discountsService,
     vouchersService,
+    auditService,
     adminAuthApi,
     db,
     env: {
@@ -150,6 +155,16 @@ vi.mock("../src/modules/discounts/service", () => ({
 
 vi.mock("../src/modules/vouchers/service", () => ({
   createVouchersService: () => mocks.vouchersService,
+}));
+
+vi.mock("../src/modules/audit/service", () => ({
+  createAuditService: () => mocks.auditService,
+  getAuditRequestContext: () => ({
+    actorId: "auth-user",
+    requestId: "req-test",
+    ip: "127.0.0.1",
+    userAgent: "vitest",
+  }),
 }));
 
 vi.mock("@platform/auth-core", () => ({
@@ -241,8 +256,14 @@ vi.mock("../src/observability/sentry", () => ({
   },
 }));
 
-const [{ app }, { clearRequestGuardrailStateForTests }, { API_VERSION_POLICY, APP_OWNED_API_ROUTES }] = await Promise.all([
+const [
+  { app },
+  { bootstrap },
+  { clearRequestGuardrailStateForTests },
+  { API_VERSION_POLICY, APP_OWNED_API_ROUTES },
+] = await Promise.all([
   import("../src/app"),
+  import("../src/bootstrap"),
   import("../src/middleware/request-guardrails"),
   import("../src/openapi"),
 ]);
@@ -314,7 +335,13 @@ function getSourceDefinedAppRoutes() {
 describe("API functional routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
+    mocks.auditService.listAuditEntries.mockResolvedValue([]);
     clearRequestGuardrailStateForTests();
+  });
+
+  it("exports the audit service from bootstrap", () => {
+    expect(bootstrap.auditService).toBe(mocks.auditService);
   });
 
   // Verifies the health endpoint always reports service readiness.

@@ -15,6 +15,7 @@ import { authConfig } from "./config/auth";
 import { creditPackages } from "./config/billing";
 import { env } from "./env";
 import { createAdminService } from "./modules/admin/service";
+import { createAuditService } from "./modules/audit/service";
 import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
@@ -32,6 +33,7 @@ const adminAllowlist = new Set(
 const { db } = createPlatformDb({
   connectionString: env.DATABASE_URL,
 });
+const auditService = createAuditService({ db });
 
 const emailProvider = env.RESEND_API_KEY
   ? createResendProvider({
@@ -343,6 +345,7 @@ export const bootstrap = {
   db,
   authModule,
   adminService,
+  auditService,
   billingService,
   discountsService,
   notificationsService,
