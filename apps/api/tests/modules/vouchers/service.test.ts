@@ -274,4 +274,86 @@ describe("createVouchersService", () => {
     expect(update).not.toHaveBeenCalled();
     expect(createNotification).not.toHaveBeenCalled();
   });
+
+  // Verifies concurrent duplicate attempts rely on the redemption reservation before credit mutation.
+  it("allows only one concurrent duplicate redemption to mutate credits", async () => {
+    const voucher = {
+      id: "22222222-2222-4222-8222-222222222222",
+      code: "WELCOME",
+      creditAmount: 10,
+      status: "active",
+      currentRedemptions: 0,
+      maxRedemptions: 2,
+      appliesToAllUsers: true,
+      expiresAt: null,
+      redeemedAt: null,
+    };
+
+    const createTx = (reservationRows: Array<{ id: string }>) => {
+      const findCredits = vi.fn().mockResolvedValue({
+        userId: "33333333-3333-4333-8333-333333333333",
+        balance: "5",
+        totalPurchased: "0",
+        totalSpent: "0",
+      });
+      const insert = vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn(() => {
+          if (table === voucherRedemptions) {
+            return {
+              onConflictDoNothing: vi.fn(() => ({
+                returning: vi.fn().mockResolvedValue(reservationRows),
+              })),
+            };
+          }
+
+          return Promise.resolve(undefined);
+        }),
+      }));
+      const update = vi.fn().mockImplementation(() => ({
+        set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+      }));
+
+      return {
+        tx: {
+          execute: vi.fn().mockResolvedValue([voucher]),
+          query: { userCredits: { findFirst: findCredits } },
+          insert,
+          update,
+        },
+        findCredits,
+        insert,
+        update,
+      };
+    };
+
+    const winner = createTx([{ id: "redemption-1" }]);
+    const duplicate = createTx([]);
+    const createNotification = vi.fn().mockResolvedValue(undefined);
+    const db = {
+      transaction: vi.fn()
+        .mockImplementationOnce((cb: (trx: unknown) => unknown) => cb(winner.tx))
+        .mockImplementationOnce((cb: (trx: unknown) => unknown) => cb(duplicate.tx)),
+    };
+
+    const service = createVouchersService({
+      db,
+      notifications: { createNotification },
+    });
+
+    const [firstResult, secondResult] = await Promise.all([
+      service.redeemVoucher("33333333-3333-4333-8333-333333333333", "welcome"),
+      service.redeemVoucher("33333333-3333-4333-8333-333333333333", "welcome"),
+    ]);
+
+    expect(firstResult).toEqual({ success: true, creditsAdded: 10, newBalance: 15 });
+    expect(secondResult).toEqual({ success: false, error: "Voucher has already been redeemed by this user" });
+    expect(winner.insert).toHaveBeenCalledWith(creditTransactions);
+    expect(winner.update).toHaveBeenCalledWith(userCredits);
+    expect(winner.update).toHaveBeenCalledWith(vouchers);
+    expect(duplicate.insert).toHaveBeenCalledWith(voucherRedemptions);
+    expect(duplicate.insert).not.toHaveBeenCalledWith(creditTransactions);
+    expect(duplicate.findCredits).not.toHaveBeenCalled();
+    expect(duplicate.update).not.toHaveBeenCalled();
+    expect(createNotification).toHaveBeenCalledOnce();
+  });
 });

@@ -73,9 +73,6 @@ export const apiRoutes = {
     discount: (discountId: string) => `/admin/discounts/${discountId}`,
     generateDiscountCode: "/admin/discounts/generate-code",
     validateDiscountCode: "/admin/discounts/validate-code",
-    assignDiscountUsers: (discountId: string) => `/admin/discounts/${discountId}/assign`,
-    removeDiscountUsers: (discountId: string) => `/admin/discounts/${discountId}/remove`,
-    searchDiscountUsers: (query: string, limit = 20) => withQuery("/admin/discounts/search-users", { query, limit }),
     vouchers: (limit = 20, offset = 0, search?: string, status?: VoucherStatus) =>
       withQuery("/admin/vouchers", { limit, offset, search, status }),
     voucher: (voucherId: string) => `/admin/vouchers/${voucherId}`,

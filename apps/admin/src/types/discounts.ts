@@ -1,12 +1,9 @@
 import type { CreateDiscountInput, UpdateDiscountInput } from "@platform/contracts";
 
-export type AdminCreateDiscountInput = CreateDiscountInput & {
-  userIds: string[];
-};
+export type AdminCreateDiscountInput = CreateDiscountInput;
 
 export type AdminUpdateDiscountInput = Omit<UpdateDiscountInput, "id"> & {
   id: string;
-  userIds: string[];
 };
 
 // Discount type definitions
@@ -58,20 +55,9 @@ export interface DiscountFormData {
   startDate: Date;
   endDate: Date;
   maxUses?: number | null;
-  userIds: string[];
 }
 
 export type { CreateDiscountInput, UpdateDiscountInput };
-
-export interface AssignDiscountInput {
-  discountId: string;
-  userIds: string[];
-}
-
-export interface RemoveDiscountInput {
-  discountId: string;
-  userIds: string[];
-}
 
 // API response types
 export interface DiscountListResponse {
@@ -96,8 +82,6 @@ export type DiscountActionResult =
       success: true;
       discount?: Discount;
       message?: string;
-      assignedCount?: number;
-      removedCount?: number;
     }
   | {
       success: false;

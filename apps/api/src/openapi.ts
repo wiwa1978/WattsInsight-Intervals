@@ -10,7 +10,6 @@ import {
   createCheckoutRequestSchema,
   discountIdParamSchema,
   discountListQuerySchema,
-  discountUserAssignmentSchema,
   errorResultSchema,
   generateDiscountCodeSchema,
   healthResponseSchema,
@@ -392,15 +391,12 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/billing/credits-consumed-chart", ["Admin Billing"], "Get credits consumed chart", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Credits consumed chart", ["400", "401", "403"]) }),
 
   route("get", "/admin/discounts", ["Admin Discounts"], "List discounts", { security: cookieOrBearerAuth, parameters: [...paginationParameters, queryParameter("search", discountListQuerySchema.shape.search), queryParameter("status", discountListQuerySchema.shape.status)], responses: defaultResponses("Discounts", ["400", "401", "403"]) }),
-  route("get", "/admin/discounts/search-users", ["Admin Discounts"], "Search users for discount assignment", { security: cookieOrBearerAuth, parameters: searchUsersParameters, responses: defaultResponses("Users", ["400", "401", "403"]) }),
   route("get", "/admin/discounts/{discountId}", ["Admin Discounts"], "Get discount detail", { security: cookieOrBearerAuth, parameters: [pathParameter("discountId", discountIdParamSchema.shape.discountId)], responses: defaultResponses("Discount detail", ["400", "401", "403", "404"]) }),
   route("post", "/admin/discounts/generate-code", ["Admin Discounts"], "Generate discount code", { security: cookieOrBearerAuth, requestBody: requestBody(generateDiscountCodeSchema), responses: defaultResponses("Discount code", ["400", "401", "403"]) }),
   route("post", "/admin/discounts/validate-code", ["Admin Discounts"], "Validate discount code", { security: cookieOrBearerAuth, requestBody: requestBody(validateDiscountCodeSchema), responses: defaultResponses("Discount code validation", ["400", "401", "403"]) }),
   route("post", "/admin/discounts", ["Admin Discounts"], "Create discount", { security: cookieOrBearerAuth, requestBody: requestBody(genericObjectSchema), responses: defaultResponses("Discount created", ["400", "401", "403"]) }),
   route("patch", "/admin/discounts/{discountId}", ["Admin Discounts"], "Update discount", { security: cookieOrBearerAuth, parameters: [pathParameter("discountId", discountIdParamSchema.shape.discountId)], requestBody: requestBody(genericObjectSchema), responses: defaultResponses("Discount updated", ["400", "401", "403", "404"]) }),
   route("delete", "/admin/discounts/{discountId}", ["Admin Discounts"], "Delete discount", { security: cookieOrBearerAuth, parameters: [pathParameter("discountId", discountIdParamSchema.shape.discountId)], responses: defaultResponses("Discount deleted", ["400", "401", "403", "404"]) }),
-  route("post", "/admin/discounts/{discountId}/assign", ["Admin Discounts"], "Assign discount to users", { security: cookieOrBearerAuth, parameters: [pathParameter("discountId", discountIdParamSchema.shape.discountId)], requestBody: requestBody(discountUserAssignmentSchema), responses: defaultResponses("Discount assigned", ["400", "401", "403", "404"]) }),
-  route("post", "/admin/discounts/{discountId}/remove", ["Admin Discounts"], "Remove discount from users", { security: cookieOrBearerAuth, parameters: [pathParameter("discountId", discountIdParamSchema.shape.discountId)], requestBody: requestBody(discountUserAssignmentSchema), responses: defaultResponses("Discount removed", ["400", "401", "403", "404"]) }),
 
   route("get", "/admin/vouchers", ["Admin Vouchers"], "List vouchers", { security: cookieOrBearerAuth, parameters: [...paginationParameters, queryParameter("search", voucherListQuerySchema.shape.search), queryParameter("status", voucherListQuerySchema.shape.status)], responses: defaultResponses("Vouchers", ["400", "401", "403"]) }),
   route("get", "/admin/vouchers/search-users", ["Admin Vouchers"], "Search users for voucher assignment", { security: cookieOrBearerAuth, parameters: searchUsersParameters, responses: defaultResponses("Users", ["400", "401", "403"]) }),

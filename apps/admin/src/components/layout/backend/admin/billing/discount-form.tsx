@@ -27,25 +27,20 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   generateDiscountCodeAction,
-  searchUsersForDiscount,
   validateDiscountCodeAction,
 } from "@/lib/services/discounts";
-import { UserMultiSelect, type UserOption } from "./user-multi-select";
 import { createDiscountSchema } from "@/schemas/discounts";
 import type { DiscountFormData } from "@/types/discounts";
 
 const discountFormSchema = createDiscountSchema.extend({
   startDate: z.date(),
   endDate: z.date(),
-  userIds: z.array(z.string().uuid()).min(1, "At least one user must be selected"),
 });
 
 type DiscountFormValues = z.infer<typeof discountFormSchema>;
 
 interface DiscountFormProps {
-  initialData?: Partial<DiscountFormData> & {
-    selectedUsers?: UserOption[];
-  };
+  initialData?: Partial<DiscountFormData>;
   onSubmit: (data: DiscountFormData) => Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -76,18 +71,8 @@ export function DiscountForm({
       startDate: initialData?.startDate || new Date(),
       endDate: initialData?.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       maxUses: initialData?.maxUses || null,
-      userIds: initialData?.userIds || [],
     },
   });
-
-  const selectedUserIds = form.watch("userIds");
-
-  // Auto-set max uses to number of selected users
-  React.useEffect(() => {
-    if (selectedUserIds.length > 0) {
-      form.setValue("maxUses", selectedUserIds.length);
-    }
-  }, [selectedUserIds.length]);
 
   // Auto-generate code on mount for create mode
   React.useEffect(() => {
@@ -378,31 +363,6 @@ export function DiscountForm({
             )}
           />
         </div>
-
-        {/* User Assignment */}
-        <FormField
-          control={form.control}
-          name="userIds"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Assign to Users (Required)</FormLabel>
-              <FormControl>
-                <UserMultiSelect
-                  selectedUserIds={field.value}
-                  onSelectionChange={field.onChange}
-                  searchUsers={searchUsersForDiscount}
-                  initialUsers={initialData?.selectedUsers}
-                  disabled={isSubmitting}
-                  placeholder="Search and select users..."
-                />
-              </FormControl>
-              <FormDescription className="text-sm">
-                Select at least one user to assign this discount to.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         {/* Maximum Uses */}
         <FormField

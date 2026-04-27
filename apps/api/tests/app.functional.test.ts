@@ -805,13 +805,11 @@ describe("API functional routes", () => {
     await expectValidationError(res, "Invalid discount validation payload");
   });
 
-  // Verifies discount CRUD and assignment routes are all wired and callable.
-  it("routes discount CRUD and assignment operations", async () => {
+  // Verifies provider-wide discount CRUD routes are wired while selected-user assignment routes are not exposed.
+  it("routes discount CRUD without assignment operations", async () => {
     mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: true, data: { id: "d1" } });
     mocks.discountsService.updateDiscount.mockResolvedValueOnce({ success: true, data: { id: "d1" } });
     mocks.discountsService.deleteDiscount.mockResolvedValueOnce({ success: true });
-    mocks.discountsService.assignDiscountToUsers.mockResolvedValueOnce({ success: true });
-    mocks.discountsService.removeDiscountFromUsers.mockResolvedValueOnce({ success: true });
 
     const createRes = await app.request("/admin/discounts", {
       method: "POST",
@@ -834,7 +832,7 @@ describe("API functional routes", () => {
     const patchRes = await app.request(`/admin/discounts/${discountId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: 20, userIds }),
+      body: JSON.stringify({ value: 20 }),
     });
 
     const assignRes = await app.request(`/admin/discounts/${discountId}/assign`, {
@@ -853,16 +851,17 @@ describe("API functional routes", () => {
 
     expect(createRes.status).toBe(200);
     expect(patchRes.status).toBe(200);
-    expect(assignRes.status).toBe(200);
-    expect(removeRes.status).toBe(200);
+    expect(assignRes.status).toBe(404);
+    expect(removeRes.status).toBe(404);
     expect(deleteRes.status).toBe(200);
     expect(mocks.discountsService.updateDiscount).toHaveBeenCalledWith(
       expect.objectContaining({
         id: discountId,
         value: 20,
-        userIds,
       }),
     );
+    expect(mocks.discountsService.assignDiscountToUsers).not.toHaveBeenCalled();
+    expect(mocks.discountsService.removeDiscountFromUsers).not.toHaveBeenCalled();
   });
 
   // Verifies voucher list and search endpoints pass validated filters to the service.
@@ -1235,30 +1234,6 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toEqual({ success: false, discount: null, error: "Discount not found" });
-  });
-
-  // Verifies discount assignment validates identifiers before payload fallback logic.
-  it("validates assignment payload", async () => {
-    const res = await app.request("/admin/discounts/d1/assign", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-    await expectValidationError(res, "Invalid discount id");
-  });
-
-  // Verifies discount removal validates identifiers before payload fallback logic.
-  it("validates removal payload", async () => {
-    const res = await app.request("/admin/discounts/d1/remove", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-    await expectValidationError(res, "Invalid discount id");
   });
 
   // Verifies discount validation endpoint passes excludeId and code to service.

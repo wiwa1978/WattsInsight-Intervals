@@ -1,12 +1,9 @@
 import {
-  assignDiscountToUsersApi,
   createDiscountApi,
   deleteDiscountApi,
   generateDiscountCodeApi,
   getDiscountByIdApi,
   getDiscountsApi,
-  removeDiscountFromUsersApi,
-  searchUsersForDiscountApi,
   updateDiscountApi,
   validateDiscountCodeApi,
 } from "@/lib/api/admin";
@@ -14,13 +11,11 @@ import {
 import type {
   AdminCreateDiscountInput,
   AdminUpdateDiscountInput,
-  AssignDiscountInput,
   CreateDiscountInput,
   Discount,
   DiscountActionResult,
   DiscountListResponse,
   DiscountResponse,
-  RemoveDiscountInput,
   UpdateDiscountInput,
 } from "@/types/discounts";
 
@@ -117,26 +112,4 @@ export async function deleteDiscount(id: string): Promise<DiscountActionResult> 
   }
 
   return discountSuccess({});
-}
-
-export async function assignDiscountToUsers(input: AssignDiscountInput): Promise<DiscountActionResult> {
-  const result = await assignDiscountToUsersApi(input.discountId, input.userIds);
-  if (!result.success) {
-    return discountFailure(result.error || "Failed to assign discount");
-  }
-
-  return discountSuccess({ assignedCount: result.assignedCount });
-}
-
-export async function removeDiscountFromUsers(input: RemoveDiscountInput): Promise<DiscountActionResult> {
-  const result = await removeDiscountFromUsersApi(input.discountId, input.userIds);
-  if (!result.success) {
-    return discountFailure(result.error || "Failed to remove discount");
-  }
-
-  return discountSuccess({ removedCount: result.removedCount });
-}
-
-export async function searchUsersForDiscount(query: string, limit: number = 20) {
-  return searchUsersForDiscountApi(query, limit);
 }
