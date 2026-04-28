@@ -1,6 +1,8 @@
+import { queryKeys } from "@platform/frontend-shared/query-keys";
+
 export const webQueryKeys = {
-  creditBalance: ["me", "credits", "balance"] as const,
-  notifications: (limit: number) => ["me", "notifications", limit] as const,
-  unreadNotifications: ["me", "notifications", "unread-count"] as const,
+  creditBalance: queryKeys.credits.balance,
+  notifications: queryKeys.notifications.list,
+  unreadNotifications: queryKeys.notifications.unreadCount,
   countries: (locale: string) => ["countries", locale] as const,
 };

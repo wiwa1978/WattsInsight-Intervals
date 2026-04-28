@@ -21,7 +21,7 @@ export const creditTransactionSchema = z.object({
   referenceType: z.string().nullable().optional(),
   referenceId: z.string().nullable().optional(),
   metadata: z.unknown().optional(),
-  createdAt: z.coerce.date(),
+  createdAt: z.string(),
 });
 
 export const creditPurchaseSchema = z.object({
@@ -35,7 +35,7 @@ export const creditPurchaseSchema = z.object({
   currency: z.string().min(1).optional(),
   paymentStatus: z.enum(["pending", "completed", "failed", "refunded"]),
   paymentId: z.string().optional(),
-  createdAt: z.coerce.date(),
+  createdAt: z.string(),
   userId: z.string().optional(),
   userName: z.string().nullable().optional(),
   userEmail: z.string().optional(),

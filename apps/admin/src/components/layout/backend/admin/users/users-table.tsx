@@ -42,7 +42,7 @@ export interface User {
   role: "user" | "admin";
   banned: boolean;
   emailVerified: boolean;
-  createdAt: Date;
+  createdAt: string;
 }
 
 interface UsersTableProps {

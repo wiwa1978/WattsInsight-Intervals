@@ -1,59 +1,28 @@
-import {
-  downloadMyInvoice,
-  getMyCreditBalance,
-  getMyCreditHistory,
-  getMyCreditPurchases,
-  redeemMyVoucher,
-} from "@/lib/api/me";
+import { createCreditsApi } from "@platform/frontend-shared/credits";
 
 import { billingConfig } from "@/config/billing";
+import { apiRequest } from "@/lib/api/client";
+import { redeemMyVoucher } from "@/lib/api/me";
 
-type CreditHistoryItem = {
-  id: string;
-  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
-  amount: string;
-  balanceAfter: string;
-  description: string;
-  referenceType?: string | null;
-  referenceId?: string | null;
-  metadata?: unknown;
-  createdAt: Date;
-};
-
-type CreditPurchaseItem = {
-  id: string;
-  packageKey: string;
-  credits: number;
-  bonusCredits: number;
-  priceInclVat: number;
-  priceExclVat: number;
-  paymentStatus: "pending" | "completed" | "failed" | "refunded";
-  paymentId: string;
-  createdAt: Date;
-};
+const creditsApi = createCreditsApi(apiRequest);
 
 export async function getCreditBalance() {
-  return getMyCreditBalance() as Promise<{
-    balance: number;
-    totalPurchased: number;
-    totalSpent: number;
-    totalPurchasedAmount: number;
-    totalPurchasedAmountExclVat: number;
-    totalVatPaid: number;
-    totalPurchases: number;
-  }>;
+  const result = await creditsApi.getBalance();
+  return result.data;
 }
 
 export async function getCreditHistory(limit: number = 50) {
-  return getMyCreditHistory(limit) as Promise<CreditHistoryItem[]>;
+  const result = await creditsApi.getHistory(limit);
+  return result.data;
 }
 
 export async function getCreditPurchases(limit: number = 50) {
-  return getMyCreditPurchases(limit) as Promise<CreditPurchaseItem[]>;
+  const result = await creditsApi.getPurchases(limit);
+  return result.data;
 }
 
 export async function downloadInvoice(paymentId: string) {
-  return downloadMyInvoice(paymentId);
+  return creditsApi.downloadInvoice(paymentId);
 }
 
 export async function redeemVoucher(code: string) {

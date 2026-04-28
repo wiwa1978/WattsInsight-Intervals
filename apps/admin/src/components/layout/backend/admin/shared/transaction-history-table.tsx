@@ -30,7 +30,7 @@ export type Transaction = {
   referenceType?: string | null;
   referenceId?: string | null;
   metadata?: unknown;
-  createdAt: Date;
+  createdAt: string;
   userId?: string;
   userName?: string | null;
   userEmail?: string;
@@ -42,11 +42,7 @@ export type SearchPageState = {
   offset: number;
 };
 
-type TransactionHistoryResponse = {
-  transactions: Transaction[];
-  total: number;
-  hasMore: boolean;
-};
+type TransactionHistoryResponse = Awaited<ReturnType<typeof getAdminAllTransactions>>;
 
 interface TransactionHistoryTableProps {
   transactions: Transaction[];

@@ -3,7 +3,7 @@
 import { nextCookies } from "better-auth/next-js";
 import { toast } from "sonner";
 
-import { createWebAuthClient } from "@platform/auth-client";
+import { createWebUserAuthClient } from "@platform/auth-client/web-user";
 
 import { env } from "@/env";
 import { clientLogger } from "./client-logger";
@@ -22,7 +22,7 @@ function isHandledAuthError(error: unknown) {
 
 const authBaseURL = `${normalizeBaseUrl(env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_APP_URL)}/auth`;
 
-export const authClient = createWebAuthClient({
+export const authClient = createWebUserAuthClient({
   baseURL: authBaseURL,
   plugins: [nextCookies()],
   onError({ error, context }) {
@@ -63,5 +63,4 @@ export const {
   twoFactor,
   passkey,
   magicLink,
-  admin,
 } = authClient;

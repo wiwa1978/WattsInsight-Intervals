@@ -15,14 +15,14 @@ export interface Discount {
   code: string;
   type: DiscountType;
   value: string; // Stored as decimal string
-  startDate: Date;
-  endDate: Date;
+  startDate: string;
+  endDate: string;
   maxUses: number | null;
   currentUses: number;
   dodoDiscountId: string | null;
   status: DiscountStatus;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DiscountWithUsers extends Discount {
@@ -36,9 +36,9 @@ export interface UserDiscount {
   id: string;
   discountId: string;
   userId: string;
-  usedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  usedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
   discount?: Discount;
   user?: {
     id: string;

@@ -1,22 +1,21 @@
+import { createNotificationsApi } from "@platform/frontend-shared/notifications";
+
 import {
   getNotificationSendHistoryApi,
   searchUsersForNotificationApi,
   sendNotificationToAllUsersApi,
   sendNotificationToUsersApi,
 } from "@/lib/api/admin";
-import {
-  deleteMyNotification,
-  getMyActiveBannerNotification,
-  getMyNotifications,
-  getMyUnreadNotificationsCount,
-  markAllMyNotificationsAsRead,
-  markMyNotificationAsRead,
-} from "@/lib/api/me";
+import { apiRequest } from "@/lib/api/client";
+import type { Notification } from "@/schemas/notification";
 import type { NotificationSendHistoryItem } from "@platform/contracts";
+
+const notificationsApi = createNotificationsApi(apiRequest);
 
 export async function getNotifications(limit = 20) {
   try {
-    const data = await getMyNotifications(limit);
+    const result = await notificationsApi.list(limit);
+    const data = result.data;
     return { success: true, data };
   } catch {
     return { success: false, error: "Failed to fetch notifications" };
@@ -25,7 +24,8 @@ export async function getNotifications(limit = 20) {
 
 export async function getActiveBannerNotifications() {
   try {
-    const data = await getMyActiveBannerNotification();
+    const result = await notificationsApi.getActiveBanner();
+    const data = result.data;
     return { success: true, data };
   } catch {
     return { success: false, data: null };
@@ -34,7 +34,8 @@ export async function getActiveBannerNotifications() {
 
 export async function getUnreadCount() {
   try {
-    const count = await getMyUnreadNotificationsCount();
+    const result = await notificationsApi.getUnreadCount();
+    const count = result.data.count;
     return { success: true, count };
   } catch {
     return { success: false, count: 0 };
@@ -43,7 +44,7 @@ export async function getUnreadCount() {
 
 export async function markAsRead(notificationId: string) {
   try {
-    await markMyNotificationAsRead(notificationId);
+    await notificationsApi.markAsRead(notificationId);
     return { success: true };
   } catch {
     return { success: false, error: "Failed to mark as read" };
@@ -52,7 +53,7 @@ export async function markAsRead(notificationId: string) {
 
 export async function markAllAsRead() {
   try {
-    await markAllMyNotificationsAsRead();
+    await notificationsApi.markAllAsRead();
     return { success: true };
   } catch {
     return { success: false, error: "Failed to mark all as read" };
@@ -102,7 +103,7 @@ export async function createNotification({
 
 export async function deleteNotification(notificationId: string) {
   try {
-    await deleteMyNotification(notificationId);
+    await notificationsApi.delete(notificationId);
     return { success: true };
   } catch {
     return { success: false, error: "Failed to delete notification" };
@@ -186,7 +187,7 @@ export async function getAllNotifications(limit = 50) {
 
 export async function getNotificationSendHistory(limit = 50) {
   try {
-    const data = (await getNotificationSendHistoryApi(limit)) as NotificationSendHistoryItem[];
+    const data = await getNotificationSendHistoryApi(limit);
     return { success: true, data };
   } catch {
     return { success: false, error: "Failed to fetch notification send history" };

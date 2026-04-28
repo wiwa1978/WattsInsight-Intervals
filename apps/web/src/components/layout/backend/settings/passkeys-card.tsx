@@ -37,10 +37,10 @@ import { passkey } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
 import { useRouter } from "@/i18n/navigation";
 
-interface Passkey {
+export interface Passkey {
   id: string;
   name?: string | null | undefined;
-  createdAt?: Date | null;
+  createdAt?: string | null;
 }
 
 export function PasskeysCard() {
@@ -82,7 +82,7 @@ export function PasskeysCard() {
         console.error("Failed to fetch passkeys:", error);
         return;
       }
-      setPasskeys(data || []);
+      setPasskeys((data || []) as unknown as Passkey[]);
     } catch {
       console.error("Error fetching passkeys");
     } finally {
@@ -148,7 +148,7 @@ export function PasskeysCard() {
     }
   };
 
-  const formatDate = (date: Date | null | undefined) => {
+  const formatDate = (date: string | null | undefined) => {
     if (!date) return t("unknownDate");
     return new Date(date).toLocaleDateString(undefined, {
       year: "numeric",

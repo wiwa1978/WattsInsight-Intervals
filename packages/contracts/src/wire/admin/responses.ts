@@ -35,7 +35,7 @@ export const adminUserListItemSchema = z.object({
   role: z.string().nullable(),
   banned: z.boolean().nullable(),
   emailVerified: z.boolean(),
-  createdAt: z.coerce.date(),
+  createdAt: z.string(),
 });
 
 export const adminUsersListSchema = z.object({
@@ -52,9 +52,9 @@ export const adminUserDetailSchema = z.object({
   role: z.string().nullable(),
   banned: z.boolean().nullable(),
   banReason: z.string().nullable(),
-  banExpires: z.coerce.date().nullable(),
-  createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date(),
+  banExpires: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export const adminSearchUserSchema = z.object({
