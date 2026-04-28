@@ -13,9 +13,15 @@
     ".": "./src/index.ts",
     "./api-client": "./src/api-client.ts",
     "./client-logger": "./src/client-logger.ts",
+    "./credits": "./src/credits.ts",
+    "./me-api": "./src/me-api.ts",
+    "./notifications": "./src/notifications.ts",
+    "./query": "./src/query.tsx",
+    "./query-keys": "./src/query-keys.ts",
     "./url": "./src/url.ts"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "*",
     "next": "*",
     "react": "*"
   },
