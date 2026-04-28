@@ -8,7 +8,7 @@ Make operational and user-facing communication reliable across notifications, lo
 
 Notifications already have API/service support for user listing, unread counts, marking read, admin listing, send-to-all, and targeted sends. Gaps remain: `/me/notifications?limit=` is ignored, active banners are not rendered in web/admin layouts, targeted sends do not validate recipients, targeted sends return only a count, and there is no durable recipient history.
 
-Client log ingestion is constrained and rate-limited, and server logs are structured JSONL. Gaps remain: client log `message`, `url`, and `context` need consistent redaction before persistence and Sentry forwarding; arbitrary client context should not be sent to Sentry; file log reads should be bounded by bytes instead of reading whole files into memory.
+Client log ingestion is constrained and rate-limited, and server logs are structured JSONL. Gaps remain: client log `message`, `url`, and `context` need consistent redaction before persistence; file log reads should be bounded by bytes instead of reading whole files into memory.
 
 Audit currently exists only as JSONL logger plumbing and is not called by mutation paths. There is no DB-backed audit store. Phase 6 will add durable DB audit entries as the source of truth.
 
@@ -79,13 +79,13 @@ Send-to-all will be batched in the service to avoid loading and inserting all us
 
 ### Logging
 
-Centralize redaction for logs and Sentry payloads. Redaction must cover:
+Centralize redaction for logs. Redaction must cover:
 
 - Sensitive keys such as password, token, secret, authorization, cookie, apiKey, accessToken, refreshToken.
 - Bearer tokens and token-like patterns in strings.
 - Sensitive URL query parameters in `message`, `url`, and nested `context`.
 
-Client log ingestion should persist and forward only sanitized payloads. For warn/error events sent to Sentry, forward a bounded safe context instead of arbitrary client context.
+Client log ingestion persists sanitized, bounded structured logs locally; no external error-reporting provider is configured.
 
 Admin log tailing should read bounded bytes from the end of the selected log file and then parse up to the requested number of JSONL entries. This prevents large log files from being fully loaded into memory.
 
@@ -124,7 +124,7 @@ Admin notification history should show recent sends with title, message preview,
 
 For audited domain mutations, route handlers capture request context, execute the mutation, then write success/failure audit entries. Before/after summaries are required for role, ban, discount, voucher, and notification mutations. Webhook failure audit entries store safe provider event identifiers and error summaries instead of before/after state.
 
-For client logs, route handlers parse payloads, sanitize message/url/context, write sanitized structured logs, and forward only sanitized bounded data to Sentry.
+For client logs, route handlers parse payloads, sanitize message/url/context, and write sanitized structured logs locally.
 
 ## Error Handling
 
@@ -148,7 +148,7 @@ Add API/service tests for:
 - Audit entries for discount/voucher mutations.
 - Webhook failure audit with no raw payload leakage.
 - Client log redaction for message, URL, and nested context.
-- Sentry forwarding receives sanitized bounded context.
+- Client log ingestion persists sanitized, bounded structured logs locally.
 - Admin log reading tails bounded bytes rather than full files.
 
 Run `bun run --cwd apps/api test` and `bun run typecheck:all` before completion.

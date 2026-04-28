@@ -55,8 +55,6 @@ export const corsMiddleware = cors({
     "Accept",
     "Origin",
     "X-Requested-With",
-    "baggage",
-    "sentry-trace",
     "x-better-auth-client",
     "x-captcha-response",
   ],

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make notifications, logging, and audit reliable by honoring notification limits, adding targeted notification reliability and history, sanitizing client logs/Sentry payloads, bounding log reads, and recording durable DB audit entries for important mutations.
+**Goal:** Make notifications, logging, and audit reliable by honoring notification limits, adding targeted notification reliability and history, sanitizing client logs, bounding log reads, and recording durable DB audit entries for important mutations.
 
 **Architecture:** Add a DB-backed audit subsystem in `apps/api/src/modules/audit` with an `audit_entries` table in `packages/platform-db`. Keep notification title/message as canonical literal text, add batch metadata for send history, and route admin mutations through audit recording. Keep local JSONL logging, but sanitize inputs consistently and tail bounded bytes instead of reading whole files.
 
@@ -35,8 +35,8 @@ Modify these files:
 - `apps/api/src/routes/me.ts`: Honor `/me/notifications?limit=`.
 - `apps/api/src/routes/admin.ts`: Return notification send counts, add notification send history, add user search for notification targeting, record audit entries around admin mutations, discounts, vouchers, and notification sends.
 - `apps/api/src/routes/auth.ts`: Record stop-impersonating audit entries.
-- `apps/api/src/routes/logs.ts`: Ensure client log message, URL, user agent, context, and Sentry extra are sanitized and bounded.
-- `apps/api/src/observability/redaction.ts`: Add bounded context helper if needed for Sentry-safe extras.
+- `apps/api/src/routes/logs.ts`: Ensure client log message, URL, user agent, and context are sanitized and bounded.
+- `apps/api/src/observability/redaction.ts`: Add bounded context helper if needed for local structured logs.
 - `apps/api/src/observability/logger.ts`: Tail bounded bytes from log files before parsing JSONL.
 - `apps/api/src/modules/notifications/service.ts`: Return send result objects, validate recipient existence, batch send-all, attach send batch metadata, expose send history from audit or notification metadata.
 - `apps/api/src/modules/payments/webhook-event-store.ts`: Record webhook failure audit entries for handler failures when audit dependency is available.
@@ -1417,12 +1417,12 @@ describe("logger.readLogEntries", () => {
 });
 ```
 
-- [ ] **Step 2: Write failing Sentry sanitization route test**
+- [ ] **Step 2: Write failing local client log sanitization route test**
 
 Add or update a client log test in `apps/api/tests/app.functional.test.ts`:
 
 ```ts
-it("sends only sanitized bounded client log context to Sentry", async () => {
+it("logs sanitized bounded client log context locally", async () => {
   const payload = {
     source: "web",
     level: "error",
@@ -1443,28 +1443,24 @@ it("sends only sanitized bounded client log context to Sentry", async () => {
   });
 
   expect(res.status).toBe(200);
-  expect(mocks.Sentry.captureMessage).toHaveBeenCalledWith(
-    expect.not.stringContaining("abc.def.ghi"),
-    expect.objectContaining({
-      extra: expect.objectContaining({
-        url: expect.not.stringContaining("token=abc"),
-        context: expect.objectContaining({
-          password: "[redacted]",
-          nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
-        }),
-      }),
-    }),
-  );
+  expect(mocks.logger.error).toHaveBeenCalled();
+  const [logRecord, message] = mocks.logger.error.mock.calls.at(-1) ?? [];
+  expect(message).not.toContain("abc.def.ghi");
+  expect(logRecord.url).not.toContain("token=abc");
+  expect(logRecord.context).toMatchObject({
+    password: "[redacted]",
+    nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
+  });
 });
 ```
 
-If the existing Sentry mock is not exposed as `mocks.Sentry`, extend the hoisted mocks to store `captureMessage` and assert that function.
+Use the existing logger mock and assert the sanitized local structured log payload.
 
 - [ ] **Step 3: Run tests to verify failure**
 
 Run: `bun run --cwd apps/api test apps/api/tests/observability/logger.test.ts apps/api/tests/app.functional.test.ts`
 
-Expected: FAIL because `logger.readLogEntries` uses `fs.readFileSync` and Sentry context may not be bounded by a dedicated safe helper.
+Expected: FAIL because `logger.readLogEntries` uses `fs.readFileSync` and local client log context may not be bounded by a dedicated safe helper.
 
 - [ ] **Step 4: Add bounded context helper**
 
