@@ -102,7 +102,7 @@ export function createApiRequest(options: ApiRequestFactoryOptions) {
 }
 
 export function createBearerApiRequest(options: BearerApiRequestFactoryOptions) {
-  return createApiRequest({
+  const apiRequest = createApiRequest({
     ...options,
     credentials: "omit",
     getHeaders: async () => {
@@ -111,4 +111,8 @@ export function createBearerApiRequest(options: BearerApiRequestFactoryOptions) 
       return token ? { Authorization: `Bearer ${token}` } : undefined;
     },
   });
+
+  return function bearerApiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+    return apiRequest<T>(path, init ? { ...init, credentials: "omit" } : init);
+  };
 }

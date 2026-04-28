@@ -40,4 +40,14 @@ describe("frontend shared API client", () => {
     expect(init.credentials).toBe("omit");
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer token-123");
   });
+
+  it("keeps bearer requests cookie-free when credentials are provided per request", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+    const request = createBearerApiRequest({ baseURL: "https://api.example.test", getToken: () => "token-123" });
+
+    await request("/mobile/me", { credentials: "include" });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.credentials).toBe("omit");
+  });
 });
