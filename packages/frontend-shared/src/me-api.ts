@@ -9,6 +9,9 @@ export type CountryRecord = {
 
 export function createMeApi(apiRequest: ApiRequest) {
   return {
+    async getSession() {
+      return apiRequest("/me/session");
+    },
     async redeemVoucher(code: string) {
       return apiRequest("/me/vouchers/redeem", {
         method: "POST",

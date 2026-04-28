@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createCreditsApi } from "../src/credits";
+import { createMeApi } from "../src/me-api";
 import { createNotificationsApi } from "../src/notifications";
 
 describe("service factories", () => {
@@ -35,6 +36,29 @@ describe("service factories", () => {
     await expect(notifications.delete("notif_123")).resolves.toEqual({
       path: "/me/notifications/notif_123",
       init: { method: "DELETE" },
+    });
+  });
+
+  it("creates me helpers using the injected request function", async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.startsWith("/countries")) {
+        return { success: true, data: [{ code: "NL" }] };
+      }
+
+      return { path, init };
+    });
+    const me = createMeApi(request);
+
+    await expect(me.getSession()).resolves.toEqual({ path: "/me/session", init: undefined });
+    await expect(me.redeemVoucher("WELCOME")).resolves.toEqual({
+      path: "/me/vouchers/redeem",
+      init: { method: "POST", body: JSON.stringify({ code: "WELCOME" }) },
+    });
+    await expect(me.getCountries("nl")).resolves.toEqual([{ code: "NL" }]);
+    expect(request).toHaveBeenCalledWith("/countries?lang=nl");
+    await expect(me.createCheckoutSession("starter")).resolves.toEqual({
+      path: "/payments/checkout",
+      init: { method: "POST", body: JSON.stringify({ packageKey: "starter" }) },
     });
   });
 });
