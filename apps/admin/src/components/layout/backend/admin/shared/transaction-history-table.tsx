@@ -19,7 +19,6 @@ import { Search, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { getAdminAllTransactions } from "@/lib/services/admin";
 import { TransactionDetailsDialog } from "../users/transaction-details-dialog";
-import type { TransactionsList } from "@platform/contracts";
 
 export type Transaction = {
   id: string;
@@ -43,7 +42,7 @@ export type SearchPageState = {
   offset: number;
 };
 
-type TransactionHistoryResponse = TransactionsList;
+type TransactionHistoryResponse = Awaited<ReturnType<typeof getAdminAllTransactions>>;
 
 interface TransactionHistoryTableProps {
   transactions: Transaction[];
