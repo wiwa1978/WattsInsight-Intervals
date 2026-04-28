@@ -7,6 +7,7 @@ import type {
   getUsers,
 } from "../../src/lib/services/admin";
 import type { getCreditHistory, getCreditPurchases } from "../../src/lib/services/credits";
+import type { createDiscount, getDiscountById, getDiscounts, updateDiscount } from "../../src/lib/services/discounts";
 import type { getActiveBannerNotifications, getNotifications } from "../../src/lib/services/notifications";
 import type { createVoucher, getVoucherById, getVouchers, updateVoucher, updateVoucherStatus } from "../../src/lib/services/vouchers";
 import type { NotificationSendHistoryItem } from "@platform/contracts";
@@ -27,6 +28,11 @@ type AdminUserCreditHistoryItem = Awaited<ReturnType<typeof getAdminUserCreditHi
 type AdminUserCreditPurchaseItem = Awaited<ReturnType<typeof getAdminUserCreditPurchases>>[number];
 type AdminAllTransactionItem = Awaited<ReturnType<typeof getAdminAllTransactions>>["transactions"][number];
 type AdminAllPurchaseItem = Awaited<ReturnType<typeof getAdminAllPurchases>>["purchases"][number];
+type DiscountListItem = Awaited<ReturnType<typeof getDiscounts>>["discounts"][number];
+type DiscountDetail = Extract<Awaited<ReturnType<typeof getDiscountById>>, { success: true }>["discount"];
+type DiscountUser = DiscountListItem["userDiscounts"][number];
+type CreatedDiscount = NonNullable<Extract<Awaited<ReturnType<typeof createDiscount>>, { success: true }>["discount"]>;
+type UpdatedDiscount = NonNullable<Extract<Awaited<ReturnType<typeof updateDiscount>>, { success: true }>["discount"]>;
 type VoucherItem = Awaited<ReturnType<typeof getVouchers>>["vouchers"][number];
 type VoucherDetail = NonNullable<Awaited<ReturnType<typeof getVoucherById>>["voucher"]>;
 type VoucherRedemption = NonNullable<VoucherDetail["redemptions"]>[number];
@@ -49,6 +55,16 @@ type AdminUserCreditHistoryCreatedAtIsWireString = Expect<Equal<AdminUserCreditH
 type AdminUserCreditPurchaseCreatedAtIsWireString = Expect<Equal<AdminUserCreditPurchaseItem["createdAt"], string>>;
 type AdminAllTransactionCreatedAtIsWireString = Expect<Equal<AdminAllTransactionItem["createdAt"], string>>;
 type AdminAllPurchaseCreatedAtIsWireString = Expect<Equal<AdminAllPurchaseItem["createdAt"], string>>;
+type DiscountStartDateIsWireString = Expect<Equal<DiscountListItem["startDate"], string>>;
+type DiscountEndDateIsWireString = Expect<Equal<DiscountListItem["endDate"], string>>;
+type DiscountCreatedAtIsWireString = Expect<Equal<DiscountListItem["createdAt"], string>>;
+type DiscountUpdatedAtIsWireString = Expect<Equal<DiscountListItem["updatedAt"], string>>;
+type DiscountDetailStartDateIsWireString = Expect<Equal<DiscountDetail["startDate"], string>>;
+type DiscountUserUsedAtIsWireString = Expect<Equal<DiscountUser["usedAt"], string | null>>;
+type DiscountUserCreatedAtIsWireString = Expect<Equal<DiscountUser["createdAt"], string>>;
+type DiscountUserUpdatedAtIsWireString = Expect<Equal<DiscountUser["updatedAt"], string>>;
+type CreatedDiscountCreatedAtIsWireString = Expect<Equal<CreatedDiscount["createdAt"], string>>;
+type UpdatedDiscountUpdatedAtIsWireString = Expect<Equal<UpdatedDiscount["updatedAt"], string>>;
 type VoucherExpiresAtIsWireString = Expect<Equal<VoucherItem["expiresAt"], string | null>>;
 type VoucherRedeemedAtIsWireString = Expect<Equal<VoucherItem["redeemedAt"], string | null>>;
 type VoucherCreatedAtIsWireString = Expect<Equal<VoucherItem["createdAt"], string>>;
