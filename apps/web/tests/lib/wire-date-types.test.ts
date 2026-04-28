@@ -1,3 +1,5 @@
+import type { Session } from "../../src/components/layout/backend/settings/active-sessions-card";
+import type { Passkey } from "../../src/components/layout/backend/settings/passkeys-card";
 import type { getCreditHistory, getCreditPurchases } from "../../src/lib/services/credits";
 import type { getActiveBannerNotifications, getNotifications } from "../../src/lib/services/notifications";
 
@@ -11,6 +13,10 @@ type CreditPurchaseItem = Awaited<ReturnType<typeof getCreditPurchases>>[number]
 type NotificationItem = Extract<Awaited<ReturnType<typeof getNotifications>>, { data: unknown }>["data"][number];
 type ActiveBannerNotification = NonNullable<Awaited<ReturnType<typeof getActiveBannerNotifications>>["data"]>;
 
+type SessionCreatedAtIsWireString = Expect<Equal<Session["createdAt"], string>>;
+type SessionUpdatedAtIsWireString = Expect<Equal<Session["updatedAt"], string>>;
+type SessionExpiresAtIsWireString = Expect<Equal<Session["expiresAt"], string>>;
+type PasskeyCreatedAtIsWireString = Expect<Equal<Passkey["createdAt"], string | null | undefined>>;
 type CreditHistoryCreatedAtIsWireString = Expect<Equal<CreditHistoryItem["createdAt"], string>>;
 type CreditPurchaseCreatedAtIsWireString = Expect<Equal<CreditPurchaseItem["createdAt"], string>>;
 type NotificationCreatedAtIsWireString = Expect<Equal<NotificationItem["createdAt"], string>>;

@@ -1,3 +1,5 @@
+import type { Session } from "../../src/components/layout/backend/settings/active-sessions-card";
+import type { Passkey } from "../../src/components/layout/backend/settings/passkeys-card";
 import type {
   getAdminAllPurchases,
   getAdminAllTransactions,
@@ -52,6 +54,10 @@ type CreatedVoucher = NonNullable<Awaited<ReturnType<typeof createVoucher>>["vou
 type UpdatedVoucher = NonNullable<Awaited<ReturnType<typeof updateVoucher>>["voucher"]>;
 type StatusUpdatedVoucher = NonNullable<Awaited<ReturnType<typeof updateVoucherStatus>>["voucher"]>;
 
+type SessionCreatedAtIsWireString = Expect<Equal<Session["createdAt"], string>>;
+type SessionUpdatedAtIsWireString = Expect<Equal<Session["updatedAt"], string>>;
+type SessionExpiresAtIsWireString = Expect<Equal<Session["expiresAt"], string>>;
+type PasskeyCreatedAtIsWireString = Expect<Equal<Passkey["createdAt"], string | null | undefined>>;
 type CreditHistoryCreatedAtIsWireString = Expect<Equal<CreditHistoryItem["createdAt"], string>>;
 type CreditPurchaseCreatedAtIsWireString = Expect<Equal<CreditPurchaseItem["createdAt"], string>>;
 type ContractCreditTransactionCreatedAtIsWireString = Expect<Equal<ContractCreditTransactionCreatedAt, string>>;

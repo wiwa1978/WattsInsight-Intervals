@@ -35,12 +35,12 @@ import {
 } from "@/components/ui/dialog";
 import { listSessions, revokeSession, revokeSessions, getSession } from "@/lib/auth-client";
 
-interface Session {
+export interface Session {
   id: string;
   token: string;
-  createdAt: Date;
-  updatedAt: Date;
-  expiresAt: Date;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
   ipAddress?: string | null;
   userAgent?: string | null;
 }
@@ -131,7 +131,7 @@ export function ActiveSessionsCard() {
 
       const currentToken = currentSession.data?.session?.token;
 
-      const parsed: ParsedSession[] = (sessionsResult.data || []).map(
+      const parsed: ParsedSession[] = ((sessionsResult.data || []) as unknown as Session[]).map(
         (session: Session) => {
           const { deviceName, browserName, osName } = parseUserAgent(
             session.userAgent
@@ -207,7 +207,7 @@ export function ActiveSessionsCard() {
     }
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
