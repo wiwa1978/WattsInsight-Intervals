@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import type { Session } from "../../src/components/layout/backend/settings/active-sessions-card";
 import type { Passkey } from "../../src/components/layout/backend/settings/passkeys-card";
 import type { getCreditHistory, getCreditPurchases } from "../../src/lib/services/credits";
@@ -43,3 +45,9 @@ type SharedCreditPurchasesBoundaryUsesSharedType = Expect<
 type SharedNotificationsListBoundaryUsesContract = Expect<
   Equal<Awaited<ReturnType<SharedNotificationsApi["list"]>>, SuccessResult<Notification[]>>
 >;
+
+describe("web wire date types", () => {
+  it("is covered by compile-time assertions", () => {
+    expect(true).toBe(true);
+  });
+});
