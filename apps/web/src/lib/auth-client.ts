@@ -3,7 +3,7 @@
 import { nextCookies } from "better-auth/next-js";
 import { toast } from "sonner";
 
-import { createWebUserAuthClient } from "@platform/auth-client";
+import { createWebUserAuthClient } from "@platform/auth-client/web-user";
 
 import { env } from "@/env";
 import { clientLogger } from "./client-logger";

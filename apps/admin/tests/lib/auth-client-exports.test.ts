@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 describe("admin auth client exports", () => {
   it("keeps admin auth plugin helpers available", async () => {
@@ -8,5 +10,11 @@ describe("admin auth client exports", () => {
     const authExports = await import("../../src/lib/auth-client");
 
     expect(Object.prototype.hasOwnProperty.call(authExports, "admin")).toBe(true);
+  });
+
+  it("imports the admin-capable auth client subpath", async () => {
+    const appAuthClientSource = await readFile(join(process.cwd(), "src/lib/auth-client.ts"), "utf8");
+
+    expect(appAuthClientSource).toContain('from "@platform/auth-client/web-admin"');
   });
 });
