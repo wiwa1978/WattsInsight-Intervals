@@ -21,67 +21,35 @@ import {
   unbanAdminUserApi,
   verifyAdminBanSecretApi,
 } from "@/lib/api/admin";
+import type {
+  AdminDashboardStats,
+  AdminUserDetail,
+  AdminUsersList,
+  AdminUserStats,
+  BillingStats,
+  CreditBalance,
+  CreditPurchase,
+  CreditTransaction,
+  CreditsConsumedPoint,
+  PurchasesList,
+  RevenuePoint,
+  TransactionPoint,
+  TransactionsList,
+} from "@platform/contracts";
 
 export type TimeRange = "daily" | "weekly" | "monthly" | "yearly";
-
-type AdminCreditTransaction = {
-  id: string;
-  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
-  amount: string;
-  balanceAfter: string;
-  description: string;
-  referenceType?: string | null;
-  referenceId?: string | null;
-  metadata?: unknown;
-  createdAt: string;
-};
-
-type AdminCreditPurchase = {
-  id: string;
-  packageKey: string;
-  credits: number;
-  bonusCredits: number;
-  priceInclVat: number;
-  priceExclVat: number;
-  paymentStatus: "pending" | "completed" | "failed" | "refunded";
-  paymentId?: string;
-  createdAt: string;
-  userId?: string;
-  userName?: string | null;
-  userEmail?: string;
-};
 
 export async function verifyAdminBanSecret(secret: string) {
   return verifyAdminBanSecretApi(secret);
 }
 
-export async function getAdminDashboardStats() {
-  return getAdminDashboardStatsApi() as Promise<{
-    totalUsers: number;
-    thisMonthUsers: number;
-    lastMonthUsers: number;
-    totalBannedUsers: number;
-    totalCompletedPurchases: number;
-    lastMonthCompletedPurchases: number;
-    totalPendingPurchases: number;
-    totalFailedPurchases: number;
-    totalRefundedPurchases: number;
-    totalUsageTransactions: number;
-    lastMonthUsageTransactions: number;
-    totalBonusTransactions: number;
-    totalPurchaseTransactions: number;
-    lastMonthPurchaseTransactions: number;
-    totalRefundTransactions: number;
-  }>;
+export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
+  return getAdminDashboardStatsApi();
 }
 
 export async function getAdminUserStats() {
   try {
-    const stats = (await getAdminUserStatsApi()) as {
-      totalUsers: number;
-      totalAdmins: number;
-      totalBanned: number;
-    };
+    const stats: AdminUserStats = await getAdminUserStatsApi();
 
     return stats;
   } catch {
@@ -95,23 +63,7 @@ export async function getAdminUserStats() {
 
 export async function getAdminUser(userId: string) {
   try {
-    const response = (await getAdminUserApi(userId)) as {
-      success: boolean;
-      data?: {
-        id: string;
-        name: string;
-        email: string;
-        emailVerified: boolean;
-        image: string | null;
-        role: string | null;
-        banned: boolean | null;
-        banReason: string | null;
-        banExpires: string | null;
-        createdAt: string;
-        updatedAt: string;
-      };
-      error?: string;
-    };
+    const response = await getAdminUserApi(userId);
 
     if (!response.success || !response.data) {
       return { data: null, error: response.error || "User not found" };
@@ -123,20 +75,12 @@ export async function getAdminUser(userId: string) {
   }
 }
 
-export async function getAdminUserCreditBalance(userId: string) {
-  return getAdminUserCreditBalanceApi(userId) as Promise<{
-    balance: number;
-    totalPurchased: number;
-    totalSpent: number;
-    totalPurchasedAmount: number;
-    totalPurchasedAmountExclVat: number;
-    totalVatPaid: number;
-    totalPurchases: number;
-  }>;
+export async function getAdminUserCreditBalance(userId: string): Promise<CreditBalance> {
+  return getAdminUserCreditBalanceApi(userId);
 }
 
 export async function getAdminUserCreditHistory(userId: string, limit: number = 50) {
-  const history = (await getAdminUserCreditHistoryApi(userId)) as AdminCreditTransaction[];
+  const history: CreditTransaction[] = await getAdminUserCreditHistoryApi(userId);
   if (Array.isArray(history)) {
     return history.slice(0, limit);
   }
@@ -145,7 +89,7 @@ export async function getAdminUserCreditHistory(userId: string, limit: number = 
 }
 
 export async function getAdminUserCreditPurchases(userId: string, limit: number = 50) {
-  const purchases = (await getAdminUserCreditPurchasesApi(userId)) as AdminCreditPurchase[];
+  const purchases: CreditPurchase[] = await getAdminUserCreditPurchasesApi(userId);
   if (Array.isArray(purchases)) {
     return purchases.slice(0, limit);
   }
@@ -153,60 +97,33 @@ export async function getAdminUserCreditPurchases(userId: string, limit: number 
   return [];
 }
 
-export async function getAdminBillingStats() {
-  return getAdminBillingStatsApi() as Promise<{
-    totalPurchases: number;
-    totalCreditsPurchased: number;
-    purchasedCredits: number;
-    bonusCredits: number;
-    totalCreditsConsumed: number;
-    totalRevenue: number;
-  }>;
+export async function getAdminBillingStats(): Promise<BillingStats> {
+  return getAdminBillingStatsApi();
 }
 
-export async function getAdminRevenueData(timeRange: TimeRange) {
-  return getAdminRevenueDataApi(timeRange) as Promise<Array<{ period: string; revenue: number; count: number }>>;
+export async function getAdminRevenueData(timeRange: TimeRange): Promise<RevenuePoint[]> {
+  return getAdminRevenueDataApi(timeRange);
 }
 
 export async function getAdminAllTransactions(limit: number = 20, offset: number = 0, searchEmail?: string) {
-  return getAdminAllTransactionsApi(limit, offset, searchEmail) as Promise<{
-    transactions: AdminCreditTransaction[];
-    total: number;
-    hasMore: boolean;
-  }>;
+  return getAdminAllTransactionsApi(limit, offset, searchEmail);
 }
 
 export async function getAdminAllPurchases(limit: number = 20, offset: number = 0, searchEmail?: string) {
-  return getAdminAllPurchasesApi(limit, offset, searchEmail) as Promise<{
-    purchases: AdminCreditPurchase[];
-    total: number;
-    hasMore: boolean;
-  }>;
+  return getAdminAllPurchasesApi(limit, offset, searchEmail);
 }
 
-export async function getAdminTransactionData(timeRange: TimeRange) {
-  return getAdminTransactionDataApi(timeRange) as Promise<Array<{ period: string; count: number }>>;
+export async function getAdminTransactionData(timeRange: TimeRange): Promise<TransactionPoint[]> {
+  return getAdminTransactionDataApi(timeRange);
 }
 
-export async function getAdminCreditsConsumedData(timeRange: TimeRange) {
-  return getAdminCreditsConsumedDataApi(timeRange) as Promise<Array<{ period: string; consumed: number }>>;
+export async function getAdminCreditsConsumedData(timeRange: TimeRange): Promise<CreditsConsumedPoint[]> {
+  return getAdminCreditsConsumedDataApi(timeRange);
 }
 
-export async function getUsers(limit = 20, offset = 0, search?: string) {
+export async function getUsers(limit = 20, offset = 0, search?: string): Promise<{ data: AdminUsersList; error: string | null }> {
   try {
-    const result = (await getAdminUsersApi(limit, offset, search)) as {
-      users: Array<{
-        id: string;
-        name: string;
-        email: string;
-        image: string | null;
-        role: string | null;
-        banned: boolean | null;
-        emailVerified: boolean;
-        createdAt: string;
-      }>;
-      total: number;
-    };
+    const result: AdminUsersList = await getAdminUsersApi(limit, offset, search);
 
     return { data: result, error: null };
   } catch {

@@ -4,57 +4,25 @@ import { billingConfig } from "@/config/billing";
 import { apiRequest } from "@/lib/api/client";
 import { redeemMyVoucher } from "@/lib/api/me";
 
-type CreditHistoryItem = {
-  id: string;
-  type: "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
-  amount: string;
-  balanceAfter: string;
-  description: string;
-  referenceType?: string | null;
-  referenceId?: string | null;
-  metadata?: unknown;
-  createdAt: string;
-};
-
-type CreditPurchaseItem = {
-  id: string;
-  packageKey: string;
-  credits: number;
-  bonusCredits: number;
-  priceInclVat: number;
-  priceExclVat: number;
-  paymentStatus: "pending" | "completed" | "failed" | "refunded";
-  paymentId: string;
-  createdAt: string;
-};
-
 const creditsApi = createCreditsApi(apiRequest);
 
 export async function getCreditBalance() {
-  const result = await creditsApi.getBalance() as { success: boolean; data: {
-    balance: number;
-    totalPurchased: number;
-    totalSpent: number;
-    totalPurchasedAmount: number;
-    totalPurchasedAmountExclVat: number;
-    totalVatPaid: number;
-    totalPurchases: number;
-  } };
+  const result = await creditsApi.getBalance();
   return result.data;
 }
 
 export async function getCreditHistory(limit: number = 50) {
-  const result = await creditsApi.getHistory(limit) as { success: boolean; data: CreditHistoryItem[] };
+  const result = await creditsApi.getHistory(limit);
   return result.data;
 }
 
 export async function getCreditPurchases(limit: number = 50) {
-  const result = await creditsApi.getPurchases(limit) as { success: boolean; data: CreditPurchaseItem[] };
+  const result = await creditsApi.getPurchases(limit);
   return result.data;
 }
 
 export async function downloadInvoice(paymentId: string) {
-  return creditsApi.downloadInvoice(paymentId) as Promise<{ success: boolean; invoiceUrl?: string; error?: string }>;
+  return creditsApi.downloadInvoice(paymentId);
 }
 
 export async function redeemVoucher(code: string) {

@@ -7,7 +7,7 @@ const notificationsApi = createNotificationsApi(apiRequest);
 
 export async function getNotifications(limit = 20) {
   try {
-    const result = await notificationsApi.list(limit) as { success: boolean; data: Notification[] };
+    const result = await notificationsApi.list(limit);
     const data = result.data;
     return { success: true, data };
   } catch {
@@ -17,7 +17,7 @@ export async function getNotifications(limit = 20) {
 
 export async function getActiveBannerNotifications() {
   try {
-    const result = await notificationsApi.getActiveBanner() as { success: boolean; data: Notification | null };
+    const result = await notificationsApi.getActiveBanner();
     const data = result.data;
     return { success: true, data };
   } catch {
@@ -27,7 +27,7 @@ export async function getActiveBannerNotifications() {
 
 export async function getUnreadCount() {
   try {
-    const result = await notificationsApi.getUnreadCount() as { success: boolean; data: { count: number } };
+    const result = await notificationsApi.getUnreadCount();
     const count = result.data.count;
     return { success: true, count };
   } catch {

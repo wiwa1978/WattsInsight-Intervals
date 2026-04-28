@@ -1,15 +1,27 @@
 import { apiRequest } from "./client";
 
 import type { AdminCreateDiscountInput, AdminUpdateDiscountInput, DiscountStatus } from "@/types/discounts";
-import type { NotificationSendHistoryItem, VoucherAssignmentScope, VoucherStatus } from "@platform/contracts";
+import type {
+  AdminDashboardStats,
+  AdminSearchUser,
+  AdminUserDetail,
+  AdminUsersList,
+  AdminUserStats,
+  BillingStats,
+  CreditBalance,
+  CreditPurchase,
+  CreditTransaction,
+  CreditsConsumedPoint,
+  NotificationSendHistoryItem,
+  NotificationSendResult,
+  PurchasesList,
+  RevenuePoint,
+  TransactionPoint,
+  TransactionsList,
+  VoucherAssignmentScope,
+  VoucherStatus,
+} from "@platform/contracts";
 import { apiRoutes } from "@platform/contracts/ts";
-
-type NotificationSendResult = {
-  sentCount: number;
-  skippedCount: number;
-  invalidRecipientCount: number;
-  invalidRecipientIds: string[];
-};
 
 export async function verifyAdminBanSecretApi(secret: string) {
   return apiRequest<{ success: boolean; error?: string }>("/admin/verify-ban-secret", {
@@ -19,7 +31,7 @@ export async function verifyAdminBanSecretApi(secret: string) {
 }
 
 export async function getAdminDashboardStatsApi() {
-  const result = await apiRequest<{ success: boolean; data: unknown }>("/admin/dashboard/stats");
+  const result = await apiRequest<{ success: boolean; data: AdminDashboardStats }>("/admin/dashboard/stats");
   return result.data;
 }
 
@@ -33,7 +45,7 @@ export async function getAdminUsersApi(limit = 20, offset = 0, search?: string) 
     params.set("search", search.trim());
   }
 
-  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/users?${params.toString()}`);
+  const result = await apiRequest<{ success: boolean; data: AdminUsersList }>(`/admin/users?${params.toString()}`);
   return result.data;
 }
 
@@ -96,42 +108,42 @@ export async function setAdminUserPasswordApi(userId: string, newPassword: strin
 }
 
 export async function getAdminUserStatsApi() {
-  const result = await apiRequest<{ success: boolean; data: unknown }>("/admin/users/stats");
+  const result = await apiRequest<{ success: boolean; data: AdminUserStats }>("/admin/users/stats");
   return result.data;
 }
 
 export async function getAdminUserApi(userId: string) {
-  return apiRequest<{ success: boolean; data?: unknown; error?: string }>(`/admin/users/${userId}`);
+  return apiRequest<{ success: boolean; data?: AdminUserDetail; error?: string }>(`/admin/users/${userId}`);
 }
 
 export async function getAdminUserCreditBalanceApi(userId: string) {
-  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/users/${userId}/credits/balance`);
+  const result = await apiRequest<{ success: boolean; data: CreditBalance }>(`/admin/users/${userId}/credits/balance`);
   return result.data;
 }
 
 export async function getAdminUserCreditHistoryApi(userId: string) {
-  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/users/${userId}/credits/history`);
+  const result = await apiRequest<{ success: boolean; data: CreditTransaction[] }>(`/admin/users/${userId}/credits/history`);
   return result.data;
 }
 
 export async function getAdminUserCreditPurchasesApi(userId: string) {
-  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/users/${userId}/credits/purchases`);
+  const result = await apiRequest<{ success: boolean; data: CreditPurchase[] }>(`/admin/users/${userId}/credits/purchases`);
   return result.data;
 }
 
 export async function getAdminBillingStatsApi() {
-  const result = await apiRequest<{ success: boolean; data: unknown }>("/admin/billing/stats");
+  const result = await apiRequest<{ success: boolean; data: BillingStats }>("/admin/billing/stats");
   return result.data;
 }
 
 export async function getAdminRevenueDataApi(timeRange: "daily" | "weekly" | "monthly" | "yearly") {
-  const result = await apiRequest<{ success: boolean; data: unknown }>(`/admin/billing/revenue?timeRange=${timeRange}`);
+  const result = await apiRequest<{ success: boolean; data: RevenuePoint[] }>(`/admin/billing/revenue?timeRange=${timeRange}`);
   return result.data;
 }
 
 export async function getAdminAllTransactionsApi(limit = 20, offset = 0, searchEmail?: string) {
   const search = searchEmail ? `&searchEmail=${encodeURIComponent(searchEmail)}` : "";
-  const result = await apiRequest<{ success: boolean; data: unknown }>(
+  const result = await apiRequest<{ success: boolean; data: TransactionsList }>(
     `/admin/billing/transactions?limit=${limit}&offset=${offset}${search}`,
   );
   return result.data;
@@ -139,21 +151,21 @@ export async function getAdminAllTransactionsApi(limit = 20, offset = 0, searchE
 
 export async function getAdminAllPurchasesApi(limit = 20, offset = 0, searchEmail?: string) {
   const search = searchEmail ? `&searchEmail=${encodeURIComponent(searchEmail)}` : "";
-  const result = await apiRequest<{ success: boolean; data: unknown }>(
+  const result = await apiRequest<{ success: boolean; data: PurchasesList }>(
     `/admin/billing/purchases?limit=${limit}&offset=${offset}${search}`,
   );
   return result.data;
 }
 
 export async function getAdminTransactionDataApi(timeRange: "daily" | "weekly" | "monthly" | "yearly") {
-  const result = await apiRequest<{ success: boolean; data: unknown }>(
+  const result = await apiRequest<{ success: boolean; data: TransactionPoint[] }>(
     `/admin/billing/transactions-chart?timeRange=${timeRange}`,
   );
   return result.data;
 }
 
 export async function getAdminCreditsConsumedDataApi(timeRange: "daily" | "weekly" | "monthly" | "yearly") {
-  const result = await apiRequest<{ success: boolean; data: unknown }>(
+  const result = await apiRequest<{ success: boolean; data: CreditsConsumedPoint[] }>(
     `/admin/billing/credits-consumed-chart?timeRange=${timeRange}`,
   );
   return result.data;
@@ -274,7 +286,7 @@ export async function updateVoucherApi(payload: {
 }
 
 export async function searchUsersForVoucherApi(query: string, limit = 20) {
-  const result = await apiRequest<{ success: boolean; data: Array<{ id: string; name: string; email: string }> }>(
+  const result = await apiRequest<{ success: boolean; data: AdminSearchUser[] }>(
     `/admin/vouchers/search-users?query=${encodeURIComponent(query)}&limit=${limit}`,
   );
   return result.data;
