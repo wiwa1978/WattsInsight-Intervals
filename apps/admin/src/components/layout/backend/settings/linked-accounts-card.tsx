@@ -29,6 +29,7 @@ import {
   type SupportedOAuthProvider,
 } from "@/lib/auth-providers";
 import { authConfig } from "@/config/auth";
+import { useRouter } from "@/i18n/navigation";
 
 interface LinkedAccount {
   id: string;
@@ -38,6 +39,7 @@ interface LinkedAccount {
 
 export function LinkedAccountsCard() {
   const t = useTranslations("settings.linkedAccounts");
+  const router = useRouter();
   const [accounts, setAccounts] = React.useState<LinkedAccount[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null);
@@ -104,6 +106,7 @@ export function LinkedAccountsCard() {
       toast.success(t("unlinkSuccess"));
       setUnlinkDialog(null);
       fetchAccounts();
+      router.refresh();
     } catch {
       toast.error(t("unlinkError"));
     } finally {

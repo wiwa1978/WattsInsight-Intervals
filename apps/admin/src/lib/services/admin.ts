@@ -78,6 +78,7 @@ export async function getAdminDashboardStats() {
 export async function getAdminUserStats() {
   try {
     const stats = (await getAdminUserStatsApi()) as {
+      totalUsers: number;
       totalAdmins: number;
       totalBanned: number;
     };
@@ -85,6 +86,7 @@ export async function getAdminUserStats() {
     return stats;
   } catch {
     return {
+      totalUsers: 0,
       totalAdmins: 0,
       totalBanned: 0,
     };
@@ -190,9 +192,9 @@ export async function getAdminCreditsConsumedData(timeRange: TimeRange) {
   return getAdminCreditsConsumedDataApi(timeRange) as Promise<Array<{ period: string; consumed: number }>>;
 }
 
-export async function getUsers(limit = 20, offset = 0) {
+export async function getUsers(limit = 20, offset = 0, search?: string) {
   try {
-    const result = (await getAdminUsersApi(limit, offset)) as {
+    const result = (await getAdminUsersApi(limit, offset, search)) as {
       users: Array<{
         id: string;
         name: string;
@@ -228,7 +230,7 @@ export async function impersonateAdminUser(userId: string) {
   return impersonateAdminUserApi(userId);
 }
 
-export async function stopAdminImpersonation() {
+export async function stopAdminImpersonation(): ReturnType<typeof stopAdminImpersonationApi> {
   return stopAdminImpersonationApi();
 }
 

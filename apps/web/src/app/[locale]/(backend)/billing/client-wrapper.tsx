@@ -1,16 +1,19 @@
 "use client";
 
-import { ReactNode, createContext, useContext, useEffect } from "react";
+import { ReactNode, createContext, useContext } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { creditPackages } from "@/config/billing";
 import { createCheckoutSession } from "@/lib/api/me";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+type CheckoutOutcome = "success" | "cancel" | null;
 
 interface BillingClientWrapperProps {
   children: ReactNode;
+  checkoutOutcome: CheckoutOutcome;
 }
 
 interface BillingContextType {
@@ -27,33 +30,9 @@ export function useBilling() {
   return context;
 }
 
-export function BillingClientWrapper({ children }: BillingClientWrapperProps) {
-  const t = useTranslations("creditPricing");
+export function BillingClientWrapper({ children, checkoutOutcome }: BillingClientWrapperProps) {
+  const billingT = useTranslations("billing");
   const { data: session } = authClient.useSession();
-  const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const checkoutSucceeded = searchParams.get("success") === "true";
-    const checkoutCanceled = searchParams.get("cancel") === "true";
-
-    if (!checkoutSucceeded && !checkoutCanceled) {
-      return;
-    }
-
-    if (checkoutSucceeded) {
-      toast.success("Payment received. Credits will appear once payment processing completes.");
-    } else {
-      toast.info("Checkout canceled. No credits were purchased.");
-    }
-
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.delete("success");
-    nextParams.delete("cancel");
-    const nextQuery = nextParams.toString();
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-  }, [pathname, router, searchParams]);
 
   const checkoutMutation = useMutation({
     mutationFn: createCheckoutSession,
@@ -89,6 +68,18 @@ export function BillingClientWrapper({ children }: BillingClientWrapperProps) {
   return (
     <BillingContext.Provider value={{ handlePurchase }}>
       <div className="space-y-6">
+        {checkoutOutcome === "success" ? (
+          <Alert>
+            <AlertTitle>{billingT("checkout.successTitle")}</AlertTitle>
+            <AlertDescription>{billingT("checkout.successDescription")}</AlertDescription>
+          </Alert>
+        ) : null}
+        {checkoutOutcome === "cancel" ? (
+          <Alert variant="destructive">
+            <AlertTitle>{billingT("checkout.cancelTitle")}</AlertTitle>
+            <AlertDescription>{billingT("checkout.cancelDescription")}</AlertDescription>
+          </Alert>
+        ) : null}
         {children}
       </div>
     </BillingContext.Provider>

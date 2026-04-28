@@ -655,7 +655,8 @@
       "active": "You are currently impersonating {email}",
       "stop": "Stop Impersonating",
       "stopped": "Impersonation stopped. Redirecting...",
-      "stopError": "Failed to stop impersonation."
+      "stopError": "Failed to stop impersonation.",
+      "adminUrlMissing": "Admin app URL is not configured. Please open the admin app manually."
     },
     "users": {
       "title": "User Management",
@@ -1155,6 +1156,12 @@
   "billing": {
     "title": "Billing Portal",
     "description": "Manage your credits, view purchase history, and track usage.",
+    "checkout": {
+      "successTitle": "Payment received",
+      "successDescription": "Your credits will appear once payment processing completes.",
+      "cancelTitle": "Checkout canceled",
+      "cancelDescription": "No credits were purchased."
+    },
     "stats": {
       "available": "Total Available Credits",
       "availableDescription": "Credits ready to use",

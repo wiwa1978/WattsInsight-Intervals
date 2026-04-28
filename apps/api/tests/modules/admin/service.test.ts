@@ -58,6 +58,29 @@ describe("createAdminService", () => {
     });
   });
 
+  // Verifies user stats expose global totals for admin summary cards.
+  it("returns global user stats", async () => {
+    const counts = [10, 2, 1];
+    const select = vi.fn(() => ({
+      from: vi.fn(() => {
+        const count = counts.shift() ?? 0;
+        return {
+          then: (resolve: (value: Array<{ count: number }>) => void) => resolve([{ count }]),
+          where: vi.fn().mockResolvedValue([{ count }]),
+        };
+      }),
+    }));
+
+    const service = createAdminService({
+      db: { select } as any,
+      adminBanSecret: "secret",
+    });
+
+    const result = await service.getUserStats();
+
+    expect(result).toEqual({ totalUsers: 10, totalAdmins: 2, totalBanned: 1 });
+  });
+
   // Verifies unknown users return null rather than throwing.
   it("returns null for unknown user in getUserById", async () => {
     const service = createAdminService({
@@ -182,5 +205,35 @@ describe("createAdminService", () => {
     await service.getUsers();
 
     expect(listLimit).toHaveBeenCalledWith(20);
+  });
+
+  // Verifies admin user search is applied consistently to list and count queries.
+  it("filters admin user listing by trimmed name or email search", async () => {
+    const listRows = [{ id: "u1", name: "Alice", email: "alice@example.com" }];
+    const listOffset = vi.fn().mockResolvedValue(listRows);
+    const listLimit = vi.fn().mockReturnValue({ offset: listOffset });
+    const listOrderBy = vi.fn().mockReturnValue({ limit: listLimit });
+    const listWhere = vi.fn().mockReturnValue({ orderBy: listOrderBy });
+    const listFrom = vi.fn().mockReturnValue({ where: listWhere, orderBy: listOrderBy });
+
+    const countRows = [{ count: 1 }];
+    const countWhere = vi.fn().mockResolvedValue(countRows);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+
+    const select = vi.fn()
+      .mockReturnValueOnce({ from: listFrom })
+      .mockReturnValueOnce({ from: countFrom });
+
+    const service = createAdminService({
+      db: { select } as any,
+      adminBanSecret: "secret",
+    });
+
+    const result = await service.getUsers(20, 0, "  alice  ");
+
+    expect(listWhere).toHaveBeenCalledOnce();
+    expect(countWhere).toHaveBeenCalledOnce();
+    expect(countWhere).toHaveBeenCalledWith(listWhere.mock.calls[0]?.[0]);
+    expect(result).toEqual({ users: listRows, total: 1 });
   });
 });

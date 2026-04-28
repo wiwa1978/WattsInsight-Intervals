@@ -46,6 +46,11 @@ export function createAdminService(deps: AdminServiceDeps) {
     return normalized ? normalized.slice(0, 255) : undefined;
   }
 
+  function getUserSearchCondition(search?: string) {
+    const normalized = search?.trim().slice(0, 255);
+    return normalized ? or(ilike(user.name, `%${normalized}%`), ilike(user.email, `%${normalized}%`)) : undefined;
+  }
+
   async function verifyAdminBanSecret(secret: string) {
     if (!deps.adminBanSecret) {
       return { success: false as const, error: "Admin ban secret is not configured." };
@@ -192,27 +197,32 @@ export function createAdminService(deps: AdminServiceDeps) {
     };
   }
 
-  async function getUsers(limit = 20, offset = 0) {
+  async function getUsers(limit = 20, offset = 0, search?: string) {
     const normalizedLimit = normalizeLimit(limit, 100);
     const normalizedOffset = normalizeOffset(offset);
+    const whereCondition = getUserSearchCondition(search);
+
+    const usersQuery = deps.db
+      .select({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        role: user.role,
+        banned: user.banned,
+        emailVerified: user.emailVerified,
+        createdAt: user.createdAt,
+      })
+      .from(user);
+
+    const countQuery = deps.db.select({ count: sql<number>`COUNT(*)` }).from(user);
 
     const [users, totalResult] = await Promise.all([
-      deps.db
-        .select({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: user.image,
-          role: user.role,
-          banned: user.banned,
-          emailVerified: user.emailVerified,
-          createdAt: user.createdAt,
-        })
-        .from(user)
+      (whereCondition ? usersQuery.where(whereCondition) : usersQuery)
         .orderBy(desc(user.createdAt))
         .limit(normalizedLimit)
         .offset(normalizedOffset),
-      deps.db.select({ count: sql<number>`COUNT(*)` }).from(user),
+      whereCondition ? countQuery.where(whereCondition) : countQuery,
     ]);
 
     return {
@@ -241,7 +251,8 @@ export function createAdminService(deps: AdminServiceDeps) {
   }
 
   async function getUserStats() {
-    const [admins, banned] = await Promise.all([
+    const [totalUsers, admins, banned] = await Promise.all([
+      deps.db.select({ count: sql<number>`COUNT(*)` }).from(user),
       deps.db
         .select({ count: sql<number>`COUNT(*)` })
         .from(user)
@@ -250,6 +261,7 @@ export function createAdminService(deps: AdminServiceDeps) {
     ]);
 
     return {
+      totalUsers: totalUsers[0]?.count || 0,
       totalAdmins: admins[0]?.count || 0,
       totalBanned: banned[0]?.count || 0,
     };

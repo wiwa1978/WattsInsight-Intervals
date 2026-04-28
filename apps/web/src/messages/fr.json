@@ -623,7 +623,8 @@
       "active": "Vous usurpez actuellement l'identité de {email}",
       "stop": "Arrêter l'usurpation",
       "stopped": "Usurpation arrêtée. Redirection...",
-      "stopError": "Échec de l'arrêt de l'usurpation."
+      "stopError": "Échec de l'arrêt de l'usurpation.",
+      "adminUrlMissing": "L'URL de l'application admin n'est pas configurée. Ouvrez l'application admin manuellement."
     },
     "users": {
       "title": "Gestion des utilisateurs",
@@ -796,23 +797,6 @@
         "totalRevenueDescription": "Revenus totaux de tous les achats",
         "totalAvailableCredits": "Total des Crédits Disponibles",
         "totalAvailableCreditsDescription": "Total des crédits actuellement disponibles pour tous les utilisateurs"
-      },
-      "transactionsChart": {
-        "title": "Transactions au Fil du Temps",
-        "description": "Suivez les tendances des transactions sur différentes périodes",
-        "daily": "Quotidien",
-        "weekly": "Hebdomadaire",
-        "monthly": "Mensuel",
-        "transactions": "Transactions",
-        "revenue": "Revenus"
-      },
-      "creditsConsumedChart": {
-        "title": "Crédits Consommés au Fil du Temps",
-        "description": "Suivez l'utilisation des crédits sur différentes périodes",
-        "daily": "Quotidien",
-        "weekly": "Hebdomadaire",
-        "monthly": "Mensuel",
-        "credits": "Crédits"
       },
       "revenueChart": {
         "title": "Revenus au Fil du Temps",
@@ -1172,6 +1156,12 @@
   "billing": {
     "title": "Portail de facturation",
     "description": "Gérez vos crédits, consultez l'historique des achats et suivez l'utilisation.",
+    "checkout": {
+      "successTitle": "Paiement recu",
+      "successDescription": "Vos credits apparaitront une fois le paiement traite.",
+      "cancelTitle": "Paiement annule",
+      "cancelDescription": "Aucun credit n'a ete achete."
+    },
     "stats": {
       "available": "Crédits Disponibles Totaux",
       "availableDescription": "Crédits prêts à utiliser",

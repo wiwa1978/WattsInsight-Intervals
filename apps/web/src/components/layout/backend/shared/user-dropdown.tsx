@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, CreditCard, Globe, LogOut, Moon, Palette, Settings, Sun, Monitor } from "lucide-react";
+import { Check, CreditCard, Globe, LogOut, Moon, Palette, Settings, ShieldX, Sun, Monitor } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
+import { toast } from "sonner";
 
 import { useTheme } from "@/components/providers/theme-provider";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ import {
 import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { signOut, useSession, updateUser } from "@/lib/auth-client";
 import { routing } from "@/i18n/routing";
+import { stopAdminImpersonation } from "@/lib/services/admin";
 
 interface UserDropdownProps {
   /** Show only avatar (true) or avatar + name/email (false) */
@@ -68,6 +70,29 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
     }
 
     router.replace(pathname, { locale: newLocale as "en" | "nl" | "fr" });
+  };
+
+  const handleStopImpersonating = async () => {
+    try {
+      const result = await stopAdminImpersonation();
+      if ((result as { error?: unknown }).error) {
+        toast.error(t("admin.impersonation.stopError"));
+        return;
+      }
+
+      const adminAppUrl = process.env.NEXT_PUBLIC_ADMIN_APP_URL;
+      if (!adminAppUrl) {
+        toast.error(t("admin.impersonation.adminUrlMissing"));
+        router.refresh();
+        return;
+      }
+
+      toast.success(t("admin.impersonation.stopped"));
+      window.location.assign(new URL("/admin/overview", adminAppUrl).toString());
+      router.refresh();
+    } catch {
+      toast.error(t("admin.impersonation.stopError"));
+    }
   };
 
   if (!session?.user) {
@@ -189,6 +214,12 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
             {t("dashboard.nav.billing")}
           </Link>
         </DropdownMenuItem>
+        {session.session.impersonatedBy && (
+          <DropdownMenuItem onClick={handleStopImpersonating}>
+            <ShieldX className="mr-2 h-4 w-4" />
+            {t("admin.impersonation.stop")}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onClick={handleSignOut}
           className="text-destructive focus:text-destructive"

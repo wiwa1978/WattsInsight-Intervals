@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useRouter } from "@/i18n/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +61,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function ChangePasswordCard() {
   const t = useTranslations("settings.changePassword");
+  const router = useRouter();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -86,6 +88,7 @@ export function ChangePasswordCard() {
     } else {
       toast.success(t("success"));
       form.reset();
+      router.refresh();
     }
   }
 

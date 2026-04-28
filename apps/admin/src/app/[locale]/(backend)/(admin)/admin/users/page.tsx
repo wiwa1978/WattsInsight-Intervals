@@ -32,14 +32,15 @@ export default function AdminUsersPage() {
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [submittedSearch, setSubmittedSearch] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const limit = authConfig.adminPaginationLimit;
   const offset = (currentPage - 1) * limit;
 
   const usersQuery = useQuery({
-    queryKey: [USERS_QUERY_KEY, currentPage, limit],
+    queryKey: [USERS_QUERY_KEY, currentPage, limit, submittedSearch],
     queryFn: async () => {
-      const result = await getUsers(limit, offset);
+      const result = await getUsers(limit, offset, submittedSearch);
       if (result.error) {
         throw new Error(result.error);
       }
@@ -148,26 +149,20 @@ export default function AdminUsersPage() {
   });
 
   const users = (usersQuery.data?.users ?? []) as User[];
-  const filteredUsers = React.useMemo(() => {
-    if (!searchQuery) return users;
 
-    const query = searchQuery.toLowerCase();
-    return users.filter(
-      (user) => user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query),
-    );
-  }, [users, searchQuery]);
-
-  const totalUsers = usersQuery.data?.total ?? 0;
+  const filteredTotalUsers = usersQuery.data?.total ?? 0;
+  const statsTotalUsers = statsQuery.data?.totalUsers ?? 0;
   const totalAdmins = statsQuery.data?.totalAdmins ?? 0;
   const totalBanned = statsQuery.data?.totalBanned ?? 0;
-  const displayTotal = searchQuery ? filteredUsers.length : totalUsers;
-  const totalPages = Math.max(1, Math.ceil(totalUsers / limit));
-  const from = totalUsers > 0 ? offset + 1 : 0;
-  const to = Math.min(offset + users.length, totalUsers);
+  const displayTotal = filteredTotalUsers;
+  const totalPages = Math.max(1, Math.ceil(filteredTotalUsers / limit));
+  const from = filteredTotalUsers > 0 ? offset + 1 : 0;
+  const to = Math.min(offset + users.length, filteredTotalUsers);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
+    setSubmittedSearch(searchQuery.trim());
   };
 
   return (
@@ -177,10 +172,10 @@ export default function AdminUsersPage() {
         <p className="mt-2 text-muted-foreground">{t("description")}</p>
       </div>
 
-      <UserStatsCard totalUsers={totalUsers} totalAdmins={totalAdmins} totalBanned={totalBanned} />
+      <UserStatsCard totalUsers={statsTotalUsers} totalAdmins={totalAdmins} totalBanned={totalBanned} />
 
       <UsersTable
-        users={filteredUsers}
+        users={users}
         loading={usersQuery.isLoading}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}

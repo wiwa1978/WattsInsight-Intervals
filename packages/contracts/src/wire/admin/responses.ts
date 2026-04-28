@@ -22,6 +22,7 @@ export const adminDashboardStatsSchema = z.object({
 });
 
 export const adminUserStatsSchema = z.object({
+  totalUsers: z.number().int().nonnegative(),
   totalAdmins: z.number().int().nonnegative(),
   totalBanned: z.number().int().nonnegative(),
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import {
@@ -19,6 +20,7 @@ import { Search, ChevronLeft, ChevronRight, ArrowUpDown, Download } from "lucide
 import { formatDateTime } from "@/lib/utils";
 import { PurchaseDetailsDialog } from "../users/purchase-details-dialog";
 import { downloadInvoice } from "@/lib/services/credits";
+import { getAdminAllPurchases } from "@/lib/services/admin";
 
 export type Purchase = {
   id: string;
@@ -37,6 +39,18 @@ export type Purchase = {
   userEmail?: string;
 };
 
+export type SearchPageState = {
+  searchEmail?: string;
+  limit: number;
+  offset: number;
+};
+
+type PurchaseHistoryResponse = {
+  purchases: Purchase[];
+  total: number;
+  hasMore: boolean;
+};
+
 interface PurchaseHistoryTableProps {
   purchases: Purchase[];
   // Optional: show user columns (default: true)
@@ -52,6 +66,43 @@ interface PurchaseHistoryTableProps {
   description?: string;
   // Optional: custom bonus text
   bonusText?: string;
+  // Optional: server pagination/search state
+  total?: number;
+  loading?: boolean;
+  onSearchPageChange?: (state: SearchPageState) => void;
+}
+
+interface AdminPurchaseHistoryTableProps {
+  initialData: PurchaseHistoryResponse;
+  description?: string;
+}
+
+const PURCHASES_LIMIT = 20;
+
+export function AdminPurchaseHistoryTable({ initialData, description }: AdminPurchaseHistoryTableProps) {
+  const [searchState, setSearchState] = React.useState<SearchPageState>({
+    limit: PURCHASES_LIMIT,
+    offset: 0,
+  });
+
+  const purchasesQuery = useQuery({
+    queryKey: ["admin-billing-purchases", searchState.limit, searchState.offset, searchState.searchEmail ?? ""],
+    queryFn: () => getAdminAllPurchases(searchState.limit, searchState.offset, searchState.searchEmail),
+    initialData: searchState.offset === 0 && !searchState.searchEmail ? initialData : undefined,
+  });
+  const data = purchasesQuery.data ?? { purchases: [], total: 0, hasMore: false };
+
+  return (
+    <PurchaseHistoryTable
+      purchases={data.purchases}
+      total={data.total}
+      loading={purchasesQuery.isFetching}
+      showUserColumns={true}
+      enableSearch={true}
+      description={description}
+      onSearchPageChange={setSearchState}
+    />
+  );
 }
 
 export function PurchaseHistoryTable({
@@ -63,47 +114,65 @@ export function PurchaseHistoryTable({
   title,
   description,
   bonusText,
+  total: serverTotal,
+  loading = false,
+  onSearchPageChange,
 }: PurchaseHistoryTableProps) {
   const t = useTranslations("admin.billing.purchases");
   const defaultBonusText = bonusText || t("bonus");
 
   // State
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [submittedSearchQuery, setSubmittedSearchQuery] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const [selectedPurchase, setSelectedPurchase] =
     React.useState<Purchase | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const [downloadingInvoices, setDownloadingInvoices] = React.useState<Set<string>>(new Set());
 
-  const limit = 20;
-
-  // Filter purchases based on search query
+  const limit = PURCHASES_LIMIT;
+  const isServerBacked = Boolean(onSearchPageChange);
   const filteredPurchases = React.useMemo(() => {
-    if (!searchQuery) return purchases;
+    if (isServerBacked || !submittedSearchQuery) return purchases;
 
-    const query = searchQuery.toLowerCase();
-    return purchases.filter((purchase) => {
-      return (
-        purchase.userName?.toLowerCase().includes(query) ||
-        purchase.userEmail?.toLowerCase().includes(query) ||
-        purchase.packageKey.toLowerCase().includes(query) ||
-        purchase.paymentStatus.toLowerCase().includes(query)
-      );
-    });
-  }, [purchases, searchQuery]);
-
-  const total = filteredPurchases.length;
+    const query = submittedSearchQuery.toLowerCase();
+    return purchases.filter((purchase) => (
+      purchase.userName?.toLowerCase().includes(query) ||
+      purchase.userEmail?.toLowerCase().includes(query) ||
+      purchase.packageKey.toLowerCase().includes(query) ||
+      purchase.paymentStatus.toLowerCase().includes(query) ||
+      purchase.paymentId?.toLowerCase().includes(query)
+    ));
+  }, [isServerBacked, purchases, submittedSearchQuery]);
+  const total = serverTotal ?? filteredPurchases.length;
   const totalPages = Math.ceil(total / limit);
 
-  // Paginate purchases
-  const paginatedPurchases = React.useMemo(() => {
+  const visiblePurchases = React.useMemo(() => {
+    if (isServerBacked) return purchases;
     const start = (currentPage - 1) * limit;
     return filteredPurchases.slice(start, start + limit);
-  }, [filteredPurchases, currentPage, limit]);
+  }, [currentPage, filteredPurchases, isServerBacked, limit, purchases]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    const nextSearchQuery = searchQuery.trim();
+    setSubmittedSearchQuery(nextSearchQuery);
     setCurrentPage(1);
+    onSearchPageChange?.({
+      limit,
+      offset: 0,
+      searchEmail: nextSearchQuery || undefined,
+    });
+  };
+
+  const handlePageChange = (page: number) => {
+    const nextPage = Math.min(Math.max(1, page), Math.max(1, totalPages));
+    setCurrentPage(nextPage);
+    onSearchPageChange?.({
+      limit,
+      offset: (nextPage - 1) * limit,
+      searchEmail: submittedSearchQuery || undefined,
+    });
   };
 
   const handleRowClick = (purchase: Purchase) => {
@@ -349,8 +418,8 @@ export function PurchaseHistoryTable({
       {/* Table */}
       <DataTable
         columns={columns}
-        data={paginatedPurchases}
-        loading={false}
+        data={visiblePurchases}
+        loading={loading}
         loadingText={t("loading")}
         emptyText={t("noPurchases")}
         onRowClick={enableRowClick ? handleRowClick : undefined}
@@ -366,7 +435,7 @@ export function PurchaseHistoryTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
@@ -378,7 +447,7 @@ export function PurchaseHistoryTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
               {t("pagination.next")}

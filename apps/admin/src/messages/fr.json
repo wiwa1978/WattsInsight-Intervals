@@ -809,30 +809,13 @@
         "totalPurchases": "Total des Achats",
         "totalPurchasesDescription": "Tous les achats terminés",
         "totalCreditsPurchased": "Total des Crédits Reçus",
-        "totalCreditsPurchasedDescription": "Tous les crédits reçus par les utilisateurs (achetés + bonus)",
+        "totalCreditsPurchasedDescription": "{purchased} credits achetes + {bonus} credits bonus",
         "totalCreditsConsumed": "Total des Crédits Consommés",
         "totalCreditsConsumedDescription": "Tous les crédits utilisés par les utilisateurs",
         "totalRevenue": "Revenus Totaux",
-        "totalRevenueDescription": "Revenus totaux de tous les achats",
+        "totalRevenueDescription": "Sur {count} achats",
         "totalAvailableCredits": "Total des Crédits Disponibles",
         "totalAvailableCreditsDescription": "Total des crédits actuellement disponibles pour tous les utilisateurs"
-      },
-      "transactionsChart": {
-        "title": "Transactions au Fil du Temps",
-        "description": "Suivez les tendances des transactions sur différentes périodes",
-        "daily": "Quotidien",
-        "weekly": "Hebdomadaire",
-        "monthly": "Mensuel",
-        "transactions": "Transactions",
-        "revenue": "Revenus"
-      },
-      "creditsConsumedChart": {
-        "title": "Crédits Consommés au Fil du Temps",
-        "description": "Suivez l'utilisation des crédits sur différentes périodes",
-        "daily": "Quotidien",
-        "weekly": "Hebdomadaire",
-        "monthly": "Mensuel",
-        "credits": "Crédits"
       },
       "revenueChart": {
         "title": "Revenus au Fil du Temps",

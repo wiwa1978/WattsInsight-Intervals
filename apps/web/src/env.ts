@@ -18,6 +18,7 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: z.string().nonempty(),
     NEXT_PUBLIC_APP_NAME: z.string().nonempty(),
     NEXT_PUBLIC_API_URL: z.string().url().optional(),
+    NEXT_PUBLIC_ADMIN_APP_URL: z.string().url().optional(),
     NEXT_PUBLIC_SENTRY_DSN: emptyToUndefined(z.string().url()),
   },
   runtimeEnv: {
@@ -25,6 +26,7 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_ADMIN_APP_URL: process.env.NEXT_PUBLIC_ADMIN_APP_URL,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   },
 });

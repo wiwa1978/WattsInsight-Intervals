@@ -4,15 +4,15 @@ import { NextResponse } from "next/server";
 import createMiddleware from "next-intl/middleware";
 
 import { routing } from "./i18n/routing";
+import { getPathLocale } from "./i18n/path-locale";
 import { getSessionCookie } from "better-auth/cookies";
 
 const intlMiddleware = createMiddleware(routing);
 const AUTHENTICATED_ONLY = ["/dashboard", "/billing", "/settings"];
 
 export function proxy(request: NextRequest) {
-  const { pathname, search, locale } = request.nextUrl;
-  const activeLocale = locale || routing.defaultLocale;
-  const pathWithoutLocale = pathname.replace(`/${activeLocale}`, "") || "/";
+  const { pathname, search } = request.nextUrl;
+  const { activeLocale, pathWithoutLocale } = getPathLocale(pathname);
 
   // fast cookie-only check (no DB)
   const rawCookie = getSessionCookie(request);
