@@ -64,7 +64,7 @@ export const notificationSendHistoryItemSchema = z.object({
   skippedCount: z.number().int().min(0),
   invalidRecipientCount: z.number().int().min(0),
   invalidRecipientIds: z.array(z.string()),
-  createdAt: z.union([z.string(), z.date()]),
+  createdAt: z.string(),
 });
 
 export type Notification = z.infer<typeof notificationSchema>;

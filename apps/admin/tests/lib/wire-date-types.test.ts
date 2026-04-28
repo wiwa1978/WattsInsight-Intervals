@@ -9,6 +9,7 @@ import type {
 import type { getCreditHistory, getCreditPurchases } from "../../src/lib/services/credits";
 import type { getActiveBannerNotifications, getNotifications } from "../../src/lib/services/notifications";
 import type { createVoucher, getVoucherById, getVouchers, updateVoucher, updateVoucherStatus } from "../../src/lib/services/vouchers";
+import type { NotificationSendHistoryItem } from "@platform/contracts";
 
 type Equal<Actual, Expected> = (<T>() => T extends Actual ? 1 : 2) extends <T>() => T extends Expected ? 1 : 2
   ? true
@@ -19,6 +20,7 @@ type CreditHistoryItem = Awaited<ReturnType<typeof getCreditHistory>>[number];
 type CreditPurchaseItem = Awaited<ReturnType<typeof getCreditPurchases>>[number];
 type NotificationItem = Extract<Awaited<ReturnType<typeof getNotifications>>, { data: unknown }>["data"][number];
 type ActiveBannerNotification = NonNullable<Awaited<ReturnType<typeof getActiveBannerNotifications>>["data"]>;
+type NotificationSendHistoryCreatedAt = NotificationSendHistoryItem["createdAt"];
 type AdminUser = NonNullable<Awaited<ReturnType<typeof getAdminUser>>["data"]>;
 type AdminUserListItem = Awaited<ReturnType<typeof getUsers>>["data"]["users"][number];
 type AdminUserCreditHistoryItem = Awaited<ReturnType<typeof getAdminUserCreditHistory>>[number];
@@ -38,6 +40,7 @@ type NotificationCreatedAtIsWireString = Expect<Equal<NotificationItem["createdA
 type NotificationUpdatedAtIsWireString = Expect<Equal<NotificationItem["updatedAt"], string>>;
 type NotificationBannerExpiresAtIsWireString = Expect<Equal<NotificationItem["bannerExpiresAt"], string | null>>;
 type ActiveBannerCreatedAtIsWireString = Expect<Equal<ActiveBannerNotification["createdAt"], string>>;
+type NotificationSendHistoryCreatedAtIsWireString = Expect<Equal<NotificationSendHistoryCreatedAt, string>>;
 type AdminUserBanExpiresIsWireString = Expect<Equal<AdminUser["banExpires"], string | null>>;
 type AdminUserCreatedAtIsWireString = Expect<Equal<AdminUser["createdAt"], string>>;
 type AdminUserUpdatedAtIsWireString = Expect<Equal<AdminUser["updatedAt"], string>>;
