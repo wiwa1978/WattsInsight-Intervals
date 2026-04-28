@@ -3,6 +3,5 @@ export * from "./client-logger";
 export * from "./credits";
 export * from "./me-api";
 export * from "./notifications";
-export * from "./query";
 export * from "./query-keys";
 export * from "./url";

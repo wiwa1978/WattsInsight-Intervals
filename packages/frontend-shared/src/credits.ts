@@ -6,10 +6,10 @@ export function createCreditsApi(apiRequest: ApiRequest) {
       return apiRequest("/me/credits/balance");
     },
     async getHistory(limit = 50) {
-      return apiRequest(`/me/credits/history?limit=${limit}`);
+      return apiRequest(`/me/credits/history?limit=${encodeURIComponent(String(limit))}`);
     },
     async getPurchases(limit = 50) {
-      return apiRequest(`/me/credits/purchases?limit=${limit}`);
+      return apiRequest(`/me/credits/purchases?limit=${encodeURIComponent(String(limit))}`);
     },
     async downloadInvoice(paymentId: string) {
       return apiRequest("/me/credits/invoice", {

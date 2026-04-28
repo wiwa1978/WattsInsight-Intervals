@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import * as frontendShared from "../src";
 import { createCreditsApi } from "../src/credits";
 import { createMeApi } from "../src/me-api";
 import { createNotificationsApi } from "../src/notifications";
@@ -15,6 +16,20 @@ describe("service factories", () => {
     await expect(credits.downloadInvoice("pay_123")).resolves.toEqual({
       path: "/me/credits/invoice",
       init: { method: "POST", body: JSON.stringify({ paymentId: "pay_123" }) },
+    });
+  });
+
+  it("encodes credits limit query values", async () => {
+    const request = vi.fn(async (path: string, init?: RequestInit) => ({ path, init }));
+    const credits = createCreditsApi(request);
+
+    await expect(credits.getHistory("10 & 20" as unknown as number)).resolves.toEqual({
+      path: "/me/credits/history?limit=10%20%26%2020",
+      init: undefined,
+    });
+    await expect(credits.getPurchases("10 & 20" as unknown as number)).resolves.toEqual({
+      path: "/me/credits/purchases?limit=10%20%26%2020",
+      init: undefined,
     });
   });
 
@@ -60,5 +75,10 @@ describe("service factories", () => {
       path: "/payments/checkout",
       init: { method: "POST", body: JSON.stringify({ packageKey: "starter" }) },
     });
+  });
+
+  it("keeps the client query provider out of the root barrel", () => {
+    expect("SharedQueryProvider" in frontendShared).toBe(false);
+    expect("createDefaultQueryClient" in frontendShared).toBe(false);
   });
 });
