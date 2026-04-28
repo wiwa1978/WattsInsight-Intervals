@@ -32,11 +32,19 @@ export class ApiRequestError extends Error {
 
 type RequestHeadersResolver = () => HeadersInit | undefined | Promise<HeadersInit | undefined>;
 
-export function createApiRequest(options: {
+export type ApiRequestFactoryOptions = {
   baseURL: string;
   nodeEnv?: string;
   getHeaders?: RequestHeadersResolver;
-}) {
+  credentials?: RequestCredentials;
+  defaultCache?: RequestCache;
+};
+
+export type BearerApiRequestFactoryOptions = Omit<ApiRequestFactoryOptions, "getHeaders" | "credentials"> & {
+  getToken: () => string | undefined | Promise<string | undefined>;
+};
+
+export function createApiRequest(options: ApiRequestFactoryOptions) {
   return async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
     const requestHeaders = new Headers(init?.headers ?? {});
     const hasBody = init?.body !== undefined && init?.body !== null;
@@ -57,8 +65,8 @@ export function createApiRequest(options: {
     }
 
     const response = await fetch(`${options.baseURL}${path}`, {
-      credentials: "include",
-      cache: "no-store",
+      credentials: options.credentials ?? "include",
+      cache: init?.cache ?? options.defaultCache ?? "no-store",
       ...init,
       headers: requestHeaders,
     });
@@ -91,4 +99,16 @@ export function createApiRequest(options: {
 
     return response.json() as Promise<T>;
   };
+}
+
+export function createBearerApiRequest(options: BearerApiRequestFactoryOptions) {
+  return createApiRequest({
+    ...options,
+    credentials: "omit",
+    getHeaders: async () => {
+      const token = await options.getToken();
+
+      return token ? { Authorization: `Bearer ${token}` } : undefined;
+    },
+  });
 }
