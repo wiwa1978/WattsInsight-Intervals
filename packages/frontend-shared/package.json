@@ -18,5 +18,8 @@
   "peerDependencies": {
     "next": "*",
     "react": "*"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }

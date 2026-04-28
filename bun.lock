@@ -211,6 +211,9 @@
     "packages/frontend-shared": {
       "name": "@platform/frontend-shared",
       "version": "0.1.0",
+      "devDependencies": {
+        "vitest": "^3.2.4",
+      },
       "peerDependencies": {
         "next": "*",
         "react": "*",
