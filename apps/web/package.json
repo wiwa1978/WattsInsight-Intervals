@@ -16,6 +16,7 @@
     "generate:api-types": "openapi-typescript http://localhost:8787/openapi.json -o src/lib/api/openapi.generated.ts"
   },
   "dependencies": {
+    "@platform/auth-client": "*",
     "@platform/auth-shared": "*",
     "@platform/frontend-shared": "*",
     "@sentry/nextjs": "^10.11.0",

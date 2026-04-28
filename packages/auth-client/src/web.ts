@@ -7,22 +7,39 @@ import { authAdditionalUserFields } from "@platform/auth-shared";
 
 import type { CreateWebAuthClientOptions } from "./types";
 
-export function createWebAuthClient(options: CreateWebAuthClientOptions) {
+function createBasePlugins(options: CreateWebAuthClientOptions) {
+  return [
+    inferAdditionalFields({ user: authAdditionalUserFields }),
+    dodopaymentsClient(),
+    twoFactorClient(),
+    passkeyClient(),
+    magicLinkClient(),
+    ...(options.plugins ?? []),
+  ];
+}
+
+function createFetchOptions(options: CreateWebAuthClientOptions) {
+  return {
+    onError(e: { error: unknown }) {
+      options.onError?.({ error: e.error, context: e });
+    },
+  };
+}
+
+export function createWebUserAuthClient(options: CreateWebAuthClientOptions) {
   return createAuthClient({
     baseURL: options.baseURL,
-    plugins: [
-      inferAdditionalFields({ user: authAdditionalUserFields }),
-      dodopaymentsClient(),
-      twoFactorClient(),
-      passkeyClient(),
-      magicLinkClient(),
-      adminClient(),
-      ...(options.plugins ?? []),
-    ],
-    fetchOptions: {
-      onError(e) {
-        options.onError?.({ error: e.error, context: e });
-      },
-    },
+    plugins: createBasePlugins(options),
+    fetchOptions: createFetchOptions(options),
   });
 }
+
+export function createWebAdminAuthClient(options: CreateWebAuthClientOptions) {
+  return createAuthClient({
+    baseURL: options.baseURL,
+    plugins: [...createBasePlugins(options), adminClient()],
+    fetchOptions: createFetchOptions(options),
+  });
+}
+
+export const createWebAuthClient = createWebAdminAuthClient;

@@ -42,6 +42,20 @@ const languageOptions = routing.locales.map((locale) => ({
   key: locale,
 }));
 
+function isImpersonated(session: unknown) {
+  if (!session || typeof session !== "object" || !("session" in session)) {
+    return false;
+  }
+
+  const sessionData = session.session;
+  return (
+    !!sessionData &&
+    typeof sessionData === "object" &&
+    "impersonatedBy" in sessionData &&
+    !!sessionData.impersonatedBy
+  );
+}
+
 export function UserDropdown({ compact = false, className }: UserDropdownProps) {
   const t = useTranslations();
   const { theme, setTheme } = useTheme();
@@ -214,7 +228,7 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
             {t("dashboard.nav.billing")}
           </Link>
         </DropdownMenuItem>
-        {session.session.impersonatedBy && (
+        {isImpersonated(session) && (
           <DropdownMenuItem onClick={handleStopImpersonating}>
             <ShieldX className="mr-2 h-4 w-4" />
             {t("admin.impersonation.stop")}

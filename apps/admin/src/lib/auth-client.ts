@@ -3,7 +3,7 @@
 import { nextCookies } from "better-auth/next-js";
 import { toast } from "sonner";
 
-import { createWebAuthClient } from "@platform/auth-client";
+import { createWebAdminAuthClient } from "@platform/auth-client";
 
 import { env } from "@/env";
 import { clientLogger } from "./client-logger";
@@ -14,7 +14,7 @@ function normalizeBaseUrl(url: string) {
 
 const authBaseURL = `${normalizeBaseUrl(env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_APP_URL)}/auth`;
 
-export const authClient = createWebAuthClient({
+export const authClient = createWebAdminAuthClient({
   baseURL: authBaseURL,
   plugins: [nextCookies()],
   onError({ error, context }) {
