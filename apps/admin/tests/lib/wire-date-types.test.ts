@@ -10,7 +10,13 @@ import type { getCreditHistory, getCreditPurchases } from "../../src/lib/service
 import type { createDiscount, getDiscountById, getDiscounts, updateDiscount } from "../../src/lib/services/discounts";
 import type { getActiveBannerNotifications, getNotifications } from "../../src/lib/services/notifications";
 import type { createVoucher, getVoucherById, getVouchers, updateVoucher, updateVoucherStatus } from "../../src/lib/services/vouchers";
-import type { NotificationSendHistoryItem } from "@platform/contracts";
+import type {
+  AdminUserDetail,
+  AdminUserListItem as ContractAdminUserListItem,
+  CreditPurchase,
+  CreditTransaction,
+  NotificationSendHistoryItem,
+} from "@platform/contracts";
 
 type Equal<Actual, Expected> = (<T>() => T extends Actual ? 1 : 2) extends <T>() => T extends Expected ? 1 : 2
   ? true
@@ -19,9 +25,15 @@ type Expect<T extends true> = T;
 
 type CreditHistoryItem = Awaited<ReturnType<typeof getCreditHistory>>[number];
 type CreditPurchaseItem = Awaited<ReturnType<typeof getCreditPurchases>>[number];
+type ContractCreditTransactionCreatedAt = CreditTransaction["createdAt"];
+type ContractCreditPurchaseCreatedAt = CreditPurchase["createdAt"];
 type NotificationItem = Extract<Awaited<ReturnType<typeof getNotifications>>, { data: unknown }>["data"][number];
 type ActiveBannerNotification = NonNullable<Awaited<ReturnType<typeof getActiveBannerNotifications>>["data"]>;
 type NotificationSendHistoryCreatedAt = NotificationSendHistoryItem["createdAt"];
+type ContractAdminUserListCreatedAt = ContractAdminUserListItem["createdAt"];
+type ContractAdminUserBanExpires = AdminUserDetail["banExpires"];
+type ContractAdminUserCreatedAt = AdminUserDetail["createdAt"];
+type ContractAdminUserUpdatedAt = AdminUserDetail["updatedAt"];
 type AdminUser = NonNullable<Awaited<ReturnType<typeof getAdminUser>>["data"]>;
 type AdminUserListItem = Awaited<ReturnType<typeof getUsers>>["data"]["users"][number];
 type AdminUserCreditHistoryItem = Awaited<ReturnType<typeof getAdminUserCreditHistory>>[number];
@@ -42,6 +54,8 @@ type StatusUpdatedVoucher = NonNullable<Awaited<ReturnType<typeof updateVoucherS
 
 type CreditHistoryCreatedAtIsWireString = Expect<Equal<CreditHistoryItem["createdAt"], string>>;
 type CreditPurchaseCreatedAtIsWireString = Expect<Equal<CreditPurchaseItem["createdAt"], string>>;
+type ContractCreditTransactionCreatedAtIsWireString = Expect<Equal<ContractCreditTransactionCreatedAt, string>>;
+type ContractCreditPurchaseCreatedAtIsWireString = Expect<Equal<ContractCreditPurchaseCreatedAt, string>>;
 type NotificationCreatedAtIsWireString = Expect<Equal<NotificationItem["createdAt"], string>>;
 type NotificationUpdatedAtIsWireString = Expect<Equal<NotificationItem["updatedAt"], string>>;
 type NotificationBannerExpiresAtIsWireString = Expect<Equal<NotificationItem["bannerExpiresAt"], string | null>>;
@@ -51,6 +65,10 @@ type AdminUserBanExpiresIsWireString = Expect<Equal<AdminUser["banExpires"], str
 type AdminUserCreatedAtIsWireString = Expect<Equal<AdminUser["createdAt"], string>>;
 type AdminUserUpdatedAtIsWireString = Expect<Equal<AdminUser["updatedAt"], string>>;
 type AdminUserListCreatedAtIsWireString = Expect<Equal<AdminUserListItem["createdAt"], string>>;
+type ContractAdminUserListCreatedAtIsWireString = Expect<Equal<ContractAdminUserListCreatedAt, string>>;
+type ContractAdminUserBanExpiresIsWireString = Expect<Equal<ContractAdminUserBanExpires, string | null>>;
+type ContractAdminUserCreatedAtIsWireString = Expect<Equal<ContractAdminUserCreatedAt, string>>;
+type ContractAdminUserUpdatedAtIsWireString = Expect<Equal<ContractAdminUserUpdatedAt, string>>;
 type AdminUserCreditHistoryCreatedAtIsWireString = Expect<Equal<AdminUserCreditHistoryItem["createdAt"], string>>;
 type AdminUserCreditPurchaseCreatedAtIsWireString = Expect<Equal<AdminUserCreditPurchaseItem["createdAt"], string>>;
 type AdminAllTransactionCreatedAtIsWireString = Expect<Equal<AdminAllTransactionItem["createdAt"], string>>;
