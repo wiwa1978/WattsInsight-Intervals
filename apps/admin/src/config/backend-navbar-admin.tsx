@@ -6,7 +6,8 @@ import {
   Logs,
   Percent,
   Ticket,
-  Users
+  Users,
+  Webhook
 } from "lucide-react"
 
 export interface BackendNavAdminItem {
@@ -33,6 +34,11 @@ export const BackendNavAdminItems: BackendNavAdminItem[] = [
     title: "admin.nav.billing",
     url: "/admin/billing",
     icon: CreditCard ,
+  },
+  {
+    title: "admin.nav.webhooks",
+    url: "/admin/webhooks",
+    icon: Webhook,
   },
   {
     title: "admin.nav.discounts",
