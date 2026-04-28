@@ -43,7 +43,7 @@ interface PurchaseHistoryProps {
     priceExclVat: number;
     paymentStatus: "pending" | "completed" | "failed" | "refunded";
     paymentId: string;
-    createdAt: Date;
+    createdAt: string;
   }>;
 }
 
@@ -206,7 +206,7 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
         );
       },
       cell: ({ row }) => {
-        const createdAt = row.getValue("createdAt") as Date;
+        const createdAt = row.getValue("createdAt") as string;
         return (
           <span className="text-muted-foreground text-sm">
             {formatDate(createdAt)}

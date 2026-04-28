@@ -13,7 +13,7 @@ type CreditHistoryItem = {
   referenceType?: string | null;
   referenceId?: string | null;
   metadata?: unknown;
-  createdAt: Date;
+  createdAt: string;
 };
 
 type CreditPurchaseItem = {
@@ -25,7 +25,7 @@ type CreditPurchaseItem = {
   priceExclVat: number;
   paymentStatus: "pending" | "completed" | "failed" | "refunded";
   paymentId: string;
-  createdAt: Date;
+  createdAt: string;
 };
 
 const creditsApi = createCreditsApi(apiRequest);

@@ -12,9 +12,9 @@ export const notificationSchema = z.object({
   category: notificationCategorySchema,
   read: z.boolean(),
   showAsBanner: z.boolean(),
-  bannerExpiresAt: z.union([z.string(), z.date(), z.null()]),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  bannerExpiresAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
   data: z.record(z.string(), z.unknown()).nullable(),
 });
 
