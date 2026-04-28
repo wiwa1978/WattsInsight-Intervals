@@ -33,7 +33,7 @@ export type Purchase = {
   currency?: string;
   paymentStatus: "pending" | "completed" | "failed" | "refunded";
   paymentId?: string;
-  createdAt: Date;
+  createdAt: string;
   userId?: string;
   userName?: string | null;
   userEmail?: string;

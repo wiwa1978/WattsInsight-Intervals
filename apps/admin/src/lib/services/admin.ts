@@ -33,7 +33,7 @@ type AdminCreditTransaction = {
   referenceType?: string | null;
   referenceId?: string | null;
   metadata?: unknown;
-  createdAt: Date;
+  createdAt: string;
 };
 
 type AdminCreditPurchase = {
@@ -45,7 +45,7 @@ type AdminCreditPurchase = {
   priceExclVat: number;
   paymentStatus: "pending" | "completed" | "failed" | "refunded";
   paymentId?: string;
-  createdAt: Date;
+  createdAt: string;
   userId?: string;
   userName?: string | null;
   userEmail?: string;
@@ -106,9 +106,9 @@ export async function getAdminUser(userId: string) {
         role: string | null;
         banned: boolean | null;
         banReason: string | null;
-        banExpires: Date | null;
-        createdAt: Date;
-        updatedAt: Date;
+        banExpires: string | null;
+        createdAt: string;
+        updatedAt: string;
       };
       error?: string;
     };
@@ -203,7 +203,7 @@ export async function getUsers(limit = 20, offset = 0, search?: string) {
         role: string | null;
         banned: boolean | null;
         emailVerified: boolean;
-        createdAt: Date;
+        createdAt: string;
       }>;
       total: number;
     };

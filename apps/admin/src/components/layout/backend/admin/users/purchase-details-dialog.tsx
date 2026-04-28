@@ -22,7 +22,7 @@ interface PurchaseDetailsDialogProps {
     priceInclVat: number;
     priceExclVat: number;
     paymentStatus: string;
-    createdAt: Date;
+    createdAt: string;
   } | null;
 }
 

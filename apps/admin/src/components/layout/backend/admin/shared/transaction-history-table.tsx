@@ -30,7 +30,7 @@ export type Transaction = {
   referenceType?: string | null;
   referenceId?: string | null;
   metadata?: unknown;
-  createdAt: Date;
+  createdAt: string;
   userId?: string;
   userName?: string | null;
   userEmail?: string;

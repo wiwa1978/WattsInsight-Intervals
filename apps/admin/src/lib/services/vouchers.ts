@@ -16,10 +16,10 @@ export interface Voucher {
   maxRedemptions: number;
   currentRedemptions: number;
   appliesToAllUsers: boolean;
-  expiresAt: Date | null;
-  redeemedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  expiresAt: string | null;
+  redeemedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface VoucherWithUsers extends Voucher {
@@ -33,9 +33,9 @@ export interface VoucherWithUsers extends Voucher {
     voucherId: string;
     userId: string;
     creditsGranted: number;
-    redeemedAt: Date;
-    createdAt: Date;
-    updatedAt: Date;
+    redeemedAt: string;
+    createdAt: string;
+    updatedAt: string;
   }>;
 }
 

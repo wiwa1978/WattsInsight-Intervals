@@ -26,7 +26,7 @@ interface TransactionDetailsDialogProps {
     referenceType?: string | null;
     referenceId?: string | null;
     metadata?: unknown;
-    createdAt: Date;
+    createdAt: string;
   } | null;
 }
 
