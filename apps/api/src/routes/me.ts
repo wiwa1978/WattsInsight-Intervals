@@ -11,8 +11,10 @@ import {
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
+import { applicationConfig } from "../config/application";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { ok, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
+import { isCreditBillingMode, isSubscriptionBillingMode } from "../lib/billing-mode";
 
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
@@ -38,6 +40,22 @@ export function createMeRouter() {
 
   router.get("/session", (c) => {
     return ok(c, getAuthUser(c));
+  });
+
+  router.get("/application-config", (c) => {
+    return ok(c, {
+      billing: {
+        enabled: applicationConfig.features.billing,
+        mode: applicationConfig.billing.mode,
+        creditSurfacesEnabled: applicationConfig.features.billing && isCreditBillingMode(),
+        subscriptionSurfacesEnabled: applicationConfig.features.billing && isSubscriptionBillingMode(),
+      },
+      features: {
+        vouchers: applicationConfig.features.vouchers,
+        discounts: applicationConfig.features.discounts,
+        notifications: applicationConfig.features.notifications,
+      },
+    });
   });
 
   router.get("/credits/balance", async (c) => {

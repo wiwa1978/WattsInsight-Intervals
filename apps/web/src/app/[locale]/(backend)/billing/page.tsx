@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getServerSession } from "@/lib/auth-session";
+import { getMyApplicationConfig } from "@/lib/api/me";
 import { getCreditPurchases } from "@/lib/services/credits";
 import { PurchaseHistory } from "@/components/layout/backend/billing/purchase-history";
 import { CreditPricing } from "@/components/layout/backend/billing/credit-pricing";
@@ -12,6 +13,8 @@ import {
   TableSkeleton,
 } from "@/components/layout/backend/billing/transaction-history";
 import { BillingClientWrapper } from "./client-wrapper";
+import { SubscriptionBillingClientWrapper } from "./subscription-client-wrapper";
+import { SubscriptionPricing } from "@/components/layout/backend/billing/subscription-pricing";
 
 type BillingPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -41,6 +44,15 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const resolvedSearchParams = await searchParams;
   const checkoutOutcome = getCheckoutOutcome(resolvedSearchParams);
   const t = await getTranslations("billing");
+  const applicationConfig = await getMyApplicationConfig();
+
+  if (applicationConfig.billing.subscriptionSurfacesEnabled) {
+    return <SubscriptionBillingPage checkoutOutcome={checkoutOutcome} />;
+  }
+
+  if (!applicationConfig.billing.creditSurfacesEnabled) {
+    return null;
+  }
 
   return (
     <BillingClientWrapper checkoutOutcome={checkoutOutcome}>
@@ -67,6 +79,24 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </div>
       </div>
     </BillingClientWrapper>
+  );
+}
+
+async function SubscriptionBillingPage({ checkoutOutcome }: { checkoutOutcome: CheckoutOutcome }) {
+  const t = await getTranslations("billing");
+  const subscriptionT = await getTranslations("billing.subscription");
+
+  return (
+    <SubscriptionBillingClientWrapper checkoutOutcome={checkoutOutcome}>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground">{subscriptionT("description")}</p>
+        </div>
+
+        <SubscriptionPricing />
+      </div>
+    </SubscriptionBillingClientWrapper>
   );
 }
 

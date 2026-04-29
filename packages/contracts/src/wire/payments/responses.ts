@@ -9,6 +9,8 @@ export const createCheckoutResponseSchema = z.object({
   }),
 });
 
+export type CreateCheckoutResponse = z.infer<typeof createCheckoutResponseSchema>;
+
 export const invoiceDataSchema = z.object({
   invoiceUrl: z.string().url(),
 });

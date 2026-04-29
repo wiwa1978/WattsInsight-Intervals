@@ -123,6 +123,20 @@ export const subscriptionsListSchema = z.object({
   hasMore: z.boolean(),
 });
 
+export const applicationConfigSchema = z.object({
+  billing: z.object({
+    enabled: z.boolean(),
+    mode: z.enum(["credits", "subscriptions"]),
+    creditSurfacesEnabled: z.boolean(),
+    subscriptionSurfacesEnabled: z.boolean(),
+  }),
+  features: z.object({
+    vouchers: z.boolean(),
+    discounts: z.boolean(),
+    notifications: z.boolean(),
+  }),
+});
+
 export const creditBalanceResponseSchema = successResultSchema(creditBalanceSchema);
 export const creditHistoryResponseSchema = successResultSchema(z.array(creditTransactionSchema));
 export const creditPurchasesResponseSchema = successResultSchema(z.array(creditPurchaseSchema));
@@ -135,6 +149,7 @@ export const creditsConsumedChartResponseSchema = successResultSchema(z.array(cr
 export const userSubscriptionResponseSchema = successResultSchema(userSubscriptionSchema.nullable());
 export const subscriptionsListResponseSchema = successResultSchema(subscriptionsListSchema);
 export const subscriptionStatsResponseSchema = successResultSchema(subscriptionStatsSchema);
+export const applicationConfigResponseSchema = successResultSchema(applicationConfigSchema);
 
 export const consumeCreditsResponseSchema = z.object({
   transactionId: z.string(),
@@ -161,3 +176,4 @@ export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 export type UserSubscription = z.infer<typeof userSubscriptionSchema>;
 export type SubscriptionsList = z.infer<typeof subscriptionsListSchema>;
 export type SubscriptionStats = z.infer<typeof subscriptionStatsSchema>;
+export type ApplicationConfig = z.infer<typeof applicationConfigSchema>;

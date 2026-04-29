@@ -30,6 +30,7 @@ export const apiRoutes = {
   },
   me: {
     session: "/me/session",
+    applicationConfig: "/me/application-config",
     creditBalance: "/me/credits/balance",
     creditHistory: (limit = 50) => withQuery("/me/credits/history", { limit }),
     creditPurchases: (limit = 50) => withQuery("/me/credits/purchases", { limit }),

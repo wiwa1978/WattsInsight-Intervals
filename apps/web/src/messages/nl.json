@@ -1216,6 +1216,16 @@
         "submit": "Voucher inwisselen",
         "redeeming": "Inwisselen..."
       }
+    },
+    "subscription": {
+      "description": "Kies een abonnement om door te gaan.",
+      "mostPopular": "Meest populair",
+      "planDescription": "Terugkerende SaaS-toegang, gefactureerd per {interval}",
+      "choosePlan": "Kies {plan}",
+      "checkout": {
+        "successDescription": "Abonnement checkout voltooid. Je abonnement wordt bijgewerkt zodra de betaling is verwerkt.",
+        "cancelDescription": "Abonnement checkout is geannuleerd."
+      }
     }
   },
   "chat": {

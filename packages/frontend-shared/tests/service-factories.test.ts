@@ -65,6 +65,7 @@ describe("service factories", () => {
     const me = createMeApi(request);
 
     await expect(me.getSession()).resolves.toEqual({ path: "/me/session", init: undefined });
+    await expect(me.getApplicationConfig()).resolves.toEqual({ path: "/me/application-config", init: undefined });
     await expect(me.redeemVoucher("WELCOME")).resolves.toEqual({
       path: "/me/vouchers/redeem",
       init: { method: "POST", body: JSON.stringify({ code: "WELCOME" }) },
@@ -74,6 +75,10 @@ describe("service factories", () => {
     await expect(me.createCheckoutSession("starter")).resolves.toEqual({
       path: "/payments/checkout",
       init: { method: "POST", body: JSON.stringify({ packageKey: "starter" }) },
+    });
+    await expect(me.createSubscriptionCheckoutSession("pro")).resolves.toEqual({
+      path: "/payments/checkout",
+      init: { method: "POST", body: JSON.stringify({ billingMode: "subscriptions", planKey: "pro" }) },
     });
   });
 

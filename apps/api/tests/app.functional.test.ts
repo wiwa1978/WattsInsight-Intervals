@@ -402,6 +402,30 @@ describe("API functional routes", () => {
     });
   });
 
+  // Verifies authenticated clients can discover application capabilities before
+  // choosing credit-only or subscription-only API surfaces.
+  it("returns application config for authenticated clients", async () => {
+    const res = await app.request("/me/application-config");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        billing: {
+          enabled: true,
+          mode: "credits",
+          creditSurfacesEnabled: true,
+          subscriptionSurfacesEnabled: false,
+        },
+        features: {
+          vouchers: true,
+          discounts: true,
+          notifications: true,
+        },
+      },
+    });
+  });
+
   // Verifies validation errors produced by API helpers include machine-readable
   // metadata for generated clients while preserving the human-readable message.
   it("returns canonical validation error metadata", async () => {
