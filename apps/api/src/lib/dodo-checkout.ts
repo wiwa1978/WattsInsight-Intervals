@@ -13,14 +13,20 @@ export function buildDodoCheckoutUrl(args: {
   baseUrl: string;
   productId: string;
   userId: string;
-  packageKey: string;
+  packageKey?: string;
+  planKey?: string;
   customerEmail?: string | null;
   successUrl?: string;
   cancelUrl?: string;
 }) {
   const url = new URL(`${args.baseUrl}/buy/${args.productId}`);
   url.searchParams.set("metadata_userId", args.userId);
-  url.searchParams.set("metadata_packageKey", args.packageKey);
+  if (args.packageKey) {
+    url.searchParams.set("metadata_packageKey", args.packageKey);
+  }
+  if (args.planKey) {
+    url.searchParams.set("metadata_planKey", args.planKey);
+  }
   if (args.customerEmail) {
     url.searchParams.set("customer_email", args.customerEmail);
   }

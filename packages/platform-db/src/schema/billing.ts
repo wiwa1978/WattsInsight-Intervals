@@ -15,6 +15,14 @@ import {
 import { user } from "./auth";
 import { createdAt, id, updatedAt } from "./helpers";
 
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "expired"
+  | "paused";
+
 export const userCredits = pgTable(
   "user_credits",
   {
@@ -118,6 +126,51 @@ export const paymentWebhookEvents = pgTable(
     index("payment_webhook_events_payment_id_idx").on(table.paymentId),
     index("payment_webhook_events_event_type_idx").on(table.eventType),
     index("payment_webhook_events_processing_status_idx").on(table.processingStatus),
+  ],
+);
+
+export const userSubscriptions = pgTable(
+  "user_subscriptions",
+  {
+    id,
+    userId: uuid("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    planKey: text("plan_key").notNull(),
+    dodoCustomerId: text("dodo_customer_id"),
+    dodoSubscriptionId: text("dodo_subscription_id").notNull(),
+    status: text("status").$type<SubscriptionStatus>().notNull(),
+    currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("user_subscriptions_user_id_idx").on(table.userId),
+    uniqueIndex("user_subscriptions_dodo_subscription_id_idx").on(table.dodoSubscriptionId),
+    index("user_subscriptions_status_idx").on(table.status),
+    index("user_subscriptions_plan_key_idx").on(table.planKey),
+  ],
+);
+
+export const subscriptionEvents = pgTable(
+  "subscription_events",
+  {
+    id,
+    userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
+    dodoSubscriptionId: text("dodo_subscription_id"),
+    eventType: text("event_type").notNull(),
+    status: text("status").$type<SubscriptionStatus>(),
+    payload: jsonb("payload"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("subscription_events_user_id_idx").on(table.userId),
+    index("subscription_events_dodo_subscription_id_idx").on(table.dodoSubscriptionId),
+    index("subscription_events_event_type_idx").on(table.eventType),
+    index("subscription_events_created_at_idx").on(table.createdAt),
   ],
 );
 
@@ -257,6 +310,25 @@ export const creditPurchasesRelations = relations(creditPurchases, ({ one }) => 
   user: one(user, {
     fields: [creditPurchases.userId],
     references: [user.id],
+  }),
+}));
+
+export const userSubscriptionsRelations = relations(userSubscriptions, ({ one, many }) => ({
+  user: one(user, {
+    fields: [userSubscriptions.userId],
+    references: [user.id],
+  }),
+  events: many(subscriptionEvents),
+}));
+
+export const subscriptionEventsRelations = relations(subscriptionEvents, ({ one }) => ({
+  user: one(user, {
+    fields: [subscriptionEvents.userId],
+    references: [user.id],
+  }),
+  subscription: one(userSubscriptions, {
+    fields: [subscriptionEvents.dodoSubscriptionId],
+    references: [userSubscriptions.dodoSubscriptionId],
   }),
 }));
 

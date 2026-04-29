@@ -66,6 +66,41 @@ export const creditsConsumedPointSchema = z.object({
   consumed: z.number().nonnegative(),
 });
 
+export const subscriptionStatusSchema = z.enum([
+  "active",
+  "trialing",
+  "past_due",
+  "canceled",
+  "expired",
+  "paused",
+]);
+
+export const userSubscriptionSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  planKey: z.string(),
+  dodoCustomerId: z.string().nullable().optional(),
+  dodoSubscriptionId: z.string(),
+  status: subscriptionStatusSchema,
+  currentPeriodStart: z.string().nullable().optional(),
+  currentPeriodEnd: z.string().nullable().optional(),
+  cancelAtPeriodEnd: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  userName: z.string().nullable().optional(),
+  userEmail: z.string().optional(),
+});
+
+export const subscriptionStatsSchema = z.object({
+  totalSubscriptions: z.number().int().nonnegative(),
+  activeSubscriptions: z.number().int().nonnegative(),
+  trialingSubscriptions: z.number().int().nonnegative(),
+  pastDueSubscriptions: z.number().int().nonnegative(),
+  canceledSubscriptions: z.number().int().nonnegative(),
+  monthlyRecurringRevenue: z.number().nonnegative(),
+  annualRecurringRevenue: z.number().nonnegative(),
+});
+
 export const transactionsListSchema = z.object({
   transactions: z.array(creditTransactionSchema.extend({
     userId: z.string(),
@@ -82,6 +117,12 @@ export const purchasesListSchema = z.object({
   hasMore: z.boolean(),
 });
 
+export const subscriptionsListSchema = z.object({
+  subscriptions: z.array(userSubscriptionSchema),
+  total: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+});
+
 export const creditBalanceResponseSchema = successResultSchema(creditBalanceSchema);
 export const creditHistoryResponseSchema = successResultSchema(z.array(creditTransactionSchema));
 export const creditPurchasesResponseSchema = successResultSchema(z.array(creditPurchaseSchema));
@@ -91,6 +132,9 @@ export const transactionsDataResponseSchema = successResultSchema(transactionsLi
 export const purchasesDataResponseSchema = successResultSchema(purchasesListSchema);
 export const transactionChartResponseSchema = successResultSchema(z.array(transactionPointSchema));
 export const creditsConsumedChartResponseSchema = successResultSchema(z.array(creditsConsumedPointSchema));
+export const userSubscriptionResponseSchema = successResultSchema(userSubscriptionSchema.nullable());
+export const subscriptionsListResponseSchema = successResultSchema(subscriptionsListSchema);
+export const subscriptionStatsResponseSchema = successResultSchema(subscriptionStatsSchema);
 
 export type CreditBalance = z.infer<typeof creditBalanceSchema>;
 export type CreditTransaction = z.infer<typeof creditTransactionSchema>;
@@ -101,3 +145,7 @@ export type TransactionPoint = z.infer<typeof transactionPointSchema>;
 export type CreditsConsumedPoint = z.infer<typeof creditsConsumedPointSchema>;
 export type TransactionsList = z.infer<typeof transactionsListSchema>;
 export type PurchasesList = z.infer<typeof purchasesListSchema>;
+export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
+export type UserSubscription = z.infer<typeof userSubscriptionSchema>;
+export type SubscriptionsList = z.infer<typeof subscriptionsListSchema>;
+export type SubscriptionStats = z.infer<typeof subscriptionStatsSchema>;
