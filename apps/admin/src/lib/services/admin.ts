@@ -43,8 +43,29 @@ import type {
   TransactionPoint,
   TransactionsList,
 } from "@platform/contracts";
+import { ApiRequestError } from "@platform/frontend-shared";
 
 export type TimeRange = "daily" | "weekly" | "monthly" | "yearly";
+
+function isCreditBillingDisabledError(error: unknown) {
+  return (
+    error instanceof ApiRequestError &&
+    error.status === 400 &&
+    error.message.includes("Billing mode disabled: credits")
+  );
+}
+
+async function getCreditBillingChartData<T>(loadData: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await loadData();
+  } catch (error) {
+    if (isCreditBillingDisabledError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
 
 export async function verifyAdminBanSecret(secret: string) {
   return verifyAdminBanSecretApi(secret);
@@ -109,7 +130,7 @@ export async function getAdminBillingStats(): Promise<BillingStats> {
 }
 
 export async function getAdminRevenueData(timeRange: TimeRange): Promise<RevenuePoint[]> {
-  return getAdminRevenueDataApi(timeRange);
+  return getCreditBillingChartData(() => getAdminRevenueDataApi(timeRange));
 }
 
 export async function getAdminAllTransactions(limit: number = 20, offset: number = 0, searchEmail?: string) {
@@ -121,11 +142,11 @@ export async function getAdminAllPurchases(limit: number = 20, offset: number = 
 }
 
 export async function getAdminTransactionData(timeRange: TimeRange): Promise<TransactionPoint[]> {
-  return getAdminTransactionDataApi(timeRange);
+  return getCreditBillingChartData(() => getAdminTransactionDataApi(timeRange));
 }
 
 export async function getAdminCreditsConsumedData(timeRange: TimeRange): Promise<CreditsConsumedPoint[]> {
-  return getAdminCreditsConsumedDataApi(timeRange);
+  return getCreditBillingChartData(() => getAdminCreditsConsumedDataApi(timeRange));
 }
 
 export async function getAdminWebhookEvents(query: AdminWebhookEventsQuery = {}): Promise<AdminWebhookEventsList> {
