@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { getMyApplicationConfig } from "@/lib/api/me";
 import { getCreditBalance } from "@/lib/services/credits";
 import { Loader2, Sparkles, Coins } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -11,13 +12,19 @@ import { webQueryKeys } from "@/lib/query/keys";
 export function CreditProgressBar() {
   const t = useTranslations("creditProgressBar");
   const { state } = useSidebar();
+  const applicationConfigQuery = useQuery({
+    queryKey: webQueryKeys.applicationConfig,
+    queryFn: getMyApplicationConfig,
+    staleTime: 60_000,
+  });
   const creditBalanceQuery = useQuery({
     queryKey: webQueryKeys.creditBalance,
     queryFn: getCreditBalance,
+    enabled: applicationConfigQuery.data?.billing.creditSurfacesEnabled === true,
     staleTime: 30_000,
   });
 
-  if (creditBalanceQuery.isLoading) {
+  if (applicationConfigQuery.isLoading || creditBalanceQuery.isLoading) {
     return (
       <div className="px-3 py-1">
         <div className="flex items-center justify-center py-1">
@@ -27,7 +34,7 @@ export function CreditProgressBar() {
     );
   }
 
-  if (creditBalanceQuery.isError) {
+  if (applicationConfigQuery.isError || applicationConfigQuery.data?.billing.creditSurfacesEnabled !== true || creditBalanceQuery.isError) {
     return null;
   }
 

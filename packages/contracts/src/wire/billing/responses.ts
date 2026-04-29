@@ -91,6 +91,19 @@ export const userSubscriptionSchema = z.object({
   userEmail: z.string().optional(),
 });
 
+export const subscriptionPaymentSchema = z.object({
+  id: z.string(),
+  planKey: z.string(),
+  dodoSubscriptionId: z.string().nullable().optional(),
+  paymentStatus: z.enum(["pending", "completed", "failed", "refunded"]),
+  paymentId: z.string(),
+  priceExclVat: z.number().int().nonnegative(),
+  priceInclVat: z.number().int().nonnegative(),
+  vatAmount: z.number().int().nonnegative(),
+  currency: z.string(),
+  createdAt: z.string(),
+});
+
 export const subscriptionStatsSchema = z.object({
   totalSubscriptions: z.number().int().nonnegative(),
   activeSubscriptions: z.number().int().nonnegative(),
@@ -147,6 +160,7 @@ export const purchasesDataResponseSchema = successResultSchema(purchasesListSche
 export const transactionChartResponseSchema = successResultSchema(z.array(transactionPointSchema));
 export const creditsConsumedChartResponseSchema = successResultSchema(z.array(creditsConsumedPointSchema));
 export const userSubscriptionResponseSchema = successResultSchema(userSubscriptionSchema.nullable());
+export const subscriptionPaymentsResponseSchema = successResultSchema(z.array(subscriptionPaymentSchema));
 export const subscriptionsListResponseSchema = successResultSchema(subscriptionsListSchema);
 export const subscriptionStatsResponseSchema = successResultSchema(subscriptionStatsSchema);
 export const applicationConfigResponseSchema = successResultSchema(applicationConfigSchema);
@@ -174,6 +188,7 @@ export type TransactionsList = z.infer<typeof transactionsListSchema>;
 export type PurchasesList = z.infer<typeof purchasesListSchema>;
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 export type UserSubscription = z.infer<typeof userSubscriptionSchema>;
+export type SubscriptionPayment = z.infer<typeof subscriptionPaymentSchema>;
 export type SubscriptionsList = z.infer<typeof subscriptionsListSchema>;
 export type SubscriptionStats = z.infer<typeof subscriptionStatsSchema>;
 export type ApplicationConfig = z.infer<typeof applicationConfigSchema>;

@@ -74,4 +74,47 @@ describe("payment event handler billing modes", () => {
       },
     });
   });
+
+  it("records subscription payments when subscription mode payment succeeds", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "subscriptions";
+    const billing = createBillingDeps();
+    const recordSubscriptionPayment = vi.fn().mockResolvedValue({});
+    const handler = createPaymentEventHandler({
+      creditPackages: [],
+      billing,
+      subscriptions: {
+        handleDodoSubscriptionWebhook: vi.fn(),
+        recordSubscriptionPayment,
+      },
+    });
+
+    await handler({
+      provider: "dodo",
+      eventType: "payment.succeeded",
+      paymentId: "pay_sub_1",
+      productId: "pdt_subscription_starter",
+      metadata: { billingMode: "subscriptions", userId: "user-1", planKey: "starter", subscriptionId: "sub_1" },
+      customerId: "cus_1",
+      currency: "EUR",
+      totalAmount: 1900,
+      taxAmount: 190,
+      raw: {},
+    });
+
+    expect(recordSubscriptionPayment).toHaveBeenCalledWith({
+      userId: "user-1",
+      planKey: "starter",
+      paymentId: "pay_sub_1",
+      paymentStatus: "completed",
+      dodoCustomerId: "cus_1",
+      dodoSubscriptionId: "sub_1",
+      pricing: {
+        priceExclVat: 1710,
+        priceInclVat: 1900,
+        vatAmount: 190,
+        currency: "EUR",
+      },
+    });
+    expect(billing.processCreditPurchase).not.toHaveBeenCalled();
+  });
 });

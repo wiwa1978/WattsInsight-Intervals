@@ -183,6 +183,53 @@ export function createMeRouter() {
     return c.json({ success: true, data: subscription ?? null });
   });
 
+  router.get("/subscription/payments", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const authUser = getAuthUser(c);
+    const parsedQuery = parseQuery(optionalLimitQuerySchema, { limit: c.req.query("limit") });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid subscription payments query");
+    }
+
+    const payments = await bootstrap.subscriptionService.listUserSubscriptionPayments(authUser.id, parsedQuery.data.limit);
+    return c.json({ success: true, data: payments });
+  });
+
+  router.post("/subscription/invoice", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const authUser = getAuthUser(c);
+    const body = await c.req.json().catch(() => null);
+    const parsedBody = parseJsonBody(invoiceRequestSchema, body);
+
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid invoice payload");
+    }
+
+    try {
+      const invoice = await bootstrap.subscriptionService.downloadSubscriptionInvoice(authUser.id, parsedBody.data.paymentId);
+      return c.json(invoice);
+    } catch (error) {
+      return c.json(
+        {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to download invoice",
+        },
+        400,
+      );
+    }
+  });
+
   router.get("/notifications", async (c) => {
     const authUser = getAuthUser(c);
     const parsedQuery = parseQuery(optionalLimitQuerySchema, { limit: c.req.query("limit") });

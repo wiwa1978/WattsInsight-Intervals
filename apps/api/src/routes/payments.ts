@@ -33,6 +33,7 @@ export function createPaymentsRouter() {
 
     const packageKey = "packageKey" in parsedBody.data ? parsedBody.data.packageKey : undefined;
     const planKey = "planKey" in parsedBody.data ? parsedBody.data.planKey : undefined;
+    const discountCode = "discountCode" in parsedBody.data ? parsedBody.data.discountCode : undefined;
     const requestMode = "billingMode" in parsedBody.data ? parsedBody.data.billingMode : "credits";
 
     try {
@@ -80,7 +81,9 @@ export function createPaymentsRouter() {
       baseUrl,
       productId: selectedProduct.productId,
       userId: authUser.id,
+      billingMode: requestMode,
       ...(requestMode === "credits" ? { packageKey } : { planKey }),
+      ...(requestMode === "subscriptions" && discountCode ? { discountCode } : {}),
       customerEmail: authUser.email ?? null,
       successUrl,
       cancelUrl,

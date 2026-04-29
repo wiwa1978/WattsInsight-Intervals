@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, createContext, useContext } from "react";
+import { ReactNode, createContext, useContext, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -13,6 +13,8 @@ interface SubscriptionBillingClientWrapperProps {
 }
 
 interface SubscriptionBillingContextType {
+  appliedDiscountCode: string | null;
+  setAppliedDiscountCode: (code: string | null) => void;
   handleSelectPlan: (planKey: string) => Promise<void>;
 }
 
@@ -28,8 +30,9 @@ export function useSubscriptionBilling() {
 
 export function SubscriptionBillingClientWrapper({ children, checkoutOutcome }: SubscriptionBillingClientWrapperProps) {
   const t = useTranslations("billing.subscription.checkout");
+  const [appliedDiscountCode, setAppliedDiscountCode] = useState<string | null>(null);
   const checkoutMutation = useMutation({
-    mutationFn: createSubscriptionCheckoutSession,
+    mutationFn: (planKey: string) => createSubscriptionCheckoutSession(planKey, appliedDiscountCode ?? undefined),
   });
 
   const handleSelectPlan = async (planKey: string) => {
@@ -48,7 +51,7 @@ export function SubscriptionBillingClientWrapper({ children, checkoutOutcome }: 
   };
 
   return (
-    <SubscriptionBillingContext.Provider value={{ handleSelectPlan }}>
+    <SubscriptionBillingContext.Provider value={{ appliedDiscountCode, setAppliedDiscountCode, handleSelectPlan }}>
       <div className="space-y-6">
         {checkoutOutcome === "success" ? (
           <div className="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">

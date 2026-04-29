@@ -34,6 +34,20 @@ export type PaymentEventHandlerDeps = {
   };
   subscriptions?: {
     handleDodoSubscriptionWebhook: (payload: unknown) => Promise<void>;
+    recordSubscriptionPayment?: (input: {
+      userId: string;
+      planKey: string;
+      paymentId: string;
+      paymentStatus: "completed" | "pending" | "failed";
+      dodoCustomerId?: string | null;
+      dodoSubscriptionId?: string | null;
+      pricing: {
+        priceExclVat: number;
+        priceInclVat: number;
+        vatAmount: number;
+        currency: string;
+      };
+    }) => Promise<unknown>;
   };
 };
 
@@ -94,8 +108,6 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       return;
     }
 
-    ensureCreditBillingEnabled();
-
     if (!event.productId) {
       throw new Error("Missing product id");
     }
@@ -108,6 +120,66 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         `Refusing payment ${event.paymentId}: metadata.userId missing. Checkout URLs must bind userId.`,
       );
     }
+
+    if (event.metadata?.billingMode === "subscriptions") {
+      ensureSubscriptionBillingEnabled();
+
+      const planKey = typeof event.metadata.planKey === "string" ? event.metadata.planKey : undefined;
+      if (!planKey) {
+        throw new Error(`Refusing payment ${event.paymentId}: metadata.planKey missing.`);
+      }
+
+      if (!event.currency) {
+        throw new Error(`Refusing payment ${event.paymentId}: currency missing.`);
+      }
+
+      if (event.currency !== EXPECTED_PAYMENT_CURRENCY) {
+        throw new Error(`Refusing payment ${event.paymentId}: expected ${EXPECTED_PAYMENT_CURRENCY}, received ${event.currency}.`);
+      }
+
+      if (!Number.isFinite(event.totalAmount) || event.totalAmount === undefined || event.totalAmount <= 0) {
+        throw new Error(`Refusing payment ${event.paymentId}: invalid total amount.`);
+      }
+
+      if (!Number.isFinite(event.taxAmount) || event.taxAmount === undefined || event.taxAmount < 0) {
+        throw new Error(`Refusing payment ${event.paymentId}: invalid tax amount.`);
+      }
+
+      if (event.taxAmount > event.totalAmount) {
+        throw new Error(`Refusing payment ${event.paymentId}: tax amount exceeds total amount.`);
+      }
+
+      const foundUser = await deps.billing.getUserById(metadataUserId);
+      if (!foundUser) {
+        throw new Error(
+          `Refusing payment ${event.paymentId}: metadata.userId ${metadataUserId} did not resolve to a known user.`,
+        );
+      }
+
+      const paymentStatus = event.eventType === "payment.succeeded"
+        ? "completed"
+        : event.eventType === "payment.processing"
+          ? "pending"
+          : "failed";
+
+      await deps.subscriptions?.recordSubscriptionPayment?.({
+        userId: foundUser.id,
+        planKey,
+        paymentId: event.paymentId,
+        paymentStatus,
+        dodoCustomerId: event.customerId ?? null,
+        dodoSubscriptionId: event.metadata.subscriptionId,
+        pricing: {
+          priceExclVat: event.totalAmount - event.taxAmount,
+          priceInclVat: event.totalAmount,
+          vatAmount: event.taxAmount,
+          currency: event.currency,
+        },
+      });
+      return;
+    }
+
+    ensureCreditBillingEnabled();
 
     const foundUser = await deps.billing.getUserById(metadataUserId);
 

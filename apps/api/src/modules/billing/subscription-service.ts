@@ -1,11 +1,33 @@
 import { desc, eq, like, sql } from "drizzle-orm";
 
-import { subscriptionEvents, type SubscriptionStatus, user, userSubscriptions } from "@platform/platform-db";
+import { subscriptionEvents, subscriptionPayments, type SubscriptionStatus, user, userSubscriptions } from "@platform/platform-db";
 
 import { subscriptionPlans } from "../../config/billing";
+import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
 
 type SubscriptionServiceDeps = {
   db: any;
+  env?: {
+    DODO_PAYMENTS_API_KEY?: string;
+    DODO_PAYMENTS_ENVIRONMENT: "test_mode" | "live_mode";
+  };
+};
+
+type SubscriptionPaymentStatus = "completed" | "pending" | "failed" | "refunded";
+
+type RecordSubscriptionPaymentInput = {
+  userId: string;
+  planKey: string;
+  paymentId: string;
+  paymentStatus: SubscriptionPaymentStatus;
+  dodoCustomerId?: string | null;
+  dodoSubscriptionId?: string | null;
+  pricing: {
+    priceExclVat: number;
+    priceInclVat: number;
+    vatAmount: number;
+    currency: string;
+  };
 };
 
 const supportedStatuses = new Set<SubscriptionStatus>([
@@ -106,6 +128,142 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       where: eq(userSubscriptions.userId, userId),
       orderBy: desc(userSubscriptions.createdAt),
     });
+  }
+
+  async function recordSubscriptionPayment(input: RecordSubscriptionPaymentInput) {
+    const now = new Date();
+    const paymentSnapshot = {
+      provider: "dodo" as const,
+      planKey: input.planKey,
+      customerId: input.dodoCustomerId ?? undefined,
+      subscriptionId: input.dodoSubscriptionId ?? undefined,
+      priceExclVat: input.pricing.priceExclVat,
+      priceInclVat: input.pricing.priceInclVat,
+      vatAmount: input.pricing.vatAmount,
+      currency: input.pricing.currency,
+    };
+
+    const [payment] = await deps.db
+      .insert(subscriptionPayments)
+      .values({
+        userId: input.userId,
+        planKey: input.planKey,
+        dodoCustomerId: input.dodoCustomerId ?? null,
+        dodoSubscriptionId: input.dodoSubscriptionId ?? null,
+        paymentId: input.paymentId,
+        paymentStatus: input.paymentStatus,
+        priceExclVat: input.pricing.priceExclVat,
+        priceInclVat: input.pricing.priceInclVat,
+        vatAmount: input.pricing.vatAmount,
+        currency: input.pricing.currency,
+        paymentSnapshot,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [subscriptionPayments.paymentProvider, subscriptionPayments.paymentId],
+        set: {
+          userId: input.userId,
+          planKey: input.planKey,
+          dodoCustomerId: input.dodoCustomerId ?? null,
+          dodoSubscriptionId: input.dodoSubscriptionId ?? null,
+          paymentStatus: input.paymentStatus,
+          priceExclVat: input.pricing.priceExclVat,
+          priceInclVat: input.pricing.priceInclVat,
+          vatAmount: input.pricing.vatAmount,
+          currency: input.pricing.currency,
+          paymentSnapshot,
+          updatedAt: now,
+        },
+      })
+      .returning();
+
+    return payment;
+  }
+
+  async function listUserSubscriptionPayments(userId: string, limit = 50) {
+    const normalizedLimit = normalizeLimit(limit, 100);
+
+    return deps.db
+      .select({
+        id: subscriptionPayments.id,
+        planKey: subscriptionPayments.planKey,
+        dodoSubscriptionId: subscriptionPayments.dodoSubscriptionId,
+        paymentStatus: subscriptionPayments.paymentStatus,
+        paymentId: subscriptionPayments.paymentId,
+        priceExclVat: subscriptionPayments.priceExclVat,
+        priceInclVat: subscriptionPayments.priceInclVat,
+        vatAmount: subscriptionPayments.vatAmount,
+        currency: subscriptionPayments.currency,
+        createdAt: subscriptionPayments.createdAt,
+      })
+      .from(subscriptionPayments)
+      .where(eq(subscriptionPayments.userId, userId))
+      .orderBy(desc(subscriptionPayments.createdAt))
+      .limit(normalizedLimit);
+  }
+
+  async function downloadSubscriptionInvoice(userId: string, paymentId: string) {
+    const [payment] = await deps.db
+      .select({
+        id: subscriptionPayments.id,
+        userId: subscriptionPayments.userId,
+        paymentStatus: subscriptionPayments.paymentStatus,
+      })
+      .from(subscriptionPayments)
+      .where(eq(subscriptionPayments.paymentId, paymentId))
+      .limit(1);
+
+    if (!payment) {
+      throw new Error("Subscription payment not found");
+    }
+
+    if (payment.userId !== userId) {
+      throw new Error("Unauthorized");
+    }
+
+    if (payment.paymentStatus !== "completed") {
+      throw new Error("Invoice not available for this payment");
+    }
+
+    const apiKey = deps.env?.DODO_PAYMENTS_API_KEY;
+    if (!apiKey) {
+      throw new Error("DodoPayments API key not configured");
+    }
+
+    const baseUrl =
+      deps.env?.DODO_PAYMENTS_ENVIRONMENT === "live_mode"
+        ? "https://live.dodopayments.com"
+        : "https://test.dodopayments.com";
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `${baseUrl}/invoices/payments/${paymentId}`,
+        withProviderTimeout({
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+        }),
+      );
+    } catch (error) {
+      throw new Error(isProviderTimeout(error) ? "Invoice provider request timed out" : "Invoice provider request failed");
+    }
+
+    if (!response.ok) {
+      throw new Error("Invoice provider request failed");
+    }
+
+    const invoiceData = (await response.json()) as { invoice_pdf?: string; url?: string };
+    if (!invoiceData.invoice_pdf && !invoiceData.url) {
+      throw new Error("Invoice URL not available in API response");
+    }
+
+    return {
+      success: true as const,
+      invoiceUrl: invoiceData.invoice_pdf || invoiceData.url,
+    };
   }
 
   async function upsertUserSubscription(input: UpsertUserSubscriptionInput) {
@@ -209,6 +367,9 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
 
   return {
     getUserSubscription,
+    recordSubscriptionPayment,
+    listUserSubscriptionPayments,
+    downloadSubscriptionInvoice,
     upsertUserSubscription,
     recordSubscriptionEvent,
     listSubscriptions,

@@ -1219,9 +1219,42 @@
     },
     "subscription": {
       "description": "Choose a subscription plan to continue.",
+      "currentTitle": "Current subscription",
+      "managedThroughPortal": "Your subscription is managed through the billing portal.",
+      "noActive": "No active subscription yet. Choose a plan below to get started.",
+      "planLabel": "Plan",
+      "statusLabel": "Status",
+      "renewsLabel": "Renews",
+      "unknownPeriod": "Unknown",
+      "upgrade": "Upgrade",
       "mostPopular": "Most popular",
       "planDescription": "Recurring SaaS access billed every {interval}",
       "choosePlan": "Choose {plan}",
+      "discount": {
+        "label": "Discount code",
+        "placeholder": "Enter discount code",
+        "apply": "Apply",
+        "applied": "Discount {code} applied",
+        "appliedDescription": "Discount code {code} will be sent with your next subscription checkout."
+      },
+      "history": {
+        "title": "Subscription invoices",
+        "description": "Your subscription payments and downloadable invoices.",
+        "empty": "No subscription payments yet.",
+        "downloadInvoice": "Download invoice",
+        "invoiceDownloaded": "Invoice opened successfully",
+        "invoiceUnavailable": "Invoice URL not available",
+        "invoiceFailed": "Failed to download invoice",
+        "table": {
+          "plan": "Plan",
+          "amount": "Amount",
+          "exclVat": "excl. VAT: €{amount}",
+          "status": "Status",
+          "date": "Date",
+          "invoice": "Invoice",
+          "notAvailable": "N/A"
+        }
+      },
       "checkout": {
         "successDescription": "Subscription checkout completed. Your subscription will update once payment processing completes.",
         "cancelDescription": "Subscription checkout was canceled."
@@ -1265,5 +1298,10 @@
     "upgrade": "Upgrade",
     "loading": "Loading credits...",
     "error": "Failed to load credits"
+  },
+  "subscriptionProgressBar": {
+    "label": "Subscription",
+    "starter": "Starter",
+    "upgrade": "Upgrade"
   }
 }

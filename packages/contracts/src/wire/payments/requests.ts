@@ -10,6 +10,7 @@ export const createCheckoutRequestSchema = z.union([
   z.object({
     billingMode: z.literal("subscriptions"),
     planKey: checkoutKeySchema,
+    discountCode: checkoutKeySchema.optional(),
   }),
   z.object({
     packageKey: checkoutKeySchema,

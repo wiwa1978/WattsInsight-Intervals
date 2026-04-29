@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getServerSession } from "@/lib/auth-session";
+import { getMyApplicationConfig } from "@/lib/api/me";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCreditBalance } from "@/lib/services/credits";
@@ -16,13 +17,16 @@ export default async function DashboardPage() {
   }
 
   const t = await getTranslations("dashboard");
+  const applicationConfig = await getMyApplicationConfig();
 
   return (
     <ClientDashboardWrapper>
       {/* Stats cards */}
-      <Suspense fallback={<CreditCardsSkeleton />}>
-        <CreditCards />
-      </Suspense>
+      {applicationConfig.billing.creditSurfacesEnabled ? (
+        <Suspense fallback={<CreditCardsSkeleton />}>
+          <CreditCards />
+        </Suspense>
+      ) : null}
     </ClientDashboardWrapper>
   );
 }
