@@ -1,8 +1,6 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { useEffect } from "react";
 
 import { Logo } from "@/components/icons/logo";
 import { Button } from "@/components/ui/button";
@@ -14,10 +12,6 @@ export default function GlobalError({
   error: Error & { digest?: string; errorCode?: string; requestId?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
   const isDevelopment = process.env.NODE_ENV === "development";
   const diagnosticCode = error.errorCode || error.digest || error.requestId || "WEB-UNEXPECTED";
 

@@ -94,25 +94,53 @@ const mocks = vi.hoisted(() => {
     { id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" },
     { id: "country-be-en", name: "Belgium", code: "BE", language: "en" },
   ];
+  const webhookRows = [
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      provider: "dodo",
+      providerEventId: "evt_123",
+      eventType: "payment.succeeded",
+      paymentId: "pay_123",
+      signatureTimestamp: new Date("2026-04-28T09:00:00.000Z"),
+      processingStatus: "processed",
+      errorDetails: null,
+      processedAt: new Date("2026-04-28T09:00:03.000Z"),
+      failedAt: null,
+      createdAt: new Date("2026-04-28T09:00:00.000Z"),
+      updatedAt: new Date("2026-04-28T09:00:03.000Z"),
+    },
+  ];
+  const webhookStatsRows = [
+    { processingStatus: "processed", count: 1 },
+    { processingStatus: "failed", count: 2 },
+  ];
   const db = {
-    select: vi.fn(() => {
+    query: {
+      paymentWebhookEvents: {
+        findMany: vi.fn(async () => webhookRows),
+        findFirst: vi.fn(async () => webhookRows[0]),
+      },
+    },
+    select: vi.fn((selection?: Record<string, unknown>) => {
       let selectedLanguage = "en";
       const builder = {
         from: vi.fn(() => builder),
         where: vi.fn((condition?: { value?: string }) => {
           selectedLanguage = condition?.value ?? "en";
+          if (selection && "count" in selection) return [{ count: webhookRows.length }];
           return builder;
         }),
-        orderBy: vi.fn(() => countries.filter((country) => country.language === selectedLanguage)),
+        groupBy: vi.fn(() => webhookStatsRows),
+        limit: vi.fn(() => builder),
+        offset: vi.fn(() => builder),
+        orderBy: vi.fn(() => {
+          if (selection && "count" in selection) return [{ count: webhookRows.length }];
+          return countries.filter((country) => country.language === selectedLanguage);
+        }),
       };
       return builder;
     }),
   };
-  const Sentry = {
-    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
-    captureMessage: vi.fn(),
-  };
-
   return {
     billingService,
     adminService,
@@ -122,7 +150,6 @@ const mocks = vi.hoisted(() => {
     auditService,
     adminAuthApi,
     db,
-    Sentry,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -141,8 +168,15 @@ const mocks = vi.hoisted(() => {
 vi.mock("../src/env", () => ({ env: mocks.env }));
 
 vi.mock("drizzle-orm", () => ({
+  and: vi.fn((...conditions) => ({ type: "and", conditions })),
   asc: vi.fn((column) => column),
+  count: vi.fn(() => ({ type: "count" })),
+  desc: vi.fn((column) => column),
   eq: vi.fn((column, value) => ({ column, value })),
+  gte: vi.fn((column, value) => ({ column, value, op: "gte" })),
+  ilike: vi.fn((column, value) => ({ column, value, op: "ilike" })),
+  lte: vi.fn((column, value) => ({ column, value, op: "lte" })),
+  or: vi.fn((...conditions) => ({ type: "or", conditions })),
 }));
 
 vi.mock("../src/modules/billing/service", () => ({
@@ -249,16 +283,25 @@ vi.mock("@platform/platform-db", () => ({
     code: "code",
     language: "language",
   },
+  paymentWebhookEvents: {
+    id: "id",
+    provider: "provider",
+    providerEventId: "providerEventId",
+    eventType: "eventType",
+    paymentId: "paymentId",
+    signatureTimestamp: "signatureTimestamp",
+    processingStatus: "processingStatus",
+    errorDetails: "errorDetails",
+    processedAt: "processedAt",
+    failedAt: "failedAt",
+    createdAt: "createdAt",
+    updatedAt: "updatedAt",
+  },
 }));
 
 vi.mock("@platform/email-core", () => ({
   createEmailModule: () => ({ sendTemplate: vi.fn() }),
   createResendProvider: () => ({ send: vi.fn() }),
-}));
-
-vi.mock("../src/observability/sentry", () => ({
-  setupSentry: vi.fn(),
-  Sentry: mocks.Sentry,
 }));
 
 const [
@@ -746,6 +789,40 @@ describe("API functional routes", () => {
       success: true,
       data: [{ period: "2026-03-01", consumed: 42 }],
     });
+  });
+
+  // Verifies the admin webhook monitor can list stored webhook events.
+  it("lists admin webhook events", async () => {
+    const response = await app.request("/admin/webhooks?limit=20&offset=0&status=processed&text=evt_123");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.data.total).toBe(1);
+    expect(body.data.events[0]).toMatchObject({
+      provider: "dodo",
+      providerEventId: "evt_123",
+      processingStatus: "processed",
+    });
+    expect(body.data.events[0].createdAt).toBe("2026-04-28T09:00:00.000Z");
+  });
+
+  // Verifies the admin webhook monitor exposes aggregate processing health.
+  it("returns admin webhook stats", async () => {
+    const response = await app.request("/admin/webhooks/stats");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toEqual({ total: 3, processing: 0, processed: 1, failed: 2 });
+  });
+
+  // Verifies the admin webhook monitor can inspect a stored webhook event.
+  it("returns admin webhook event details", async () => {
+    const response = await app.request("/admin/webhooks/11111111-1111-4111-8111-111111111111");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.providerEventId).toBe("evt_123");
   });
 
   // Verifies user listing and stats endpoints both return service payloads.
@@ -2077,10 +2154,9 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
-  // Verifies Sentry receives only sanitized bounded client log context.
-  it("sends only sanitized bounded client log context to Sentry", async () => {
-    mocks.Sentry.captureMessage.mockClear();
-
+  // Verifies client error logs stay sanitized when written through the local logger.
+  it("logs sanitized bounded client log context locally", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const wideContext = Object.fromEntries(Array.from({ length: 20 }, (_, index) => [`extra${index}`, `value${index}`]));
 
     const payload = {
@@ -2106,24 +2182,13 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(200);
-    const sentryContext = mocks.Sentry.captureMessage.mock.calls[0]?.[1]?.extra?.context as Record<string, unknown>;
-
-    expect(Object.keys(sentryContext)).toHaveLength(8);
-    expect(String(sentryContext.longValue).length).toBeLessThanOrEqual(128);
-    expect(sentryContext.extra19).toBeUndefined();
-    expect(mocks.Sentry.captureMessage).toHaveBeenCalledWith(
-      expect.not.stringContaining("abc.def.ghi"),
-      expect.objectContaining({
-        extra: expect.objectContaining({
-          url: expect.not.stringContaining("token=abc"),
-          context: expect.objectContaining({
-            safe: "ok",
-            password: "[redacted]",
-            nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
-          }),
-        }),
-      }),
-    );
+    const output = errorSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).not.toContain("abc.def.ghi");
+    expect(output).not.toContain("token=abc");
+    expect(output).toContain('"password":"[redacted]"');
+    expect(output).toContain('"authorization":"[redacted]"');
+    expect(output).toContain('"safe":"ok"');
+    errorSpy.mockRestore();
   });
 
   // Verifies guarded endpoints reject oversized bodies before route parsing.

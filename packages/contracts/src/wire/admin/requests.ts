@@ -36,6 +36,22 @@ export const billingListQuerySchema = paginationQuerySchema.extend({
   searchEmail: z.string().trim().email().max(255).optional(),
 });
 
+export const webhookEventStatusSchema = z.enum(["processing", "processed", "failed"]);
+
+export const webhookEventsQuerySchema = paginationQuerySchema.extend({
+  provider: z.string().trim().min(1).max(100).optional(),
+  status: webhookEventStatusSchema.optional(),
+  eventType: z.string().trim().min(1).max(255).optional(),
+  paymentId: z.string().trim().min(1).max(255).optional(),
+  text: z.string().trim().min(1).max(255).optional(),
+  dateFrom: z.string().trim().min(1).max(40).optional(),
+  dateTo: z.string().trim().min(1).max(40).optional(),
+});
+
+export const webhookEventIdParamSchema = z.object({
+  eventId: z.string().uuid(),
+});
+
 export const searchUsersQuerySchema = z.object({
   query: z.string().trim().min(2).max(255),
   limit: z.coerce.number().int().min(1).max(50).default(20),

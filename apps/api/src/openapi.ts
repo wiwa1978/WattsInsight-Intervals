@@ -40,6 +40,8 @@ import {
   verifyBanSecretSchema,
   voucherIdParamSchema,
   voucherListQuerySchema,
+  webhookEventIdParamSchema,
+  webhookEventsQuerySchema,
 } from "@platform/contracts/wire";
 
 import { env } from "./env";
@@ -87,6 +89,17 @@ const activeBannerNotificationResponseSchema = z.object({
   success: z.literal(true),
   data: notificationSchema.nullable(),
 });
+const webhookEventsParameters = [
+  queryParameter("limit", webhookEventsQuerySchema.shape.limit),
+  queryParameter("offset", webhookEventsQuerySchema.shape.offset),
+  queryParameter("provider", webhookEventsQuerySchema.shape.provider),
+  queryParameter("status", webhookEventsQuerySchema.shape.status),
+  queryParameter("eventType", webhookEventsQuerySchema.shape.eventType),
+  queryParameter("paymentId", webhookEventsQuerySchema.shape.paymentId),
+  queryParameter("text", webhookEventsQuerySchema.shape.text),
+  queryParameter("dateFrom", webhookEventsQuerySchema.shape.dateFrom),
+  queryParameter("dateTo", webhookEventsQuerySchema.shape.dateTo),
+];
 
 function jsonContent(schema: z.ZodTypeAny) {
   return {
@@ -431,6 +444,10 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/billing/credits-consumed-chart", ["Admin Billing"], "Get credits consumed chart", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Credits consumed chart", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscriptions", ["Admin Billing"], "List billing subscriptions", { security: cookieOrBearerAuth, parameters: billingListParameters, responses: defaultResponses("Billing subscriptions", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-stats", ["Admin Billing"], "Get subscription billing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription billing statistics", ["400", "401", "403"]) }),
+
+  route("get", "/admin/webhooks", ["Admin Webhooks"], "List payment webhook events", { security: cookieOrBearerAuth, parameters: webhookEventsParameters, responses: defaultResponses("Webhook events", ["400", "401", "403"]) }),
+  route("get", "/admin/webhooks/stats", ["Admin Webhooks"], "Get payment webhook processing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Webhook statistics", ["401", "403"]) }),
+  route("get", "/admin/webhooks/{eventId}", ["Admin Webhooks"], "Get payment webhook event detail", { security: cookieOrBearerAuth, parameters: [pathParameter("eventId", webhookEventIdParamSchema.shape.eventId)], responses: defaultResponses("Webhook event detail", ["400", "401", "403", "404"]) }),
 
   route("get", "/admin/discounts", ["Admin Discounts"], "List discounts", { security: cookieOrBearerAuth, parameters: [...paginationParameters, queryParameter("search", discountListQuerySchema.shape.search), queryParameter("status", discountListQuerySchema.shape.status)], responses: defaultResponses("Discounts", ["400", "401", "403"]) }),
   route("get", "/admin/discounts/{discountId}", ["Admin Discounts"], "Get discount detail", { security: cookieOrBearerAuth, parameters: [pathParameter("discountId", discountIdParamSchema.shape.discountId)], responses: defaultResponses("Discount detail", ["400", "401", "403", "404"]) }),

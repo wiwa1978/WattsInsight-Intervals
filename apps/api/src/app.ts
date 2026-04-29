@@ -14,11 +14,8 @@ import { createLogsRouter } from "./routes/logs";
 import { createMeRouter } from "./routes/me";
 import { createPaymentsRouter } from "./routes/payments";
 import { createSystemRouter } from "./routes/system";
-import { setupSentry } from "./observability/sentry";
 
 const app = new Hono<AppEnv>();
-
-setupSentry();
 
 app.use("/*", requestId());
 app.use("/*", corsMiddleware);

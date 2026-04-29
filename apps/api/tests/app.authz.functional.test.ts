@@ -99,7 +99,6 @@ vi.mock("@platform/auth-core", () => ({
 vi.mock("@platform/payments-core", () => ({ createPaymentsModule: () => ({ router: new Hono() }) }));
 vi.mock("@platform/platform-db", () => ({ createPlatformDb: () => ({ db: {} }), mobileRefreshToken: {} }));
 vi.mock("@platform/email-core", () => ({ createEmailModule: () => ({ sendTemplate: vi.fn() }), createResendProvider: () => ({ send: vi.fn() }) }));
-vi.mock("../src/observability/sentry", () => ({ setupSentry: vi.fn(), Sentry: { withSentry: vi.fn(async (fn: any, c: any) => fn(c)) } }));
 vi.mock("../src/modules/billing/service", () => ({ createBillingService: () => mocks.billingService }));
 vi.mock("../src/modules/admin/service", () => ({ createAdminService: () => mocks.adminService }));
 vi.mock("../src/modules/discounts/service", () => ({

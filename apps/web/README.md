@@ -25,7 +25,6 @@ Use `.env` in this folder. Minimum keys:
 - `NEXT_PUBLIC_APP_URL`
 - `NEXT_PUBLIC_APP_NAME`
 - `NEXT_PUBLIC_API_URL`
-- `NEXT_PUBLIC_SENTRY_DSN` (optional)
 
 ## Notes
 

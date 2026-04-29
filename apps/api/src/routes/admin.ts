@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { z } from "zod";
+import { and, count, desc, eq, gte, ilike, lte, or, type SQL } from "drizzle-orm";
 
 import {
   banUserSchema,
@@ -29,7 +30,10 @@ import {
   verifyBanSecretSchema,
   voucherIdParamSchema,
   voucherListQuerySchema,
+  webhookEventIdParamSchema,
+  webhookEventsQuerySchema,
 } from "@platform/contracts";
+import { paymentWebhookEvents } from "@platform/platform-db";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
@@ -175,6 +179,71 @@ function notificationSendHistoryItem(entry: Record<string, unknown>) {
     invalidRecipientIds,
     createdAt: entry.createdAt instanceof Date ? entry.createdAt.toISOString() : stringValue(entry.createdAt),
   };
+}
+
+type WebhookEventRow = typeof paymentWebhookEvents.$inferSelect;
+
+function isoDate(value: Date | string | null | undefined) {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function publicWebhookEvent(event: WebhookEventRow) {
+  return {
+    id: event.id,
+    provider: event.provider,
+    providerEventId: event.providerEventId,
+    eventType: event.eventType,
+    paymentId: event.paymentId,
+    signatureTimestamp: isoDate(event.signatureTimestamp),
+    processingStatus: event.processingStatus,
+    errorDetails: event.errorDetails ?? null,
+    processedAt: isoDate(event.processedAt),
+    failedAt: isoDate(event.failedAt),
+    createdAt: isoDate(event.createdAt) ?? new Date(0).toISOString(),
+    updatedAt: isoDate(event.updatedAt) ?? new Date(0).toISOString(),
+  };
+}
+
+function parseOptionalDate(value: string | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildWebhookEventWhere(filters: {
+  provider?: string;
+  status?: "processing" | "processed" | "failed";
+  eventType?: string;
+  paymentId?: string;
+  text?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const conditions: SQL[] = [];
+
+  if (filters.provider) conditions.push(eq(paymentWebhookEvents.provider, filters.provider));
+  if (filters.status) conditions.push(eq(paymentWebhookEvents.processingStatus, filters.status));
+  if (filters.eventType) conditions.push(ilike(paymentWebhookEvents.eventType, `%${filters.eventType}%`));
+  if (filters.paymentId) conditions.push(ilike(paymentWebhookEvents.paymentId, `%${filters.paymentId}%`));
+  if (filters.text) {
+    conditions.push(
+      or(
+        ilike(paymentWebhookEvents.provider, `%${filters.text}%`),
+        ilike(paymentWebhookEvents.providerEventId, `%${filters.text}%`),
+        ilike(paymentWebhookEvents.eventType, `%${filters.text}%`),
+        ilike(paymentWebhookEvents.paymentId, `%${filters.text}%`),
+      )!,
+    );
+  }
+
+  const dateFrom = parseOptionalDate(filters.dateFrom);
+  if (dateFrom) conditions.push(gte(paymentWebhookEvents.createdAt, dateFrom));
+
+  const dateTo = parseOptionalDate(filters.dateTo);
+  if (dateTo) conditions.push(lte(paymentWebhookEvents.createdAt, dateTo));
+
+  return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
 export function createAdminRouter() {
@@ -670,6 +739,75 @@ export function createAdminRouter() {
 
     const data = await bootstrap.subscriptionService.getSubscriptionStats();
     return c.json({ success: true, data });
+  router.get("/webhooks", async (c) => {
+    const parsedQuery = parseQuery(webhookEventsQuerySchema, {
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+      provider: c.req.query("provider"),
+      status: c.req.query("status"),
+      eventType: c.req.query("eventType"),
+      paymentId: c.req.query("paymentId"),
+      text: c.req.query("text"),
+      dateFrom: c.req.query("dateFrom"),
+      dateTo: c.req.query("dateTo"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid webhook events query");
+    }
+
+    const where = buildWebhookEventWhere(parsedQuery.data);
+    const [events, totalRows] = await Promise.all([
+      bootstrap.db.query.paymentWebhookEvents.findMany({
+        where,
+        orderBy: desc(paymentWebhookEvents.createdAt),
+        limit: parsedQuery.data.limit,
+        offset: parsedQuery.data.offset,
+      }),
+      bootstrap.db.select({ count: count() }).from(paymentWebhookEvents).where(where),
+    ]);
+
+    const total = Number(totalRows[0]?.count ?? 0);
+    return c.json({ success: true, data: { events: events.map(publicWebhookEvent), total } });
+  });
+
+  router.get("/webhooks/stats", async (c) => {
+    const rows = await bootstrap.db
+      .select({ processingStatus: paymentWebhookEvents.processingStatus, count: count() })
+      .from(paymentWebhookEvents)
+      .groupBy(paymentWebhookEvents.processingStatus);
+
+    const stats = { total: 0, processing: 0, processed: 0, failed: 0 };
+    for (const row of rows) {
+      const status = row.processingStatus;
+      const value = Number(row.count ?? 0);
+      if (status === "processing" || status === "processed" || status === "failed") {
+        stats[status] = value;
+        stats.total += value;
+      }
+    }
+
+    return c.json({ success: true, data: stats });
+  });
+
+  router.get("/webhooks/:eventId", async (c) => {
+    return withParams(
+      c,
+      webhookEventIdParamSchema,
+      { eventId: c.req.param("eventId") ?? "" },
+      "Invalid webhook event id",
+      async ({ eventId }) => {
+        const event = await bootstrap.db.query.paymentWebhookEvents.findFirst({
+          where: eq(paymentWebhookEvents.id, eventId),
+        });
+
+        if (!event) {
+          return c.json({ success: false, error: "Webhook event not found" }, 404);
+        }
+
+        return c.json({ success: true, data: publicWebhookEvent(event) });
+      },
+    );
   });
 
   router.get("/discounts", async (c) => {
