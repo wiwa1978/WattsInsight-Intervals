@@ -7,6 +7,10 @@ import type {
   AdminUserDetail,
   AdminUsersList,
   AdminUserStats,
+  AdminWebhookEvent,
+  AdminWebhookEventsList,
+  AdminWebhookEventStatus,
+  AdminWebhookStats,
   BillingStats,
   CreditBalance,
   CreditPurchase,
@@ -168,6 +172,52 @@ export async function getAdminCreditsConsumedDataApi(timeRange: "daily" | "weekl
   const result = await apiRequest<{ success: boolean; data: CreditsConsumedPoint[] }>(
     `/admin/billing/credits-consumed-chart?timeRange=${timeRange}`,
   );
+  return result.data;
+}
+
+export type AdminWebhookEventsQuery = {
+  limit?: number;
+  offset?: number;
+  provider?: string;
+  status?: AdminWebhookEventStatus;
+  eventType?: string;
+  paymentId?: string;
+  text?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+function adminWebhookQueryString(query: AdminWebhookEventsQuery = {}) {
+  const params = new URLSearchParams({
+    limit: String(query.limit ?? 100),
+    offset: String(query.offset ?? 0),
+  });
+
+  if (query.provider) params.set("provider", query.provider);
+  if (query.status) params.set("status", query.status);
+  if (query.eventType) params.set("eventType", query.eventType);
+  if (query.paymentId) params.set("paymentId", query.paymentId);
+  if (query.text) params.set("text", query.text);
+  if (query.dateFrom) params.set("dateFrom", query.dateFrom);
+  if (query.dateTo) params.set("dateTo", query.dateTo);
+
+  return params.toString();
+}
+
+export async function getAdminWebhookEventsApi(query: AdminWebhookEventsQuery = {}) {
+  const result = await apiRequest<{ success: boolean; data: AdminWebhookEventsList }>(
+    `/admin/webhooks?${adminWebhookQueryString(query)}`,
+  );
+  return result.data;
+}
+
+export async function getAdminWebhookStatsApi() {
+  const result = await apiRequest<{ success: boolean; data: AdminWebhookStats }>("/admin/webhooks/stats");
+  return result.data;
+}
+
+export async function getAdminWebhookEventApi(eventId: string) {
+  const result = await apiRequest<{ success: boolean; data: AdminWebhookEvent }>(`/admin/webhooks/${eventId}`);
   return result.data;
 }
 

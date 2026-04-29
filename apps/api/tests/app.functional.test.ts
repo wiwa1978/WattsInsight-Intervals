@@ -93,16 +93,49 @@ const mocks = vi.hoisted(() => {
     { id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" },
     { id: "country-be-en", name: "Belgium", code: "BE", language: "en" },
   ];
+  const webhookRows = [
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      provider: "dodo",
+      providerEventId: "evt_123",
+      eventType: "payment.succeeded",
+      paymentId: "pay_123",
+      signatureTimestamp: new Date("2026-04-28T09:00:00.000Z"),
+      processingStatus: "processed",
+      errorDetails: null,
+      processedAt: new Date("2026-04-28T09:00:03.000Z"),
+      failedAt: null,
+      createdAt: new Date("2026-04-28T09:00:00.000Z"),
+      updatedAt: new Date("2026-04-28T09:00:03.000Z"),
+    },
+  ];
+  const webhookStatsRows = [
+    { processingStatus: "processed", count: 1 },
+    { processingStatus: "failed", count: 2 },
+  ];
   const db = {
-    select: vi.fn(() => {
+    query: {
+      paymentWebhookEvents: {
+        findMany: vi.fn(async () => webhookRows),
+        findFirst: vi.fn(async () => webhookRows[0]),
+      },
+    },
+    select: vi.fn((selection?: Record<string, unknown>) => {
       let selectedLanguage = "en";
       const builder = {
         from: vi.fn(() => builder),
         where: vi.fn((condition?: { value?: string }) => {
           selectedLanguage = condition?.value ?? "en";
+          if (selection && "count" in selection) return [{ count: webhookRows.length }];
           return builder;
         }),
-        orderBy: vi.fn(() => countries.filter((country) => country.language === selectedLanguage)),
+        groupBy: vi.fn(() => webhookStatsRows),
+        limit: vi.fn(() => builder),
+        offset: vi.fn(() => builder),
+        orderBy: vi.fn(() => {
+          if (selection && "count" in selection) return [{ count: webhookRows.length }];
+          return countries.filter((country) => country.language === selectedLanguage);
+        }),
       };
       return builder;
     }),
@@ -140,8 +173,15 @@ const mocks = vi.hoisted(() => {
 vi.mock("../src/env", () => ({ env: mocks.env }));
 
 vi.mock("drizzle-orm", () => ({
+  and: vi.fn((...conditions) => ({ type: "and", conditions })),
   asc: vi.fn((column) => column),
+  count: vi.fn(() => ({ type: "count" })),
+  desc: vi.fn((column) => column),
   eq: vi.fn((column, value) => ({ column, value })),
+  gte: vi.fn((column, value) => ({ column, value, op: "gte" })),
+  ilike: vi.fn((column, value) => ({ column, value, op: "ilike" })),
+  lte: vi.fn((column, value) => ({ column, value, op: "lte" })),
+  or: vi.fn((...conditions) => ({ type: "or", conditions })),
 }));
 
 vi.mock("../src/modules/billing/service", () => ({
@@ -247,6 +287,20 @@ vi.mock("@platform/platform-db", () => ({
     name: "name",
     code: "code",
     language: "language",
+  },
+  paymentWebhookEvents: {
+    id: "id",
+    provider: "provider",
+    providerEventId: "providerEventId",
+    eventType: "eventType",
+    paymentId: "paymentId",
+    signatureTimestamp: "signatureTimestamp",
+    processingStatus: "processingStatus",
+    errorDetails: "errorDetails",
+    processedAt: "processedAt",
+    failedAt: "failedAt",
+    createdAt: "createdAt",
+    updatedAt: "updatedAt",
   },
 }));
 
@@ -745,6 +799,40 @@ describe("API functional routes", () => {
       success: true,
       data: [{ period: "2026-03-01", consumed: 42 }],
     });
+  });
+
+  // Verifies the admin webhook monitor can list stored webhook events.
+  it("lists admin webhook events", async () => {
+    const response = await app.request("/admin/webhooks?limit=20&offset=0&status=processed&text=evt_123");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.success).toBe(true);
+    expect(body.data.total).toBe(1);
+    expect(body.data.events[0]).toMatchObject({
+      provider: "dodo",
+      providerEventId: "evt_123",
+      processingStatus: "processed",
+    });
+    expect(body.data.events[0].createdAt).toBe("2026-04-28T09:00:00.000Z");
+  });
+
+  // Verifies the admin webhook monitor exposes aggregate processing health.
+  it("returns admin webhook stats", async () => {
+    const response = await app.request("/admin/webhooks/stats");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toEqual({ total: 3, processing: 0, processed: 1, failed: 2 });
+  });
+
+  // Verifies the admin webhook monitor can inspect a stored webhook event.
+  it("returns admin webhook event details", async () => {
+    const response = await app.request("/admin/webhooks/11111111-1111-4111-8111-111111111111");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.providerEventId).toBe("evt_123");
   });
 
   // Verifies user listing and stats endpoints both return service payloads.

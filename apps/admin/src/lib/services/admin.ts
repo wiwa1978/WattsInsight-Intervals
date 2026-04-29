@@ -13,12 +13,16 @@ import {
   getAdminUserCreditPurchasesApi,
   getAdminUserStatsApi,
   getAdminUsersApi,
+  getAdminWebhookEventApi,
+  getAdminWebhookEventsApi,
+  getAdminWebhookStatsApi,
   impersonateAdminUserApi,
   revokeAdminUserSessionsApi,
   setAdminUserPasswordApi,
   setAdminUserRoleApi,
   stopAdminImpersonationApi,
   unbanAdminUserApi,
+  type AdminWebhookEventsQuery,
   verifyAdminBanSecretApi,
 } from "@/lib/api/admin";
 import type {
@@ -26,6 +30,9 @@ import type {
   AdminUserDetail,
   AdminUsersList,
   AdminUserStats,
+  AdminWebhookEvent,
+  AdminWebhookEventsList,
+  AdminWebhookStats,
   BillingStats,
   CreditBalance,
   CreditPurchase,
@@ -119,6 +126,30 @@ export async function getAdminTransactionData(timeRange: TimeRange): Promise<Tra
 
 export async function getAdminCreditsConsumedData(timeRange: TimeRange): Promise<CreditsConsumedPoint[]> {
   return getAdminCreditsConsumedDataApi(timeRange);
+}
+
+export async function getAdminWebhookEvents(query: AdminWebhookEventsQuery = {}): Promise<AdminWebhookEventsList> {
+  try {
+    return await getAdminWebhookEventsApi(query);
+  } catch {
+    return { events: [], total: 0 };
+  }
+}
+
+export async function getAdminWebhookStats(): Promise<AdminWebhookStats> {
+  try {
+    return await getAdminWebhookStatsApi();
+  } catch {
+    return { total: 0, processing: 0, processed: 0, failed: 0 };
+  }
+}
+
+export async function getAdminWebhookEvent(eventId: string): Promise<AdminWebhookEvent | null> {
+  try {
+    return await getAdminWebhookEventApi(eventId);
+  } catch {
+    return null;
+  }
 }
 
 export async function getUsers(limit = 20, offset = 0, search?: string): Promise<{ data: AdminUsersList; error: string | null }> {

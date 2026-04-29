@@ -63,6 +63,35 @@ export const adminSearchUserSchema = z.object({
   email: z.string(),
 });
 
+export const adminWebhookEventStatusSchema = z.enum(["processing", "processed", "failed"]);
+
+export const adminWebhookEventSchema = z.object({
+  id: z.string().uuid(),
+  provider: z.string(),
+  providerEventId: z.string(),
+  eventType: z.string(),
+  paymentId: z.string().nullable(),
+  signatureTimestamp: z.string().nullable(),
+  processingStatus: adminWebhookEventStatusSchema,
+  errorDetails: z.unknown().nullable(),
+  processedAt: z.string().nullable(),
+  failedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const adminWebhookEventsListSchema = z.object({
+  events: z.array(adminWebhookEventSchema),
+  total: z.number().int().nonnegative(),
+});
+
+export const adminWebhookStatsSchema = z.object({
+  total: z.number().int().nonnegative(),
+  processing: z.number().int().nonnegative(),
+  processed: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+});
+
 export const adminDashboardStatsResponseSchema = successResultSchema(adminDashboardStatsSchema);
 export const adminUsersListResponseSchema = successResultSchema(adminUsersListSchema);
 export const adminUserStatsResponseSchema = successResultSchema(adminUserStatsSchema);
@@ -71,6 +100,9 @@ export const adminUserCreditBalanceResponseSchema = successResultSchema(creditBa
 export const adminUserCreditHistoryResponseSchema = successResultSchema(z.array(creditTransactionSchema));
 export const adminUserCreditPurchasesResponseSchema = successResultSchema(z.array(creditPurchaseSchema));
 export const adminSearchUsersResponseSchema = successResultSchema(z.array(adminSearchUserSchema));
+export const adminWebhookEventsListResponseSchema = successResultSchema(adminWebhookEventsListSchema);
+export const adminWebhookStatsResponseSchema = successResultSchema(adminWebhookStatsSchema);
+export const adminWebhookEventDetailResponseSchema = successResultSchema(adminWebhookEventSchema);
 
 export type AdminDashboardStats = z.infer<typeof adminDashboardStatsSchema>;
 export type AdminUsersList = z.infer<typeof adminUsersListSchema>;
@@ -78,3 +110,7 @@ export type AdminUserStats = z.infer<typeof adminUserStatsSchema>;
 export type AdminUserDetail = z.infer<typeof adminUserDetailSchema>;
 export type AdminUserListItem = z.infer<typeof adminUserListItemSchema>;
 export type AdminSearchUser = z.infer<typeof adminSearchUserSchema>;
+export type AdminWebhookEventStatus = z.infer<typeof adminWebhookEventStatusSchema>;
+export type AdminWebhookEvent = z.infer<typeof adminWebhookEventSchema>;
+export type AdminWebhookEventsList = z.infer<typeof adminWebhookEventsListSchema>;
+export type AdminWebhookStats = z.infer<typeof adminWebhookStatsSchema>;
