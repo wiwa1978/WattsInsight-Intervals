@@ -36,7 +36,7 @@ export function StatCard({
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {Icon && (
           iconBgColor ? (
-            <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", iconBgColor)}>
+            <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg dark:bg-transparent", iconBgColor)}>
               <Icon className={cn("h-5 w-5", iconColor)} />
             </div>
           ) : (
