@@ -739,6 +739,8 @@ export function createAdminRouter() {
 
     const data = await bootstrap.subscriptionService.getSubscriptionStats();
     return c.json({ success: true, data });
+  });
+
   router.get("/webhooks", async (c) => {
     const parsedQuery = parseQuery(webhookEventsQuerySchema, {
       limit: c.req.query("limit"),
