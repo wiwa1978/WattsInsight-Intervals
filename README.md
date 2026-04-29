@@ -179,10 +179,6 @@ Typical required public values:
 - `NEXT_PUBLIC_APP_NAME`
 - `NEXT_PUBLIC_API_URL`
 
-Optional:
-
-- `NEXT_PUBLIC_SENTRY_DSN`
-
 ### Admin
 
 Typical required public values:
@@ -191,10 +187,6 @@ Typical required public values:
 - `NEXT_PUBLIC_APP_NAME`
 - `NEXT_PUBLIC_MAIN_APP_URL`
 - `NEXT_PUBLIC_API_URL`
-
-Optional:
-
-- `NEXT_PUBLIC_SENTRY_DSN`
 
 ## API Documentation
 
@@ -216,7 +208,7 @@ API versioning policy:
 
 - API logs can be written to a shared file via `LOG_FILE_PATH`
 - browser logs are forwarded to the API via `POST /logs/client`
-- Sentry is configured separately for API and Next.js clients
+- no external error-reporting provider is configured by default
 
 ## Quality Checks
 

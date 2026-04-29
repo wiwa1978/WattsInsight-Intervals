@@ -130,7 +130,7 @@ Goal: close the highest-risk auth, admin, logging, and request-abuse issues.
 - Add global request body limits.
 - Add stricter per-route limits for auth, checkout, voucher redemption, admin mutations, logs, and webhooks.
 - Add rate limiting for auth, mobile token exchange, mobile refresh, voucher redemption, checkout, ban-secret verification, and client log ingestion.
-- Redact logs before persistence and before Sentry forwarding.
+- Redact logs before persistence.
 - Restrict checkout `successUrl` and `cancelUrl` to first-party origins, or accept relative paths and construct URLs server-side.
 - Strengthen environment validation for production secrets and provider configuration.
 - Require a webhook secret when Dodo payments are enabled.
@@ -211,7 +211,7 @@ Goal: make operational and user-facing communication reliable.
 
 - Keep client log ingestion constrained and rate-limited.
 - Redact sensitive keys and patterns from client log `message`, `url`, and `context`.
-- Avoid forwarding arbitrary client context to Sentry without sanitization.
+- Persist sanitized, bounded client log context locally; no external error-reporting provider is configured.
 - Replace sync file logging with async/buffered logging or stdout plus a collector.
 - Tail log files by bounded bytes instead of reading whole files into memory.
 

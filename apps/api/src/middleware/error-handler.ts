@@ -4,7 +4,6 @@ import type { AppEnv } from "../context";
 import { env } from "../env";
 import { buildErrorCode } from "../lib/http";
 import { logger } from "../observability/logger";
-import { Sentry } from "../observability/sentry";
 
 function serializeError(error: unknown) {
   if (!(error instanceof Error)) {
@@ -21,15 +20,6 @@ function serializeError(error: unknown) {
 export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
   const requestId = c.get("requestId") ?? crypto.randomUUID();
   const errorCode = buildErrorCode(requestId);
-
-  if (typeof Sentry.captureException === "function") {
-    Sentry.captureException(error, {
-      tags: {
-        requestId,
-        errorCode,
-      },
-    });
-  }
 
   logger.error(
     {

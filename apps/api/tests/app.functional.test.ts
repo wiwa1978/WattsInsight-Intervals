@@ -140,11 +140,6 @@ const mocks = vi.hoisted(() => {
       return builder;
     }),
   };
-  const Sentry = {
-    withSentry: vi.fn(async (fn: any, c: any) => fn(c)),
-    captureMessage: vi.fn(),
-  };
-
   return {
     billingService,
     adminService,
@@ -154,7 +149,6 @@ const mocks = vi.hoisted(() => {
     auditService,
     adminAuthApi,
     db,
-    Sentry,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
@@ -307,11 +301,6 @@ vi.mock("@platform/platform-db", () => ({
 vi.mock("@platform/email-core", () => ({
   createEmailModule: () => ({ sendTemplate: vi.fn() }),
   createResendProvider: () => ({ send: vi.fn() }),
-}));
-
-vi.mock("../src/observability/sentry", () => ({
-  setupSentry: vi.fn(),
-  Sentry: mocks.Sentry,
 }));
 
 const [
@@ -2164,10 +2153,9 @@ describe("API functional routes", () => {
     infoSpy.mockRestore();
   });
 
-  // Verifies Sentry receives only sanitized bounded client log context.
-  it("sends only sanitized bounded client log context to Sentry", async () => {
-    mocks.Sentry.captureMessage.mockClear();
-
+  // Verifies client error logs stay sanitized when written through the local logger.
+  it("logs sanitized bounded client log context locally", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const wideContext = Object.fromEntries(Array.from({ length: 20 }, (_, index) => [`extra${index}`, `value${index}`]));
 
     const payload = {
@@ -2193,24 +2181,13 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(200);
-    const sentryContext = mocks.Sentry.captureMessage.mock.calls[0]?.[1]?.extra?.context as Record<string, unknown>;
-
-    expect(Object.keys(sentryContext)).toHaveLength(8);
-    expect(String(sentryContext.longValue).length).toBeLessThanOrEqual(128);
-    expect(sentryContext.extra19).toBeUndefined();
-    expect(mocks.Sentry.captureMessage).toHaveBeenCalledWith(
-      expect.not.stringContaining("abc.def.ghi"),
-      expect.objectContaining({
-        extra: expect.objectContaining({
-          url: expect.not.stringContaining("token=abc"),
-          context: expect.objectContaining({
-            safe: "ok",
-            password: "[redacted]",
-            nested: expect.objectContaining({ authorization: "[redacted]", safe: "ok" }),
-          }),
-        }),
-      }),
-    );
+    const output = errorSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(output).not.toContain("abc.def.ghi");
+    expect(output).not.toContain("token=abc");
+    expect(output).toContain('"password":"[redacted]"');
+    expect(output).toContain('"authorization":"[redacted]"');
+    expect(output).toContain('"safe":"ok"');
+    errorSpy.mockRestore();
   });
 
   // Verifies guarded endpoints reject oversized bodies before route parsing.
