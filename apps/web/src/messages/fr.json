@@ -1216,6 +1216,16 @@
         "submit": "Utiliser le bon",
         "redeeming": "Utilisation..."
       }
+    },
+    "subscription": {
+      "description": "Choisissez un abonnement pour continuer.",
+      "mostPopular": "Le plus populaire",
+      "planDescription": "Accès SaaS récurrent facturé chaque {interval}",
+      "choosePlan": "Choisir {plan}",
+      "checkout": {
+        "successDescription": "Le paiement de l'abonnement est terminé. Votre abonnement sera mis à jour une fois le paiement traité.",
+        "cancelDescription": "Le paiement de l'abonnement a été annulé."
+      }
     }
   },
   "chat": {

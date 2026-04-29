@@ -1216,6 +1216,16 @@
         "submit": "Redeem Voucher",
         "redeeming": "Redeeming..."
       }
+    },
+    "subscription": {
+      "description": "Choose a subscription plan to continue.",
+      "mostPopular": "Most popular",
+      "planDescription": "Recurring SaaS access billed every {interval}",
+      "choosePlan": "Choose {plan}",
+      "checkout": {
+        "successDescription": "Subscription checkout completed. Your subscription will update once payment processing completes.",
+        "cancelDescription": "Subscription checkout was canceled."
+      }
     }
   },
   "chat": {

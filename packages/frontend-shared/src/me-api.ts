@@ -1,4 +1,5 @@
 import type { ApiRequest } from "./credits";
+import type { ApplicationConfig, CreateCheckoutResponse } from "@platform/contracts";
 
 export type CountryRecord = {
   id: string;
@@ -12,6 +13,9 @@ export function createMeApi(apiRequest: ApiRequest) {
     async getSession() {
       return apiRequest("/me/session");
     },
+    async getApplicationConfig() {
+      return apiRequest<{ success: boolean; data: ApplicationConfig }>("/me/application-config");
+    },
     async redeemVoucher(code: string) {
       return apiRequest("/me/vouchers/redeem", {
         method: "POST",
@@ -23,9 +27,15 @@ export function createMeApi(apiRequest: ApiRequest) {
       return result.data;
     },
     async createCheckoutSession(packageKey: string) {
-      return apiRequest("/payments/checkout", {
+      return apiRequest<CreateCheckoutResponse>("/payments/checkout", {
         method: "POST",
         body: JSON.stringify({ packageKey }),
+      });
+    },
+    async createSubscriptionCheckoutSession(planKey: string) {
+      return apiRequest<CreateCheckoutResponse>("/payments/checkout", {
+        method: "POST",
+        body: JSON.stringify({ billingMode: "subscriptions", planKey }),
       });
     },
   };

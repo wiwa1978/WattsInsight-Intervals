@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   banUserSchema,
+  applicationConfigResponseSchema,
   billingListQuerySchema,
   billingRangeQuerySchema,
   clientLogSchema,
@@ -287,6 +288,13 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     security: cookieOrBearerAuth,
     responses: {
       "200": jsonResponse("Current authenticated user", sessionResponseSchema),
+      "401": jsonResponse("Unauthorized", genericErrorSchema),
+    },
+  }),
+  route("get", "/me/application-config", ["Me"], "Get application capabilities for the authenticated client", {
+    security: cookieOrBearerAuth,
+    responses: {
+      "200": jsonResponse("Application capabilities", applicationConfigResponseSchema),
       "401": jsonResponse("Unauthorized", genericErrorSchema),
     },
   }),

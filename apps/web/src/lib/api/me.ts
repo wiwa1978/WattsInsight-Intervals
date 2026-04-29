@@ -4,6 +4,7 @@ import { createNotificationsApi } from "@platform/frontend-shared/notifications"
 
 import { apiRequest } from "./client";
 import type { Notification } from "@/schemas/notification";
+import type { ApplicationConfig } from "@platform/contracts";
 
 export type { CountryRecord } from "@platform/frontend-shared/me-api";
 
@@ -13,6 +14,11 @@ const meApi = createMeApi(apiRequest);
 
 export async function getMyCreditBalance() {
   const result = await creditsApi.getBalance() as { success: boolean; data: unknown };
+  return result.data;
+}
+
+export async function getMyApplicationConfig() {
+  const result = await meApi.getApplicationConfig() as { success: boolean; data: ApplicationConfig };
   return result.data;
 }
 
@@ -72,4 +78,8 @@ export async function getCountries(lang: "en" | "fr" | "nl") {
 
 export async function createCheckoutSession(packageKey: string) {
   return meApi.createCheckoutSession(packageKey) as Promise<{ success: boolean; data: { checkoutUrl: string } }>;
+}
+
+export async function createSubscriptionCheckoutSession(planKey: string) {
+  return meApi.createSubscriptionCheckoutSession(planKey) as Promise<{ success: boolean; data: { checkoutUrl: string } }>;
 }
