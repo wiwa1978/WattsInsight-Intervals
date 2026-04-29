@@ -1,6 +1,8 @@
 import type { NormalizedPaymentEvent, PaymentEventHandler } from "@platform/payments-core";
 
 import type { creditPackages as CreditPackagesList } from "../../config/billing";
+import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled } from "../../lib/feature-guards";
+import { isDodoSubscriptionWebhookEvent } from "./subscription-webhooks";
 
 type CreditPackage = (typeof CreditPackagesList)[number];
 
@@ -30,9 +32,18 @@ export type PaymentEventHandlerDeps = {
     processCreditRefund: (paymentId: string, refundId?: string) => Promise<unknown>;
     processCreditDisputeLoss: (paymentId: string, disputeId?: string, disputeStatus?: string) => Promise<unknown>;
   };
+  subscriptions?: {
+    handleDodoSubscriptionWebhook: (payload: unknown) => Promise<void>;
+  };
 };
 
 const DISPUTE_REVERSAL_EVENTS = new Set(["dispute.accepted", "dispute.lost"]);
+
+function getWebhookDataPayload(raw: unknown) {
+  return typeof raw === "object" && raw !== null && "data" in raw
+    ? (raw as { data: unknown }).data
+    : {};
+}
 
 /**
  * Build the payment event handler that turns a verified Dodo
@@ -47,7 +58,17 @@ const DISPUTE_REVERSAL_EVENTS = new Set(["dispute.accepted", "dispute.lost"]);
  */
 export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): PaymentEventHandler {
   return async (event: NormalizedPaymentEvent) => {
+    if (isDodoSubscriptionWebhookEvent(event.eventType)) {
+      ensureSubscriptionBillingEnabled();
+      await deps.subscriptions?.handleDodoSubscriptionWebhook({
+        event_type: event.eventType,
+        data: getWebhookDataPayload(event.raw),
+      });
+      return;
+    }
+
     if (event.eventType === "refund.succeeded") {
+      ensureCreditBillingEnabled();
       if (event.refundIsPartial) {
         throw new Error(`Refusing payment ${event.paymentId}: partial refunds require manual reconciliation.`);
       }
@@ -57,6 +78,7 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
     }
 
     if (event.eventType.startsWith("dispute.")) {
+      ensureCreditBillingEnabled();
       if (DISPUTE_REVERSAL_EVENTS.has(event.eventType)) {
         await deps.billing.processCreditDisputeLoss(event.paymentId, event.disputeId, event.disputeStatus);
       }
@@ -71,6 +93,8 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
     ) {
       return;
     }
+
+    ensureCreditBillingEnabled();
 
     if (!event.productId) {
       throw new Error("Missing product id");

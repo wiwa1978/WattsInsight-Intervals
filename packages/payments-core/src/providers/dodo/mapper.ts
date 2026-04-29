@@ -12,6 +12,17 @@ const disputeEventTypes = [
   "dispute.lost",
 ] as const;
 
+const subscriptionEventTypes = [
+  "subscription.active",
+  "subscription.renewed",
+  "subscription.cancelled",
+  "subscription.failed",
+  "subscription.expired",
+  "subscription.on_hold",
+  "subscription.plan_changed",
+  "subscription.updated",
+] as const;
+
 const disputeEventTypeSchema = z.enum(disputeEventTypes);
 
 const paymentSucceededSchema = z.object({
@@ -237,6 +248,19 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
       customerId: data.customer?.customer_id,
       currency: data.currency,
       totalAmount: Number.isFinite(amount) ? amount : undefined,
+      raw: payload,
+    };
+  }
+
+  if (subscriptionEventTypes.includes(parsed.data.type as (typeof subscriptionEventTypes)[number])) {
+    const data = parsed.data.data as { subscription_id?: unknown } | undefined;
+    const subscriptionId = typeof data?.subscription_id === "string" ? data.subscription_id : "subscription";
+
+    return {
+      provider: "dodo",
+      providerEventId: parsed.data.id ?? parsed.data.event_id,
+      eventType: parsed.data.type as (typeof subscriptionEventTypes)[number],
+      paymentId: subscriptionId,
       raw: payload,
     };
   }

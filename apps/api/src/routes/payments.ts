@@ -4,7 +4,7 @@ import { createCheckoutRequestSchema } from "@platform/contracts";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
-import { creditPackages } from "../config/billing";
+import { creditPackages, subscriptionPlans } from "../config/billing";
 import { env } from "../env";
 import {
   CHECKOUT_CANCEL_RETURN_PATH,
@@ -14,6 +14,7 @@ import {
   buildDodoCheckoutUrl,
 } from "../lib/dodo-checkout";
 import { parseJsonBody, validationError } from "../lib/http";
+import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 
 export { buildDodoCheckoutUrl } from "../lib/dodo-checkout";
 
@@ -30,10 +31,30 @@ export function createPaymentsRouter() {
       return validationError(c, "Invalid checkout payload");
     }
 
-    const packageKey = parsedBody.data.packageKey;
-    const selectedPackage = creditPackages.find((pkg) => pkg.key === packageKey);
-    if (!selectedPackage) {
-      return c.json({ success: false, error: "Unknown package" }, 400);
+    const packageKey = "packageKey" in parsedBody.data ? parsedBody.data.packageKey : undefined;
+    const planKey = "planKey" in parsedBody.data ? parsedBody.data.planKey : undefined;
+    const requestMode = "billingMode" in parsedBody.data ? parsedBody.data.billingMode : "credits";
+
+    try {
+      if (requestMode === "credits") {
+        ensureCreditBillingEnabled();
+      } else {
+        ensureSubscriptionBillingEnabled();
+      }
+    } catch (error) {
+      const billingModeError = getBillingModeDisabledErrorMessage(error);
+      if (billingModeError) {
+        return c.json({ success: false, error: billingModeError }, 400);
+      }
+
+      throw error;
+    }
+
+    const selectedProduct = requestMode === "credits"
+      ? creditPackages.find((pkg) => pkg.key === packageKey)
+      : subscriptionPlans.find((plan) => plan.key === planKey);
+    if (!selectedProduct) {
+      return c.json({ success: false, error: requestMode === "credits" ? "Unknown package" : "Unknown plan" }, 400);
     }
 
     const authUser = c.get("authUser");
@@ -57,9 +78,9 @@ export function createPaymentsRouter() {
 
     const checkoutUrl = buildDodoCheckoutUrl({
       baseUrl,
-      productId: selectedPackage.productId,
+      productId: selectedProduct.productId,
       userId: authUser.id,
-      packageKey,
+      ...(requestMode === "credits" ? { packageKey } : { planKey }),
       customerEmail: authUser.email ?? null,
       successUrl,
       cancelUrl,

@@ -38,6 +38,7 @@ import { paymentWebhookEvents } from "@platform/platform-db";
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
+import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 import { getAuditRequestContext } from "../modules/audit/service";
 import { logger } from "../observability/logger";
@@ -69,6 +70,15 @@ function getAuthUser(c: Context<AppEnv>) {
   }
 
   return authUser;
+}
+
+function billingModeErrorResponse(c: Context<AppEnv>, error: unknown) {
+  const billingModeError = getBillingModeDisabledErrorMessage(error);
+  if (billingModeError) {
+    return c.json({ success: false, error: billingModeError }, 400);
+  }
+
+  throw error;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -528,6 +538,12 @@ export function createAdminRouter() {
   });
 
   router.get("/users/:userId/credits/balance", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     return withUserIdParam(c, async (userId) => {
       const balance = await bootstrap.adminService.getUserCreditBalance(userId);
       return c.json({ success: true, data: balance });
@@ -535,6 +551,12 @@ export function createAdminRouter() {
   });
 
   router.get("/users/:userId/credits/history", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     return withUserIdParam(c, async (userId) => {
       return withQuery(c, optionalLimitQuerySchema, { limit: c.req.query("limit") }, "Invalid history query", async ({ limit }) => {
         const history = await bootstrap.adminService.getUserCreditHistory(userId, limit);
@@ -544,6 +566,12 @@ export function createAdminRouter() {
   });
 
   router.get("/users/:userId/credits/purchases", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     return withUserIdParam(c, async (userId) => {
       return withQuery(c, optionalLimitQuerySchema, { limit: c.req.query("limit") }, "Invalid purchases query", async ({ limit }) => {
         const purchases = await bootstrap.adminService.getUserCreditPurchases(userId, limit);
@@ -553,11 +581,23 @@ export function createAdminRouter() {
   });
 
   router.get("/billing/stats", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const stats = await bootstrap.adminService.getBillingStats();
     return c.json({ success: true, data: stats });
   });
 
   router.get("/billing/revenue", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const parsedQuery = parseQuery(billingRangeQuerySchema, { timeRange: c.req.query("timeRange") });
 
     if (!parsedQuery.success) {
@@ -569,6 +609,12 @@ export function createAdminRouter() {
   });
 
   router.get("/billing/transactions", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const parsedQuery = parseQuery(billingListQuerySchema, {
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
@@ -588,6 +634,12 @@ export function createAdminRouter() {
   });
 
   router.get("/billing/purchases", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const parsedQuery = parseQuery(billingListQuerySchema, {
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
@@ -607,6 +659,12 @@ export function createAdminRouter() {
   });
 
   router.get("/billing/transactions-chart", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const parsedQuery = parseQuery(billingRangeQuerySchema, { timeRange: c.req.query("timeRange") });
 
     if (!parsedQuery.success) {
@@ -618,6 +676,12 @@ export function createAdminRouter() {
   });
 
   router.get("/billing/credits-consumed-chart", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const parsedQuery = parseQuery(billingRangeQuerySchema, { timeRange: c.req.query("timeRange") });
 
     if (!parsedQuery.success) {
@@ -628,6 +692,53 @@ export function createAdminRouter() {
     return c.json({ success: true, data });
   });
 
+  router.get("/users/:userId/subscription", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    return withUserIdParam(c, async (userId) => {
+      const subscription = await bootstrap.subscriptionService.getUserSubscription(userId);
+      return c.json({ success: true, data: subscription ?? null });
+    });
+  });
+
+  router.get("/billing/subscriptions", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const parsedQuery = parseQuery(billingListQuerySchema, {
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+      searchEmail: c.req.query("searchEmail"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid subscriptions query");
+    }
+
+    const data = await bootstrap.subscriptionService.listSubscriptions(
+      parsedQuery.data.limit,
+      parsedQuery.data.offset,
+      parsedQuery.data.searchEmail,
+    );
+    return c.json({ success: true, data });
+  });
+
+  router.get("/billing/subscription-stats", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const data = await bootstrap.subscriptionService.getSubscriptionStats();
+    return c.json({ success: true, data });
   router.get("/webhooks", async (c) => {
     const parsedQuery = parseQuery(webhookEventsQuerySchema, {
       limit: c.req.query("limit"),

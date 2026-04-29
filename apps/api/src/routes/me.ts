@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 
 import {
+  consumeCreditsRequestSchema,
   invoiceRequestSchema,
   notificationIdParamSchema,
   optionalLimitQuerySchema,
@@ -10,6 +11,7 @@ import {
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
+import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { ok, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 
 function getAuthUser(c: Context<AppEnv>) {
@@ -21,6 +23,15 @@ function getAuthUser(c: Context<AppEnv>) {
   return authUser;
 }
 
+function billingModeErrorResponse(c: Context<AppEnv>, error: unknown) {
+  const billingModeError = getBillingModeDisabledErrorMessage(error);
+  if (billingModeError) {
+    return c.json({ success: false, error: billingModeError }, 400);
+  }
+
+  throw error;
+}
+
 export function createMeRouter() {
   const router = new Hono<AppEnv>();
   router.use("/*", bootstrap.authModule.requireAuth);
@@ -30,12 +41,24 @@ export function createMeRouter() {
   });
 
   router.get("/credits/balance", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const authUser = getAuthUser(c);
     const balance = await bootstrap.billingService.getCreditBalance(authUser.id);
     return c.json({ success: true, data: balance });
   });
 
   router.get("/credits/history", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const authUser = getAuthUser(c);
     const parsedQuery = parseQuery(optionalLimitQuerySchema, { limit: c.req.query("limit") });
 
@@ -48,6 +71,12 @@ export function createMeRouter() {
   });
 
   router.get("/credits/purchases", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const authUser = getAuthUser(c);
     const parsedQuery = parseQuery(optionalLimitQuerySchema, { limit: c.req.query("limit") });
 
@@ -59,7 +88,30 @@ export function createMeRouter() {
     return c.json({ success: true, data: purchases });
   });
 
+  router.post("/credits/consume", async (c) => {
+    const authUser = getAuthUser(c);
+    const body = await c.req.json().catch(() => null);
+    const parsedBody = parseJsonBody(consumeCreditsRequestSchema, body);
+
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid credit usage payload");
+    }
+
+    try {
+      const result = await bootstrap.billingService.consumeCredits(authUser.id, parsedBody.data);
+      return c.json({ success: true, data: result });
+    } catch (error) {
+      return c.json({ success: false, error: error instanceof Error ? error.message : "Failed to consume credits" }, 400);
+    }
+  });
+
   router.post("/credits/invoice", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const authUser = getAuthUser(c);
     const body = await c.req.json().catch(() => null);
     const parsedBody = parseJsonBody(invoiceRequestSchema, body);
@@ -83,6 +135,12 @@ export function createMeRouter() {
   });
 
   router.post("/vouchers/redeem", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
     const authUser = getAuthUser(c);
     const body = await c.req.json().catch(() => null);
     const parsedBody = parseJsonBody(redeemVoucherSchema, body);
@@ -93,6 +151,18 @@ export function createMeRouter() {
 
     const result = await bootstrap.vouchersService.redeemVoucher(authUser.id, parsedBody.data.code);
     return c.json(result, result.success ? 200 : 400);
+  });
+
+  router.get("/subscription", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const authUser = getAuthUser(c);
+    const subscription = await bootstrap.subscriptionService.getUserSubscription(authUser.id);
+    return c.json({ success: true, data: subscription ?? null });
   });
 
   router.get("/notifications", async (c) => {

@@ -11,10 +11,18 @@ export type NormalizedPaymentEvent = {
     | "dispute.opened"
     | "dispute.expired"
     | "dispute.accepted"
-    | "dispute.cancelled"
-    | "dispute.challenged"
-    | "dispute.won"
-    | "dispute.lost";
+     | "dispute.cancelled"
+     | "dispute.challenged"
+     | "dispute.won"
+     | "dispute.lost"
+     | "subscription.active"
+     | "subscription.renewed"
+     | "subscription.cancelled"
+     | "subscription.failed"
+     | "subscription.expired"
+     | "subscription.on_hold"
+     | "subscription.plan_changed"
+     | "subscription.updated";
   paymentId: string;
   refundId?: string;
   refundIsPartial?: boolean;

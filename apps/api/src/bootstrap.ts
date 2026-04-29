@@ -14,11 +14,15 @@ import { createPlatformDb, mobileRefreshToken, user } from "@platform/platform-d
 import { authConfig } from "./config/auth";
 import { creditPackages } from "./config/billing";
 import { env } from "./env";
+import { getBillingMode } from "./lib/billing-mode";
+import { getDodoCheckoutProductsForBillingMode } from "./lib/dodo-billing-products";
 import { createAdminService } from "./modules/admin/service";
 import { createAuditService } from "./modules/audit/service";
 import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
+import { createSubscriptionService } from "./modules/billing/subscription-service";
+import { createSubscriptionWebhookHandler } from "./modules/billing/subscription-webhooks";
 import { createPaymentWebhookEventStore } from "./modules/payments/webhook-event-store";
 import { createNotificationsService } from "./modules/notifications/service";
 import { createVouchersService } from "./modules/vouchers/service";
@@ -57,6 +61,7 @@ const billingService = createBillingService({
   env,
   notifications: notificationsService,
 });
+const subscriptionService = createSubscriptionService({ db });
 const adminService = createAdminService({
   db,
   adminBanSecret: env.ADMIN_BAN_SECRET,
@@ -238,10 +243,7 @@ const authModule = createAuthModule({
               }),
               use: [
                 checkout({
-                  products: creditPackages.map((pkg) => ({
-                    productId: pkg.productId,
-                    slug: pkg.key,
-                  })),
+                  products: getDodoCheckoutProductsForBillingMode(getBillingMode()),
                   successUrl: `${env.APP_URL}/billing?success=true`,
                   authenticatedUsersOnly: true,
                 }),
@@ -357,6 +359,11 @@ const paymentsModule = createPaymentsModule({
   onPaymentEvent: createPaymentEventHandler({
     creditPackages,
     billing: billingService,
+    subscriptions: {
+      handleDodoSubscriptionWebhook: createSubscriptionWebhookHandler({
+        subscriptions: subscriptionService,
+      }),
+    },
   }),
 });
 
@@ -366,6 +373,7 @@ export const bootstrap = {
   adminService,
   auditService,
   billingService,
+  subscriptionService,
   discountsService,
   notificationsService,
   vouchersService,

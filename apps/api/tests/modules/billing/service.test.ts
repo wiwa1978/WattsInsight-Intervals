@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   creditPurchases,
   creditTransactions,
+  creditUsageEvents,
   user,
   userCredits,
 } from "@platform/platform-db";
@@ -429,6 +430,9 @@ describe("createBillingService", () => {
       insert: vi.fn().mockImplementation((table: unknown) => ({
         values: vi.fn((values: unknown) => {
           inserts.push({ table, values });
+          if (table === creditTransactions) {
+            return { returning: vi.fn().mockResolvedValue([{ id: "tx-refund-1" }]) };
+          }
           return Promise.resolve(undefined);
         }),
       })),
@@ -453,7 +457,7 @@ describe("createBillingService", () => {
     expect(result).toMatchObject({ id: "purchase-refund", paymentStatus: "refunded" });
     expect(updates).toHaveLength(2);
     expect(updates[0]?.table).toBe(userCredits);
-    expect(updates[0]?.set).toMatchObject({ balance: "40" });
+    expect(updates[0]?.set).toMatchObject({ balance: "40.00" });
     expect(updates[1]?.table).toBe(creditPurchases);
     expect(updates[1]?.set).toMatchObject({ paymentStatus: "refunded" });
     expect(inserts).toHaveLength(1);
@@ -461,10 +465,10 @@ describe("createBillingService", () => {
     expect(inserts[0]?.values).toMatchObject({
       userId: "u1",
       type: "refund",
-      amount: "-110",
+      amount: "-110.00",
       referenceType: "payment",
       referenceId: "pay_refund",
-      balanceAfter: "40",
+      balanceAfter: "40.00",
       metadata: { refundId: "rfnd_123" },
     });
   });
@@ -535,6 +539,9 @@ describe("createBillingService", () => {
       insert: vi.fn().mockImplementation((table: unknown) => ({
         values: vi.fn((values: unknown) => {
           inserts.push({ table, values });
+          if (table === creditTransactions) {
+            return { returning: vi.fn().mockResolvedValue([{ id: "tx-dispute-1" }]) };
+          }
           return Promise.resolve(undefined);
         }),
       })),
@@ -559,19 +566,19 @@ describe("createBillingService", () => {
     expect(result).toMatchObject({ id: "purchase-dispute", paymentStatus: "failed" });
     expect(updates).toHaveLength(2);
     expect(updates[0]?.table).toBe(userCredits);
-    expect(updates[0]?.set).toMatchObject({ balance: "40" });
+    expect(updates[0]?.set).toMatchObject({ balance: "40.00" });
     expect(updates[1]?.table).toBe(creditPurchases);
     expect(updates[1]?.set).toMatchObject({ paymentStatus: "failed" });
     expect(inserts).toHaveLength(1);
     expect(inserts[0]?.table).toBe(creditTransactions);
     expect(inserts[0]?.values).toMatchObject({
       userId: "u1",
-      type: "adjustment",
-      amount: "-110",
+      type: "admin_adjustment",
+      amount: "-110.00",
       description: "Dispute reversal: Silver",
       referenceType: "payment",
       referenceId: "pay_dispute",
-      balanceAfter: "40",
+      balanceAfter: "40.00",
       metadata: { disputeId: "disp_123", disputeStatus: "dispute_lost" },
     });
   });
@@ -824,5 +831,221 @@ describe("createBillingService", () => {
 
     expect(historyLimit).toHaveBeenCalledWith(100);
     expect(purchaseLimit).toHaveBeenCalledWith(50);
+  });
+
+  // Verifies consumeCredits deducts credits and records a usage event atomically.
+  it("consumeCredits deducts credits and inserts usage event", async () => {
+    const inserts: Array<{ table: unknown; values: unknown }> = [];
+    const updates: Array<{ table: unknown; set: unknown }> = [];
+
+    const tx = {
+      query: {
+        creditUsageEvents: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "100", totalPurchased: "100", totalSpent: "10" }),
+        },
+      },
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn((values: unknown) => {
+          inserts.push({ table, values });
+          if (table === creditTransactions) {
+            return { returning: vi.fn().mockResolvedValue([{ id: "tx-usage-1" }]) };
+          }
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: vi.fn().mockImplementation((table: unknown) => ({
+        set: vi.fn((set: unknown) => {
+          updates.push({ table, set });
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        }),
+      })),
+    };
+
+    const service = createBillingService({
+      db: { transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)) } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.consumeCredits("u1", {
+      featureKey: "ai-query",
+      amount: 5,
+      idempotencyKey: "idem-key-12345678",
+    });
+
+    expect(result).toMatchObject({
+      transactionId: "tx-usage-1",
+      idempotencyKey: "idem-key-12345678",
+      balanceBefore: "100.00",
+      balanceAfter: "95.00",
+      alreadyProcessed: false,
+    });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.table).toBe(userCredits);
+    expect(updates[0]?.set).toMatchObject({ balance: "95.00" });
+    const txInsert = inserts.find((i) => i.table === creditTransactions);
+    expect(txInsert?.values).toMatchObject({
+      userId: "u1",
+      type: "usage",
+      amount: "-5.00",
+      referenceType: "feature_usage",
+      referenceId: "idem-key-12345678",
+      balanceAfter: "95.00",
+    });
+    const usageInsert = inserts.find((i) => i.table === creditUsageEvents);
+    expect(usageInsert?.values).toMatchObject({
+      userId: "u1",
+      featureKey: "ai-query",
+      idempotencyKey: "idem-key-12345678",
+      amount: "5.00",
+      transactionId: "tx-usage-1",
+    });
+  });
+
+  // Verifies consumeCredits is idempotent when the same idempotency key is repeated.
+  it("consumeCredits returns cached result for duplicate idempotency key", async () => {
+    const existingEvent = {
+      transactionId: "tx-existing-1",
+      idempotencyKey: "idem-key-12345678",
+      amount: "5.00",
+    };
+
+    const tx = {
+      query: {
+        creditUsageEvents: {
+          findFirst: vi.fn().mockResolvedValueOnce(existingEvent),
+        },
+      },
+      select: vi.fn().mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ balanceAfter: "95.00" }]),
+          }),
+        }),
+      }),
+      insert: vi.fn(),
+      update: vi.fn(),
+    };
+
+    const service = createBillingService({
+      db: { transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)) } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    const result = await service.consumeCredits("u1", {
+      featureKey: "ai-query",
+      amount: 5,
+      idempotencyKey: "idem-key-12345678",
+    });
+
+    expect(result).toMatchObject({
+      transactionId: "tx-existing-1",
+      idempotencyKey: "idem-key-12345678",
+      balanceBefore: "100.00",
+      balanceAfter: "95.00",
+      alreadyProcessed: true,
+    });
+    expect(tx.insert).not.toHaveBeenCalled();
+    expect(tx.update).not.toHaveBeenCalled();
+  });
+
+  // Verifies consumeCredits rejects when user has insufficient credits.
+  it("consumeCredits throws on insufficient credits", async () => {
+    const tx = {
+      query: {
+        creditUsageEvents: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "3", totalPurchased: "10", totalSpent: "7" }),
+        },
+      },
+      select: vi.fn(),
+      insert: vi.fn(),
+      update: vi.fn(),
+    };
+
+    const service = createBillingService({
+      db: { transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)) } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+    });
+
+    await expect(
+      service.consumeCredits("u1", {
+        featureKey: "ai-query",
+        amount: 10,
+        idempotencyKey: "idem-key-12345678",
+      }),
+    ).rejects.toThrow("Insufficient credits");
+    expect(tx.insert).not.toHaveBeenCalled();
+  });
+
+  // Verifies applyAdminCreditAdjustment adjusts the balance and optionally notifies.
+  it("applyAdminCreditAdjustment adjusts credits with admin type", async () => {
+    const inserts: Array<{ table: unknown; values: unknown }> = [];
+    const updates: Array<{ table: unknown; set: unknown }> = [];
+    const notifications = { createNotification: vi.fn().mockResolvedValue(undefined) };
+
+    const db = {
+      query: {
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "50", totalPurchased: "50", totalSpent: "0" }),
+        },
+      },
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn((values: unknown) => {
+          inserts.push({ table, values });
+          if (table === creditTransactions) {
+            return { returning: vi.fn().mockResolvedValue([{ id: "tx-admin-1" }]) };
+          }
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: vi.fn().mockImplementation((table: unknown) => ({
+        set: vi.fn((set: unknown) => {
+          updates.push({ table, set });
+          return { where: vi.fn().mockResolvedValue(undefined) };
+        }),
+      })),
+    };
+
+    const service = createBillingService({
+      db: db as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications,
+    });
+
+    const result = await service.applyAdminCreditAdjustment("u1", {
+      amount: 25,
+      reason: "Compensation for downtime",
+      notifyUser: true,
+    });
+
+    expect(result).toMatchObject({
+      transactionId: "tx-admin-1",
+      balanceBefore: "50.00",
+      balanceAfter: "75.00",
+    });
+    const txInsert = inserts.find((i) => i.table === creditTransactions);
+    expect(txInsert?.values).toMatchObject({
+      userId: "u1",
+      type: "admin_adjustment",
+      amount: "25.00",
+      referenceType: "admin",
+      balanceAfter: "75.00",
+    });
+    await vi.waitFor(() => expect(notifications.createNotification).toHaveBeenCalledOnce());
   });
 });

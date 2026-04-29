@@ -5,6 +5,7 @@ import {
   billingListQuerySchema,
   billingRangeQuerySchema,
   clientLogSchema,
+  consumeCreditsRequestSchema,
   countriesResponseSchema,
   countriesQuerySchema,
   createCheckoutRequestSchema,
@@ -308,6 +309,15 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     requestBody: requestBody(invoiceRequestSchema),
     responses: defaultResponses("Invoice URL", ["400", "401"]),
   }),
+  route("post", "/me/credits/consume", ["Me"], "Consume credits for a feature", {
+    security: cookieOrBearerAuth,
+    requestBody: requestBody(consumeCreditsRequestSchema),
+    responses: defaultResponses("Credits consumed", ["400", "401"]),
+  }),
+  route("get", "/me/subscription", ["Me"], "Get current user subscription", {
+    security: cookieOrBearerAuth,
+    responses: defaultResponses("Current subscription", ["400", "401"]),
+  }),
   route("post", "/me/vouchers/redeem", ["Me"], "Redeem a voucher", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(redeemVoucherSchema),
@@ -420,6 +430,11 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     parameters: [pathParameter("userId", userIdParamSchema.shape.userId), ...optionalLimitParameters],
     responses: defaultResponses("User credit purchases", ["400", "401", "403"]),
   }),
+  route("get", "/admin/users/{userId}/subscription", ["Admin Users"], "Get user subscription", {
+    security: cookieOrBearerAuth,
+    parameters: [pathParameter("userId", userIdParamSchema.shape.userId)],
+    responses: defaultResponses("User subscription", ["400", "401", "403"]),
+  }),
 
   route("get", "/admin/billing/stats", ["Admin Billing"], "Get billing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Billing statistics", ["401", "403"]) }),
   route("get", "/admin/billing/revenue", ["Admin Billing"], "Get revenue data", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Revenue data", ["400", "401", "403"]) }),
@@ -427,6 +442,8 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/billing/purchases", ["Admin Billing"], "List billing purchases", { security: cookieOrBearerAuth, parameters: billingListParameters, responses: defaultResponses("Billing purchases", ["400", "401", "403"]) }),
   route("get", "/admin/billing/transactions-chart", ["Admin Billing"], "Get billing transactions chart", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Billing transactions chart", ["400", "401", "403"]) }),
   route("get", "/admin/billing/credits-consumed-chart", ["Admin Billing"], "Get credits consumed chart", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Credits consumed chart", ["400", "401", "403"]) }),
+  route("get", "/admin/billing/subscriptions", ["Admin Billing"], "List billing subscriptions", { security: cookieOrBearerAuth, parameters: billingListParameters, responses: defaultResponses("Billing subscriptions", ["400", "401", "403"]) }),
+  route("get", "/admin/billing/subscription-stats", ["Admin Billing"], "Get subscription billing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription billing statistics", ["400", "401", "403"]) }),
 
   route("get", "/admin/webhooks", ["Admin Webhooks"], "List payment webhook events", { security: cookieOrBearerAuth, parameters: webhookEventsParameters, responses: defaultResponses("Webhook events", ["400", "401", "403"]) }),
   route("get", "/admin/webhooks/stats", ["Admin Webhooks"], "Get payment webhook processing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Webhook statistics", ["401", "403"]) }),

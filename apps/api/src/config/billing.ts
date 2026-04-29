@@ -27,3 +27,25 @@ export const billingConfig = {
   allowNegativeCredits: false,
   maxCredits: 10000,
 } as const;
+
+export const subscriptionPlans = [
+  {
+    key: "starter",
+    price: 1900,
+    currency: "EUR",
+    interval: "month",
+    productId: "pdt_subscription_starter",
+    features: ["Core app access"],
+  },
+  {
+    key: "pro",
+    price: 4900,
+    currency: "EUR",
+    interval: "month",
+    productId: "pdt_subscription_pro",
+    popular: true,
+    features: ["Core app access", "Priority support"],
+  },
+] as const;
+
+export type SubscriptionPlan = typeof subscriptionPlans[number];
