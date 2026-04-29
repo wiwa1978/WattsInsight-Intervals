@@ -136,6 +136,18 @@ export const userSubscriptionResponseSchema = successResultSchema(userSubscripti
 export const subscriptionsListResponseSchema = successResultSchema(subscriptionsListSchema);
 export const subscriptionStatsResponseSchema = successResultSchema(subscriptionStatsSchema);
 
+export const consumeCreditsResponseSchema = z.object({
+  transactionId: z.string(),
+  idempotencyKey: z.string(),
+  balanceBefore: z.string(),
+  balanceAfter: z.string(),
+  alreadyProcessed: z.boolean(),
+});
+
+export type ConsumeCreditsResponse = z.infer<typeof consumeCreditsResponseSchema>;
+
+export const consumeCreditsApiResponseSchema = successResultSchema(consumeCreditsResponseSchema);
+
 export type CreditBalance = z.infer<typeof creditBalanceSchema>;
 export type CreditTransaction = z.infer<typeof creditTransactionSchema>;
 export type CreditPurchase = z.infer<typeof creditPurchaseSchema>;

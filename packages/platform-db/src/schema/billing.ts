@@ -291,6 +291,26 @@ export const voucherRedemptions = pgTable(
   ],
 );
 
+export const creditUsageEvents = pgTable(
+  "credit_usage_events",
+  {
+    id,
+    userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }).notNull(),
+    featureKey: text("feature_key").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    transactionId: uuid("transaction_id").references(() => creditTransactions.id, { onDelete: "restrict" }).notNull(),
+    metadata: jsonb("metadata"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("credit_usage_events_user_id_idempotency_key_idx").on(table.userId, table.idempotencyKey),
+    index("credit_usage_events_feature_key_created_at_idx").on(table.featureKey, table.createdAt),
+    index("credit_usage_events_transaction_id_idx").on(table.transactionId),
+  ],
+);
+
 export const userCreditsRelations = relations(userCredits, ({ one, many }) => ({
   user: one(user, {
     fields: [userCredits.userId],
@@ -299,11 +319,17 @@ export const userCreditsRelations = relations(userCredits, ({ one, many }) => ({
   transactions: many(creditTransactions),
 }));
 
-export const creditTransactionsRelations = relations(creditTransactions, ({ one }) => ({
+export const creditTransactionsRelations = relations(creditTransactions, ({ one, many }) => ({
   user: one(user, {
     fields: [creditTransactions.userId],
     references: [user.id],
   }),
+  usageEvents: many(creditUsageEvents),
+}));
+
+export const creditUsageEventsRelations = relations(creditUsageEvents, ({ one }) => ({
+  user: one(user, { fields: [creditUsageEvents.userId], references: [user.id] }),
+  transaction: one(creditTransactions, { fields: [creditUsageEvents.transactionId], references: [creditTransactions.id] }),
 }));
 
 export const creditPurchasesRelations = relations(creditPurchases, ({ one }) => ({

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     downloadInvoice: vi.fn(),
     processCreditPurchase: vi.fn(),
     getUserByEmail: vi.fn(),
+    consumeCredits: vi.fn(),
   };
 
   const adminService = {
@@ -2218,6 +2219,78 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(200);
     expect(mocks.discountsService.validateDiscountCode).toHaveBeenCalledWith("SAVE10", "11111111-1111-4111-8111-111111111111");
+  });
+
+  // Verifies POST /me/credits/consume successfully consumes credits and returns result.
+  it("consumes credits and returns transaction result", async () => {
+    mocks.billingService.consumeCredits.mockResolvedValueOnce({
+      transactionId: "tx-1",
+      idempotencyKey: "idem-key-12345678",
+      balanceBefore: "100.00",
+      balanceAfter: "95.00",
+      alreadyProcessed: false,
+    });
+
+    const res = await app.request("/me/credits/consume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        featureKey: "ai-query",
+        amount: 5,
+        idempotencyKey: "idem-key-12345678",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.billingService.consumeCredits).toHaveBeenCalledWith("auth-user", {
+      featureKey: "ai-query",
+      amount: 5,
+      idempotencyKey: "idem-key-12345678",
+    });
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        transactionId: "tx-1",
+        idempotencyKey: "idem-key-12345678",
+        balanceBefore: "100.00",
+        balanceAfter: "95.00",
+        alreadyProcessed: false,
+      },
+    });
+  });
+
+  // Verifies POST /me/credits/consume returns 400 when service throws (e.g. insufficient credits).
+  it("returns 400 when consuming credits fails", async () => {
+    mocks.billingService.consumeCredits.mockRejectedValueOnce(new Error("Insufficient credits"));
+
+    const res = await app.request("/me/credits/consume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        featureKey: "ai-query",
+        amount: 1000,
+        idempotencyKey: "idem-key-12345678",
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: "Insufficient credits",
+    });
+  });
+
+  // Verifies POST /me/credits/consume validates the request body.
+  it("validates consume credits payload", async () => {
+    const res = await app.request("/me/credits/consume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ featureKey: "ai-query" }),
+    });
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid credit usage payload");
+    expect(mocks.billingService.consumeCredits).not.toHaveBeenCalled();
   });
 
 });

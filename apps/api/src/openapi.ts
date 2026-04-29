@@ -5,6 +5,7 @@ import {
   billingListQuerySchema,
   billingRangeQuerySchema,
   clientLogSchema,
+  consumeCreditsRequestSchema,
   countriesResponseSchema,
   countriesQuerySchema,
   createCheckoutRequestSchema,
@@ -294,6 +295,11 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     security: cookieOrBearerAuth,
     requestBody: requestBody(invoiceRequestSchema),
     responses: defaultResponses("Invoice URL", ["400", "401"]),
+  }),
+  route("post", "/me/credits/consume", ["Me"], "Consume credits for a feature", {
+    security: cookieOrBearerAuth,
+    requestBody: requestBody(consumeCreditsRequestSchema),
+    responses: defaultResponses("Credits consumed", ["400", "401"]),
   }),
   route("get", "/me/subscription", ["Me"], "Get current user subscription", {
     security: cookieOrBearerAuth,

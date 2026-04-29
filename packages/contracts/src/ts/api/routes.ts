@@ -34,6 +34,7 @@ export const apiRoutes = {
     creditHistory: (limit = 50) => withQuery("/me/credits/history", { limit }),
     creditPurchases: (limit = 50) => withQuery("/me/credits/purchases", { limit }),
     invoice: "/me/credits/invoice",
+    consumeCredits: "/me/credits/consume",
     redeemVoucher: "/me/vouchers/redeem",
     notifications: (limit = 20) => withQuery("/me/notifications", { limit }),
     unreadNotificationsCount: "/me/notifications/unread-count",

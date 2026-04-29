@@ -3,12 +3,36 @@ import { desc, eq } from "drizzle-orm";
 import {
   creditPurchases,
   creditTransactions,
+  creditUsageEvents,
   user,
   userCredits,
 } from "@platform/platform-db";
 
+import type { ConsumeCreditsRequest, ConsumeCreditsResponse } from "@platform/contracts/wire";
+
 import { creditPackages } from "../../config/billing";
 import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
+
+type CreditLedgerTransactionType = "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
+type CreditLedgerReferenceType = "payment" | "feature_usage" | "admin" | "bonus" | "voucher";
+
+type ApplyCreditDeltaInput = {
+  userId: string;
+  amount: number;
+  type: CreditLedgerTransactionType;
+  description: string;
+  referenceType?: CreditLedgerReferenceType;
+  referenceId?: string;
+  metadata?: Record<string, unknown>;
+  allowNegativeBalance?: boolean;
+  createdAt?: Date;
+};
+
+type ApplyCreditDeltaResult = {
+  transactionId: string;
+  balanceBefore: string;
+  balanceAfter: string;
+};
 
 type BillingServiceDeps = {
   db: any;
@@ -81,6 +105,45 @@ async function getOrInitializeCredits(db: any, userId: string) {
   return db.query.userCredits.findFirst({
     where: (table: any, operators: any) => operators.eq(table.userId, userId),
   });
+}
+
+async function applyCreditDelta(db: any, input: ApplyCreditDeltaInput): Promise<ApplyCreditDeltaResult> {
+  const current = await getOrInitializeCredits(db, input.userId);
+  const balanceBefore = Number(current.balance);
+  const balanceAfter = balanceBefore + input.amount;
+
+  if (!input.allowNegativeBalance && balanceAfter < 0) {
+    throw new Error("Insufficient credits");
+  }
+
+  const now = input.createdAt ?? new Date();
+
+  await db
+    .update(userCredits)
+    .set({
+      balance: balanceAfter.toFixed(2),
+      totalSpent: input.type === "usage" ? (Number(current.totalSpent) + Math.abs(input.amount)).toFixed(2) : current.totalSpent,
+      updatedAt: now,
+    })
+    .where(eq(userCredits.userId, input.userId));
+
+  const [transaction] = await db.insert(creditTransactions).values({
+    userId: input.userId,
+    type: input.type,
+    amount: input.amount.toFixed(2),
+    description: input.description,
+    referenceType: input.referenceType,
+    referenceId: input.referenceId,
+    metadata: input.metadata,
+    balanceAfter: balanceAfter.toFixed(2),
+    createdAt: now,
+  }).returning({ id: creditTransactions.id });
+
+  return {
+    transactionId: transaction.id,
+    balanceBefore: balanceBefore.toFixed(2),
+    balanceAfter: balanceAfter.toFixed(2),
+  };
 }
 
 export function createBillingService(deps: BillingServiceDeps) {
@@ -324,27 +387,17 @@ export function createBillingService(deps: BillingServiceDeps) {
         return purchase;
       }
 
-      const current = await getOrInitializeCredits(tx, purchase.userId);
       const totalCredits = Number(purchase.credits) + Number(purchase.bonusCredits ?? 0);
-      const newBalance = Math.max(0, Number(current.balance) - totalCredits);
 
-      await tx
-        .update(userCredits)
-        .set({
-          balance: newBalance.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(userCredits.userId, purchase.userId));
-
-      await tx.insert(creditTransactions).values({
+      await applyCreditDelta(tx, {
         userId: purchase.userId,
-        type: reason === "refund" ? "refund" : "adjustment",
-        amount: (-totalCredits).toString(),
+        amount: -totalCredits,
+        type: reason === "refund" ? "refund" : "admin_adjustment",
         description: `${reason === "refund" ? "Refund" : "Dispute reversal"}: ${purchase.packageKey.charAt(0).toUpperCase() + purchase.packageKey.slice(1)}`,
         referenceType: "payment",
         referenceId: paymentId,
-        balanceAfter: newBalance.toString(),
         metadata,
+        allowNegativeBalance: true,
       });
 
       await tx
@@ -448,6 +501,87 @@ export function createBillingService(deps: BillingServiceDeps) {
     };
   }
 
+  async function applyAdminCreditAdjustment(userId: string, input: { amount: number; reason: string; notifyUser: boolean; idempotencyKey?: string }) {
+    const result = await applyCreditDelta(deps.db, {
+      userId,
+      amount: input.amount,
+      type: "admin_adjustment",
+      description: input.reason,
+      referenceType: "admin",
+      referenceId: input.idempotencyKey,
+      allowNegativeBalance: true,
+    });
+
+    if (input.notifyUser) {
+      deps.notifications.createNotification({
+        userId,
+        title: "creditAdjustment.title",
+        message: "creditAdjustment.message",
+        type: input.amount >= 0 ? "success" : "warning",
+        category: "billing",
+        data: { amount: input.amount, reason: input.reason },
+      }).catch(() => undefined);
+    }
+
+    return result;
+  }
+
+  async function consumeCredits(userId: string, input: ConsumeCreditsRequest): Promise<ConsumeCreditsResponse> {
+    return deps.db.transaction(async (tx: any) => {
+      const existing = await tx.query.creditUsageEvents.findFirst({
+        where: (table: any, operators: any) => operators.and(
+          operators.eq(table.userId, userId),
+          operators.eq(table.idempotencyKey, input.idempotencyKey),
+        ),
+      });
+
+      if (existing) {
+        const [txRow] = await tx.select({ balanceAfter: creditTransactions.balanceAfter })
+          .from(creditTransactions)
+          .where(eq(creditTransactions.id, existing.transactionId))
+          .limit(1);
+
+        const balanceAfter = txRow?.balanceAfter ?? "0";
+        const balanceBefore = (Number(balanceAfter) + Number(existing.amount)).toFixed(2);
+
+        return {
+          transactionId: existing.transactionId,
+          idempotencyKey: existing.idempotencyKey,
+          balanceBefore,
+          balanceAfter,
+          alreadyProcessed: true,
+        };
+      }
+
+      const result = await applyCreditDelta(tx, {
+        userId,
+        amount: -Math.abs(input.amount),
+        type: "usage",
+        description: input.description ?? `Usage: ${input.featureKey}`,
+        referenceType: "feature_usage",
+        referenceId: input.idempotencyKey,
+        metadata: { featureKey: input.featureKey, ...(input.metadata ?? {}) },
+      });
+
+      await tx.insert(creditUsageEvents).values({
+        userId,
+        featureKey: input.featureKey,
+        idempotencyKey: input.idempotencyKey,
+        amount: input.amount.toFixed(2),
+        transactionId: result.transactionId,
+        metadata: input.metadata,
+      });
+
+      return {
+        transactionId: result.transactionId,
+        idempotencyKey: input.idempotencyKey,
+        balanceBefore: result.balanceBefore,
+        balanceAfter: result.balanceAfter,
+        alreadyProcessed: false,
+      };
+    });
+  }
+
   return {
     getCreditBalance,
     getCreditHistory,
@@ -458,5 +592,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     getUserByEmail,
     getUserById,
     downloadInvoice,
+    applyAdminCreditAdjustment,
+    consumeCredits,
   };
 }

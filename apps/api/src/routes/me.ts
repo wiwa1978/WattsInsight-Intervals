@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 
 import {
+  consumeCreditsRequestSchema,
   invoiceRequestSchema,
   notificationIdParamSchema,
   optionalLimitQuerySchema,
@@ -85,6 +86,23 @@ export function createMeRouter() {
 
     const purchases = await bootstrap.billingService.getCreditPurchases(authUser.id, parsedQuery.data.limit);
     return c.json({ success: true, data: purchases });
+  });
+
+  router.post("/credits/consume", async (c) => {
+    const authUser = getAuthUser(c);
+    const body = await c.req.json().catch(() => null);
+    const parsedBody = parseJsonBody(consumeCreditsRequestSchema, body);
+
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid credit usage payload");
+    }
+
+    try {
+      const result = await bootstrap.billingService.consumeCredits(authUser.id, parsedBody.data);
+      return c.json({ success: true, data: result });
+    } catch (error) {
+      return c.json({ success: false, error: error instanceof Error ? error.message : "Failed to consume credits" }, 400);
+    }
   });
 
   router.post("/credits/invoice", async (c) => {
