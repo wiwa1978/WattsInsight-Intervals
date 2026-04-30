@@ -12,6 +12,7 @@ import { createPaymentsModule } from "@platform/payments-core";
 import { createPlatformDb, mobileRefreshToken, user } from "@platform/platform-db";
 
 import { authConfig } from "./config/auth";
+import { buildSocialProviders } from "./config/auth-social-providers";
 import { creditPackages } from "./config/billing";
 import { env } from "./env";
 import { getBillingMode } from "./lib/billing-mode";
@@ -150,24 +151,7 @@ const authModule = createAuthModule({
         });
       },
     },
-    socialProviders: {
-      ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-        ? {
-            google: {
-              clientId: env.GOOGLE_CLIENT_ID,
-              clientSecret: env.GOOGLE_CLIENT_SECRET,
-            },
-          }
-        : {}),
-      ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
-        ? {
-            github: {
-              clientId: env.GITHUB_CLIENT_ID,
-              clientSecret: env.GITHUB_CLIENT_SECRET,
-            },
-          }
-        : {}),
-    },
+    socialProviders: buildSocialProviders(env, authConfig),
     account: {
       accountLinking: {
         enabled: authConfig.allowAccountLinking,

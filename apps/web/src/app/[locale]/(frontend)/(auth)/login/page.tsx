@@ -113,7 +113,7 @@ function LoginPageContent() {
       const { error } = await authClient.signIn.email({
         email: values.email,
         password: values.password,
-        rememberMe: values.rememberMe,
+        ...(authConfig.rememberMeEnabled && { rememberMe: values.rememberMe }),
         callbackURL: redirectTo,
       });
 

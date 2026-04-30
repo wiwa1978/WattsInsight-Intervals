@@ -35,7 +35,9 @@ export const userSchema = z.object({
 export type User = z.infer<typeof userSchema>;
 export type SignInErrors = Partial<Record<keyof z.infer<typeof signInSchema>, string>>;
 
-export const signUpSchema = createSignUpSchema(passwordSchema);
+export const signUpSchema = createSignUpSchema(passwordSchema, {
+  confirmPassword: authConfig.confirmPasswordEnabled,
+});
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignUpErrors = Partial<Record<keyof SignUpInput, string>>;

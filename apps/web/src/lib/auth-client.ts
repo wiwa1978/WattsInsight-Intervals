@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { createWebUserAuthClient } from "@platform/auth-client/web-user";
 
 import { env } from "@/env";
+import { authConfig } from "@/config/auth";
 import { clientLogger } from "./client-logger";
 
 function normalizeBaseUrl(url: string) {
@@ -24,6 +25,12 @@ const authBaseURL = `${normalizeBaseUrl(env.NEXT_PUBLIC_API_URL || env.NEXT_PUBL
 
 export const authClient = createWebUserAuthClient({
   baseURL: authBaseURL,
+  features: {
+    billing: true,
+    twoFactor: authConfig.enableTwoFactor,
+    passkeys: authConfig.enablePasskeys,
+    magicLink: authConfig.enableMagicLink,
+  },
   plugins: [nextCookies()],
   onError({ error, context }) {
     if (isHandledAuthError(error)) {
