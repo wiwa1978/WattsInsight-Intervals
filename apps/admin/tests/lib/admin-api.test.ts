@@ -103,4 +103,20 @@ describe("admin API", () => {
       body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
     });
   });
+
+  it("types step-up status to include allowlisted enrollment capability", async () => {
+    apiRequestMock.mockResolvedValueOnce({
+      success: true,
+      data: {
+        stepUpRequired: true,
+        totpRequired: true,
+        twoFactorEnabled: false,
+        canEnrollTotp: true,
+      },
+    });
+
+    const response = await getAdminStepUpStatusApi();
+
+    expect(response.data.canEnrollTotp).toBe(true);
+  });
 });

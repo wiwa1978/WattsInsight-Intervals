@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import QRCode from "qrcode";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,6 +58,7 @@ function LoginPageContent() {
   const needsStepUp = reason === "admin-step-up";
   const [enrollmentSecret, setEnrollmentSecret] = React.useState<string | null>(null);
   const [enrollmentUri, setEnrollmentUri] = React.useState<string | null>(null);
+  const [enrollmentQrCode, setEnrollmentQrCode] = React.useState<string | null>(null);
 
   const callbackUrl = searchParams.get("callbackUrl");
   const redirectTo = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : DEFAULT_REDIRECT;
@@ -86,6 +88,30 @@ function LoginPageContent() {
 
   const isSubmitting = passwordForm.formState.isSubmitting;
 
+  React.useEffect(() => {
+    if (!enrollmentUri) {
+      setEnrollmentQrCode(null);
+      return;
+    }
+
+    let active = true;
+    QRCode.toDataURL(enrollmentUri, { width: 220, margin: 2 })
+      .then((dataUrl) => {
+        if (active) {
+          setEnrollmentQrCode(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setEnrollmentQrCode(null);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [enrollmentUri]);
+
   async function onPasswordSubmit(values: AdminLoginInput) {
     const { error } = await authClient.signIn.email({
       email: values.email,
@@ -111,6 +137,14 @@ function LoginPageContent() {
       const current = await getAdminStepUpStatus();
       const statusPayload = current.data;
       if (statusPayload.totpRequired && !statusPayload.twoFactorEnabled) {
+        if (!statusPayload.canEnrollTotp) {
+          passwordForm.setError("root", {
+            message: "Invalid admin credentials. Please check the admin secret and authentication code.",
+          });
+          await authClient.signOut();
+          return;
+        }
+
         if (!enrollmentSecret) {
           const setup = await twoFactor.enable({ password: values.password });
           const setupData = setup && typeof setup === "object" && "data" in setup
@@ -166,6 +200,7 @@ function LoginPageContent() {
       passwordForm.resetField("totpCode");
       setEnrollmentSecret(null);
       setEnrollmentUri(null);
+      setEnrollmentQrCode(null);
       return;
     }
 
@@ -187,6 +222,7 @@ function LoginPageContent() {
     router.push(redirectTo);
     setEnrollmentSecret(null);
     setEnrollmentUri(null);
+    setEnrollmentQrCode(null);
   }
 
   return (
@@ -215,6 +251,16 @@ function LoginPageContent() {
 
                 {enrollmentSecret && (
                   <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+                    <div className="mb-2 font-medium">First-time authenticator setup</div>
+                    {enrollmentQrCode && (
+                      <div className="mb-3 flex justify-center">
+                        <img
+                          src={enrollmentQrCode}
+                          alt="Authenticator QR code"
+                          className="h-44 w-44 rounded border border-blue-200 bg-white p-2"
+                        />
+                      </div>
+                    )}
                     Setup key for authenticator app: <span className="font-mono">{enrollmentSecret}</span>
                     {enrollmentUri && (
                       <div className="mt-2 break-all text-xs">

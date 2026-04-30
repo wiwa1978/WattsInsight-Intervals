@@ -38,6 +38,7 @@ import { paymentWebhookEvents } from "@platform/platform-db";
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { authConfig } from "../config/auth";
+import { env } from "../env";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
@@ -71,6 +72,13 @@ const adminStepUpSchema = z.object({
   totpCode: z.string().regex(/^\d{6}$/).optional(),
 });
 
+const adminAllowlist = new Set(
+  (env.ADMIN_ALLOWLIST ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean),
+);
+
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
   if (!authUser) {
@@ -78,6 +86,11 @@ function getAuthUser(c: Context<AppEnv>) {
   }
 
   return authUser;
+}
+
+function canEnrollTotp(authUser: ReturnType<typeof getAuthUser>) {
+  const email = authUser.email?.trim().toLowerCase() ?? "";
+  return authUser.role === "admin" && email.length > 0 && adminAllowlist.has(email);
 }
 
 function billingModeErrorResponse(c: Context<AppEnv>, error: unknown) {
@@ -462,6 +475,7 @@ export function createAdminRouter() {
   router.get("/status", async (c) => {
     const authUser = getAuthUser(c);
     const stepUpVerified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
+    const allowTotpEnrollment = canEnrollTotp(authUser);
     const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
       | { user?: { twoFactorEnabled?: boolean | null } }
       | null;
@@ -474,6 +488,7 @@ export function createAdminRouter() {
         stepUpRequired: !stepUpVerified,
         totpRequired: authConfig.adminPortalTotpRequired,
         twoFactorEnabled,
+        canEnrollTotp: allowTotpEnrollment,
       },
     });
   });
@@ -481,6 +496,7 @@ export function createAdminRouter() {
   router.get("/step-up/status", async (c) => {
     const authUser = getAuthUser(c);
     const stepUpVerified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
+    const allowTotpEnrollment = canEnrollTotp(authUser);
     const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
       | { user?: { twoFactorEnabled?: boolean | null } }
       | null;
@@ -492,12 +508,14 @@ export function createAdminRouter() {
         stepUpRequired: !stepUpVerified,
         totpRequired: authConfig.adminPortalTotpRequired,
         twoFactorEnabled,
+        canEnrollTotp: allowTotpEnrollment,
       },
     });
   });
 
   router.post("/step-up/complete", async (c) => {
     const authUser = getAuthUser(c);
+    const allowTotpEnrollment = canEnrollTotp(authUser);
     const parsedBody = parseJsonBody(adminStepUpSchema, await c.req.json().catch(() => null));
 
     if (!parsedBody.success) {
@@ -507,6 +525,10 @@ export function createAdminRouter() {
     const verifyAdminLoginSecret = bootstrap.adminService.verifyAdminLoginSecret ?? bootstrap.adminService.verifyAdminBanSecret;
     const secretResult = await verifyAdminLoginSecret(parsedBody.data.secret);
     if (!secretResult.success) {
+      return forbidden(c, "Invalid admin step-up credentials");
+    }
+
+    if (!allowTotpEnrollment) {
       return forbidden(c, "Invalid admin step-up credentials");
     }
 

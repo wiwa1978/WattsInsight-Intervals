@@ -13,6 +13,8 @@ The admin login flow must require four factors at login time:
 
 This design treats all login attempts in `apps/admin` as admin-only attempts and adds strict, defense-in-depth enforcement in both the web app and Hono API layer.
 
+Admin bootstrap enrollment visibility is additionally restricted by server-side allowlist policy: only authenticated users with role `admin` whose email is present in `ADMIN_ALLOWLIST` may see TOTP enrollment setup artifacts (secret/URI/QR) or complete first-time enrollment in the admin portal.
+
 ## Goals
 
 - Ensure normal users can never access the admin portal.
@@ -103,6 +105,27 @@ If authenticated `admin` has no TOTP enrolled:
 - Redirect to forced enrollment flow before portal access.
 - Enrollment must complete successfully before step-up can be marked verified.
 - Do not permit access to protected admin routes while enrollment is pending.
+- Enrollment UI and setup artifacts are shown only when backend confirms:
+  - user role is `admin`, and
+  - user email is in `ADMIN_ALLOWLIST`.
+- Non-allowlisted or non-admin users must never receive enrollment secret, TOTP URI, or QR payload.
+
+### 8) Allowlist-Gated Enrollment Capability
+
+Add explicit backend capability flag in admin status response:
+
+- `canEnrollTotp: boolean`
+- Computed server-side from authenticated identity (not from client-submitted email):
+  - `isAdminRole && isEmailInAdminAllowlist`
+
+Usage contract:
+
+- Frontend may render enrollment setup (including QR code) only when:
+  - `totpRequired === true`
+  - `twoFactorEnabled === false`
+  - `canEnrollTotp === true`
+- If enrollment is required but `canEnrollTotp === false`, deny with generic message and no setup payload.
+- Enrollment endpoints must enforce the same rule and return `403` on violation.
 
 ## Detailed Flow
 
@@ -121,9 +144,11 @@ If authenticated `admin` has no TOTP enrolled:
 1. User submits login form.
 2. Email/password + role + admin secret checks pass.
 3. System detects no TOTP enrollment.
-4. User is redirected to forced TOTP enrollment UI.
-5. On successful enrollment and first verification, step-up marker is set.
-6. User can access admin routes.
+4. Backend computes `canEnrollTotp` from role + `ADMIN_ALLOWLIST`.
+5. If `canEnrollTotp` is false, enrollment is denied and no setup secret/URI/QR is returned.
+6. If `canEnrollTotp` is true, user is redirected to forced TOTP enrollment UI.
+7. On successful enrollment and first verification, step-up marker is set.
+8. User can access admin routes.
 
 ### Non-Admin User Attempt
 
@@ -140,6 +165,8 @@ If authenticated `admin` has no TOTP enrolled:
 - Step-up endpoints are rate-limited per IP/session.
 - Error messages remain intentionally generic to reduce enumeration and side-channel leakage.
 - Step-up marker TTL limits blast radius if session is stolen.
+- Frontend never grants enrollment based on typed email; only server-evaluated authenticated identity may unlock enrollment setup.
+- QR/setup secrets are only emitted to allowlisted admin identities.
 
 ## Testing Strategy (TDD)
 
@@ -162,6 +189,8 @@ If authenticated `admin` has no TOTP enrolled:
 - `/admin/*` accepts valid marker + admin role.
 - Secret+TOTP verification endpoint denies invalid inputs.
 - Rate limiting behavior verified.
+- Enrollment capability endpoint returns `canEnrollTotp=false` for non-allowlisted identities.
+- Enrollment endpoint rejects attempts when `canEnrollTotp=false` even if client calls it directly.
 
 ### E2E
 
@@ -184,3 +213,4 @@ If authenticated `admin` has no TOTP enrolled:
 3. No admin access is possible with only primary auth session.
 4. Admin users without TOTP are forced through enrollment before access.
 5. All new behaviors are covered by automated tests.
+6. TOTP enrollment setup artifacts (including QR code) are visible only to authenticated users with role `admin` and email in `ADMIN_ALLOWLIST`.
