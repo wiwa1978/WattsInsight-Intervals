@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { FrontendAuthItems, FrontendNavItems } from "../../src/config/frontend-navbar";
-import { BackendNavItems } from "../../src/config/backend-navbar-dashboard";
+import { BackendNavItems, getBackendNavItems } from "../../src/config/backend-navbar-dashboard";
 
 describe("web navigation config", () => {
   it("keeps unique frontend navigation urls", () => {
@@ -26,5 +26,20 @@ describe("web navigation config", () => {
         url: "/billing",
       }),
     ]);
+  });
+
+  it("hides billing navigation when no billing surfaces are enabled", () => {
+    expect(getBackendNavItems({ billing: { creditSurfacesEnabled: false, subscriptionSurfacesEnabled: false } })).toEqual([
+      expect.objectContaining({ url: "/dashboard" }),
+    ]);
+  });
+
+  it("shows billing navigation when any billing surface is enabled", () => {
+    expect(getBackendNavItems({ billing: { creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false } })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
+    );
+    expect(getBackendNavItems({ billing: { creditSurfacesEnabled: false, subscriptionSurfacesEnabled: true } })).toEqual(
+      expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
+    );
   });
 });
