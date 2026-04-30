@@ -13,6 +13,19 @@ const mocks = vi.hoisted(() => {
     consumeCredits: vi.fn(),
   };
 
+  const subscriptionService = {
+    getUserSubscription: vi.fn(),
+    listSubscriptions: vi.fn(),
+    getSubscriptionStats: vi.fn(),
+    getPlanDistribution: vi.fn(),
+    listSubscriptionEvents: vi.fn(),
+    listUserSubscriptionPayments: vi.fn(),
+    downloadSubscriptionInvoice: vi.fn(),
+    recordSubscriptionPayment: vi.fn(),
+    upsertUserSubscription: vi.fn(),
+    recordSubscriptionEvent: vi.fn(),
+  };
+
   const adminService = {
     verifyAdminBanSecret: vi.fn(),
     getDashboardStats: vi.fn(),
@@ -143,6 +156,7 @@ const mocks = vi.hoisted(() => {
   };
   return {
     billingService,
+    subscriptionService,
     adminService,
     notificationsService,
     discountsService,
@@ -181,6 +195,10 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("../src/modules/billing/service", () => ({
   createBillingService: () => mocks.billingService,
+}));
+
+vi.mock("../src/modules/billing/subscription-service", () => ({
+  createSubscriptionService: () => mocks.subscriptionService,
 }));
 
 vi.mock("../src/modules/admin/service", () => ({
@@ -309,12 +327,18 @@ const [
   { bootstrap },
   { clearRequestGuardrailStateForTests },
   { API_VERSION_POLICY, APP_OWNED_API_ROUTES },
+  { applicationConfig },
 ] = await Promise.all([
   import("../src/app"),
   import("../src/bootstrap"),
   import("../src/middleware/request-guardrails"),
   import("../src/openapi"),
+  import("../src/config/application"),
 ]);
+
+function setBillingModeForTest(mode: "credits" | "subscriptions") {
+  (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = mode;
+}
 
 type RouteSignature = `${string} ${string}`;
 
@@ -383,6 +407,7 @@ function getSourceDefinedAppRoutes() {
 describe("API functional routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setBillingModeForTest("credits");
     mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
     mocks.auditService.listAuditEntries.mockResolvedValue([]);
     clearRequestGuardrailStateForTests();
@@ -812,6 +837,104 @@ describe("API functional routes", () => {
     await expect(res.json()).resolves.toEqual({
       success: true,
       data: [{ period: "2026-03-01", consumed: 42 }],
+    });
+  });
+
+  it("returns subscription billing stats", async () => {
+    setBillingModeForTest("subscriptions");
+    mocks.subscriptionService.getSubscriptionStats.mockResolvedValueOnce({
+      totalSubscriptions: 4,
+      activeSubscriptions: 2,
+      trialingSubscriptions: 1,
+      pastDueSubscriptions: 1,
+      canceledSubscriptions: 0,
+      monthlyRecurringRevenue: 68,
+      annualRecurringRevenue: 816,
+    });
+
+    const res = await app.request("/admin/billing/subscription-stats");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        totalSubscriptions: 4,
+        activeSubscriptions: 2,
+        trialingSubscriptions: 1,
+        pastDueSubscriptions: 1,
+        canceledSubscriptions: 0,
+        monthlyRecurringRevenue: 68,
+        annualRecurringRevenue: 816,
+      },
+    });
+  });
+
+  it("passes pagination and search to subscription billing endpoint", async () => {
+    setBillingModeForTest("subscriptions");
+    mocks.subscriptionService.listSubscriptions.mockResolvedValueOnce({
+      subscriptions: [{ id: "sub-row-1" }],
+      total: 1,
+      hasMore: false,
+    });
+
+    const res = await app.request("/admin/billing/subscriptions?limit=5&offset=10&searchEmail=alice@example.com");
+
+    expect(res.status).toBe(200);
+    expect(mocks.subscriptionService.listSubscriptions).toHaveBeenCalledWith(5, 10, "alice@example.com");
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { subscriptions: [{ id: "sub-row-1" }], total: 1, hasMore: false },
+    });
+  });
+
+  it("returns subscription plan distribution", async () => {
+    setBillingModeForTest("subscriptions");
+    mocks.subscriptionService.getPlanDistribution.mockResolvedValueOnce([
+      { planKey: "starter", count: 2 },
+      { planKey: "pro", count: 1 },
+    ]);
+
+    const res = await app.request("/admin/billing/subscription-plan-distribution");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [
+        { planKey: "starter", count: 2 },
+        { planKey: "pro", count: 1 },
+      ],
+    });
+  });
+
+  it("returns subscription events with limit", async () => {
+    setBillingModeForTest("subscriptions");
+    mocks.subscriptionService.listSubscriptionEvents.mockResolvedValueOnce([
+      {
+        id: "evt_1",
+        userId: "user_1",
+        dodoSubscriptionId: "sub_1",
+        eventType: "subscription.active",
+        status: "active",
+        createdAt: "2026-04-30T10:00:00.000Z",
+      },
+    ]);
+
+    const res = await app.request("/admin/billing/subscription-events?limit=25");
+
+    expect(res.status).toBe(200);
+    expect(mocks.subscriptionService.listSubscriptionEvents).toHaveBeenCalledWith(25);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: [
+        {
+          id: "evt_1",
+          userId: "user_1",
+          dodoSubscriptionId: "sub_1",
+          eventType: "subscription.active",
+          status: "active",
+          createdAt: "2026-04-30T10:00:00.000Z",
+        },
+      ],
     });
   });
 

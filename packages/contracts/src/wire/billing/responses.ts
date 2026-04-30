@@ -114,6 +114,20 @@ export const subscriptionStatsSchema = z.object({
   annualRecurringRevenue: z.number().nonnegative(),
 });
 
+export const subscriptionPlanDistributionPointSchema = z.object({
+  planKey: z.string(),
+  count: z.number().int().nonnegative(),
+});
+
+export const subscriptionEventSchema = z.object({
+  id: z.string(),
+  userId: z.string().nullable().optional(),
+  dodoSubscriptionId: z.string().nullable().optional(),
+  eventType: z.string(),
+  status: subscriptionStatusSchema.nullable().optional(),
+  createdAt: z.string(),
+});
+
 export const transactionsListSchema = z.object({
   transactions: z.array(creditTransactionSchema.extend({
     userId: z.string(),
@@ -163,6 +177,8 @@ export const userSubscriptionResponseSchema = successResultSchema(userSubscripti
 export const subscriptionPaymentsResponseSchema = successResultSchema(z.array(subscriptionPaymentSchema));
 export const subscriptionsListResponseSchema = successResultSchema(subscriptionsListSchema);
 export const subscriptionStatsResponseSchema = successResultSchema(subscriptionStatsSchema);
+export const subscriptionPlanDistributionResponseSchema = successResultSchema(z.array(subscriptionPlanDistributionPointSchema));
+export const subscriptionEventsResponseSchema = successResultSchema(z.array(subscriptionEventSchema));
 export const applicationConfigResponseSchema = successResultSchema(applicationConfigSchema);
 
 export const consumeCreditsResponseSchema = z.object({
@@ -191,4 +207,6 @@ export type UserSubscription = z.infer<typeof userSubscriptionSchema>;
 export type SubscriptionPayment = z.infer<typeof subscriptionPaymentSchema>;
 export type SubscriptionsList = z.infer<typeof subscriptionsListSchema>;
 export type SubscriptionStats = z.infer<typeof subscriptionStatsSchema>;
+export type SubscriptionPlanDistributionPoint = z.infer<typeof subscriptionPlanDistributionPointSchema>;
+export type SubscriptionEvent = z.infer<typeof subscriptionEventSchema>;
 export type ApplicationConfig = z.infer<typeof applicationConfigSchema>;
