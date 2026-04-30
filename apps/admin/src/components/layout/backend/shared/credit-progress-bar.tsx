@@ -2,27 +2,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { usePathname } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { getMyApplicationConfig } from "@/lib/api/me";
 import { getCreditBalance } from "@/lib/services/credits";
 import { Loader2, Sparkles, Coins } from "lucide-react";
 import { useSidebar } from "@/components/ui/sidebar";
-import { stripLocaleFromPath } from "@/lib/utils";
 import { adminQueryKeys } from "@/lib/query/keys";
 
 export function CreditProgressBar() {
   const t = useTranslations("creditProgressBar");
-  const pathname = usePathname();
   const { state } = useSidebar();
 
-  // Don't show on admin routes
-  const normalizedPath = stripLocaleFromPath(pathname);
-  const isAdminRoute = normalizedPath.startsWith("/admin");
   const applicationConfigQuery = useQuery({
     queryKey: adminQueryKeys.applicationConfig,
     queryFn: getMyApplicationConfig,
-    enabled: !isAdminRoute,
     staleTime: 60_000,
   });
   const creditBalanceQuery = useQuery({
@@ -31,10 +24,6 @@ export function CreditProgressBar() {
     enabled: applicationConfigQuery.data?.billing.creditSurfacesEnabled === true,
     staleTime: 30_000,
   });
-
-  if (isAdminRoute) {
-    return null;
-  }
 
   if (applicationConfigQuery.isLoading || creditBalanceQuery.isLoading) {
     return (
