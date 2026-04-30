@@ -25,9 +25,7 @@ import { authClient } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
 import { signUpSchema, type SignUpInput, magicLinkSchema, type MagicLinkFormValues } from "@/schemas";
 
-const passwordFormSchema = authConfig.confirmPasswordEnabled
-  ? signUpSchema
-  : signUpSchema.omit({ passwordConfirmation: true });
+const passwordFormSchema = signUpSchema;
 
 type PasswordFormValues =
   | SignUpInput

@@ -59,12 +59,19 @@ export const forgotPasswordSchema = z.object({
   email: z.string().email("Please enter a valid email"),
 });
 
-export function createSignUpSchema(passwordSchema: z.ZodString) {
-  return z
-    .object({
-      name: z.string().min(1, "Name is required"),
-      email: z.string().email("Please enter a valid email"),
-      password: passwordSchema,
+export function createSignUpSchema(passwordSchema: z.ZodString, options?: { confirmPassword?: boolean }) {
+  const baseSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    email: z.string().email("Please enter a valid email"),
+    password: passwordSchema,
+  });
+
+  if (options?.confirmPassword === false) {
+    return baseSchema;
+  }
+
+  return baseSchema
+    .extend({
       passwordConfirmation: z.string().min(1, "Please confirm your password"),
     })
     .refine((data) => data.password === data.passwordConfirmation, {
