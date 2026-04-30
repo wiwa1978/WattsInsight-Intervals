@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useQuery } from "@tanstack/react-query"
-import { getBackendNavItems } from "@/config/backend-navbar-dashboard"
+import { getBackendNavItems, getUserDropdownNavItems } from "@/config/backend-navbar-dashboard"
 import { getMyApplicationConfig } from "@/lib/api/me"
 import { webQueryKeys } from "@/lib/query/keys"
 
@@ -14,6 +14,7 @@ export interface DashboardNavItem {
 
 interface DashboardNavContextValue {
   navItems: DashboardNavItem[]
+  userDropdownNavItems: DashboardNavItem[]
 }
 
 const DashboardNavContext = React.createContext<DashboardNavContextValue | undefined>(undefined)
@@ -24,9 +25,13 @@ export function DashboardNavProvider({ children }: { children: React.ReactNode }
     queryFn: getMyApplicationConfig,
     staleTime: 60_000,
   })
+  const applicationConfig = applicationConfigQuery.data
 
   return (
-    <DashboardNavContext.Provider value={{ navItems: getBackendNavItems(applicationConfigQuery.data) }}>
+    <DashboardNavContext.Provider value={{
+      navItems: getBackendNavItems(applicationConfig),
+      userDropdownNavItems: getUserDropdownNavItems(applicationConfig),
+    }}>
       {children}
     </DashboardNavContext.Provider>
   )
