@@ -13,6 +13,7 @@ export const authConfig = {
   sessionUpdateAge: 60 * 60 * 24,
   sessionFreshAge: 60 * 60 * 24,
   enableTwoFactor: true,
+  adminPortalTotpRequired: true,
   twoFactorIssuer: "Acme",
   allowBackupCodeRegeneration: true,
   enablePasskeys: true,

@@ -28,6 +28,8 @@ import {
   unbanAdminUserApi,
   type AdminWebhookEventsQuery,
   verifyAdminBanSecretApi,
+  completeAdminStepUpApi,
+  getAdminStepUpStatusApi,
 } from "@/lib/api/admin";
 import type {
   AdminDashboardStats,
@@ -107,6 +109,14 @@ async function getCreditBillingChartData<T>(loadData: () => Promise<T[]>): Promi
 
 export async function verifyAdminBanSecret(secret: string) {
   return verifyAdminBanSecretApi(secret);
+}
+
+export async function getAdminStepUpStatus() {
+  return getAdminStepUpStatusApi();
+}
+
+export async function completeAdminStepUp(payload: { secret: string; totpCode: string }) {
+  return completeAdminStepUpApi(payload);
 }
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {

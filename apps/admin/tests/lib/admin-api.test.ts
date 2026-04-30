@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  completeAdminStepUpApi,
+  getAdminStepUpStatusApi,
   getAdminAllPurchasesApi,
   getAdminAllTransactionsApi,
   getAdminBillingSubscriptionEventsApi,
@@ -68,5 +70,16 @@ describe("admin API", () => {
       4,
       "/admin/billing/subscriptions?limit=20&offset=40&searchEmail=alice%2Badmin%40example.com",
     );
+  });
+
+  it("calls admin step-up endpoints", async () => {
+    await getAdminStepUpStatusApi();
+    await completeAdminStepUpApi({ secret: "secret", totpCode: "123456" });
+
+    expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/admin/step-up/status");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/step-up/complete", {
+      method: "POST",
+      body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
+    });
   });
 });

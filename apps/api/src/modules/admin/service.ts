@@ -72,6 +72,10 @@ export function createAdminService(deps: AdminServiceDeps) {
     };
   }
 
+  async function verifyAdminLoginSecret(secret: string) {
+    return verifyAdminBanSecret(secret);
+  }
+
   async function getDashboardStats() {
     const now = new Date();
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -569,6 +573,7 @@ export function createAdminService(deps: AdminServiceDeps) {
 
   return {
     verifyAdminBanSecret,
+    verifyAdminLoginSecret,
     getDashboardStats,
     getVoucherStats,
     getUsers,

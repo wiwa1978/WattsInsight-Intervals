@@ -49,6 +49,18 @@ vi.mock("../../src/app/[locale]/(backend)/billing/subscription-client-wrapper", 
   SubscriptionBillingClientWrapper: vi.fn(),
 }));
 
+vi.mock("@/components/layout/backend/billing/subscription-status", () => ({
+  SubscriptionStatus: vi.fn(),
+}));
+
+vi.mock("@/components/layout/backend/billing/subscription-discount-form", () => ({
+  SubscriptionDiscountForm: vi.fn(),
+}));
+
+vi.mock("@/components/layout/backend/billing/subscription-history", () => ({
+  SubscriptionHistory: vi.fn(),
+}));
+
 vi.mock("@/components/layout/backend/billing/subscription-pricing", () => ({
   SubscriptionPricing: vi.fn(),
 }));

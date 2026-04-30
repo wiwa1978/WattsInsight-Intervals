@@ -44,6 +44,18 @@ describe("createAdminService", () => {
     expect(result).toEqual({ success: true, error: undefined });
   });
 
+  // Verifies admin step-up secret checks can be reused for admin login hardening.
+  it("verifies admin login secret using existing secret validator", async () => {
+    const service = createAdminService({
+      db: {},
+      adminBanSecret: "secret",
+    });
+
+    const result = await service.verifyAdminLoginSecret("secret");
+
+    expect(result).toEqual({ success: true, error: undefined });
+  });
+
   // Verifies missing server configuration fails closed for secret validation.
   it("returns configuration error when admin secret is missing", async () => {
     const service = createAdminService({

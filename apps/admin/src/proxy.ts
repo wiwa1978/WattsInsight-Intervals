@@ -38,11 +38,19 @@ export async function proxy(request: NextRequest) {
     const headers = new Headers();
     headers.set("cookie", request.headers.get("cookie") || "");
 
-    const sessionUrl = `${(process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "")}/admin/session`;
+    const sessionUrl = `${(process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "")}/admin/status`;
     try {
       const res = await fetch(sessionUrl, { headers, cache: "no-store" });
       if (!res.ok) {
         return NextResponse.redirect(new URL(`/${activeLocale}/login`, request.url));
+      }
+
+      const status = await res.json().catch(() => null) as { data?: { stepUpRequired?: boolean } } | null;
+      if (status?.data?.stepUpRequired) {
+        const loginUrl = new URL(`/${activeLocale}/login`, request.url);
+        loginUrl.searchParams.set("reason", "admin-step-up");
+        loginUrl.searchParams.set("callbackUrl", pathname + (search ?? ""));
+        return NextResponse.redirect(loginUrl);
       }
 
       return intlMiddleware(request as unknown as Parameters<typeof intlMiddleware>[0]);

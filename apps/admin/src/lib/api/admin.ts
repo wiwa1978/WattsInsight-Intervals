@@ -38,6 +38,20 @@ export async function verifyAdminBanSecretApi(secret: string) {
   });
 }
 
+export async function getAdminStepUpStatusApi() {
+  return apiRequest<{
+    success: boolean;
+    data: { stepUpRequired: boolean; totpRequired: boolean; twoFactorEnabled: boolean };
+  }>("/admin/step-up/status");
+}
+
+export async function completeAdminStepUpApi(payload: { secret: string; totpCode: string }) {
+  return apiRequest<{ success: boolean; data: { verified: boolean } }>("/admin/step-up/complete", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getAdminDashboardStatsApi() {
   const result = await apiRequest<{ success: boolean; data: AdminDashboardStats }>("/admin/dashboard/stats");
   return result.data;
