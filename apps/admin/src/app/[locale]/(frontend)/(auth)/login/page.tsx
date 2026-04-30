@@ -117,7 +117,6 @@ function LoginPageContent() {
       email: values.email,
       password: values.password,
       ...(authConfig.rememberMeEnabled && { rememberMe: values.rememberMe }),
-      callbackURL: redirectTo,
     });
 
     if (error) {
