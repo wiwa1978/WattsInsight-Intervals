@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, CreditCard, Globe, LogOut, Moon, Palette, Settings, ShieldX, Sun, Monitor } from "lucide-react";
+import { Check, Globe, LogOut, Moon, Palette, Shield, ShieldX, Sun, Monitor } from "lucide-react";
 import { useTranslations, useLocale } from "next-intl";
+import { hasAdminAccess } from "@platform/auth-shared";
 import { toast } from "sonner";
 
 import { useTheme } from "@/components/providers/theme-provider";
@@ -24,6 +25,8 @@ import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { signOut, useSession, updateUser } from "@/lib/auth-client";
 import { routing } from "@/i18n/routing";
 import { stopAdminImpersonation } from "@/lib/services/admin";
+import { useDashboardNav } from "@/components/providers/backend-nav-provider";
+import { getAdminAppOverviewUrl } from "@/lib/admin-app-url";
 
 interface UserDropdownProps {
   /** Show only avatar (true) or avatar + name/email (false) */
@@ -63,6 +66,7 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
   const router = useRouter();
   const pathname = usePathname();
   const { data: session } = useSession();
+  const { userDropdownNavItems } = useDashboardNav();
 
   const handleSignOut = async () => {
     await signOut({
@@ -114,6 +118,7 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
   }
 
   const userInitial = session.user.name?.charAt(0).toUpperCase() || "U";
+  const adminAppOverviewUrl = getAdminAppOverviewUrl();
 
   return (
     <DropdownMenu>
@@ -215,19 +220,22 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            {t("dashboard.nav.settings")}
-          </Link>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem asChild>
-          <Link href="/billing">
-            <CreditCard className="mr-2 h-4 w-4" />
-            {t("dashboard.nav.billing")}
-          </Link>
-        </DropdownMenuItem>
+        {userDropdownNavItems.map((item) => (
+          <DropdownMenuItem key={item.url} asChild>
+            <Link href={item.url}>
+              <item.icon className="mr-2 h-4 w-4" />
+              {t(item.title as Parameters<typeof t>[0])}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        {adminAppOverviewUrl && hasAdminAccess(session.user) && (
+          <DropdownMenuItem asChild>
+            <a href={adminAppOverviewUrl}>
+              <Shield className="mr-2 h-4 w-4" />
+              {t("dashboard.nav.admin")}
+            </a>
+          </DropdownMenuItem>
+        )}
         {isImpersonated(session) && (
           <DropdownMenuItem onClick={handleStopImpersonating}>
             <ShieldX className="mr-2 h-4 w-4" />
