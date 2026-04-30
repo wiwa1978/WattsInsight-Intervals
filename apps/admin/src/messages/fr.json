@@ -900,6 +900,48 @@
           "next": "Suivant"
         }
       },
+      "subscription": {
+        "title": "Facturation des abonnements",
+        "description": "Suivez les revenus récurrents, la répartition des forfaits et la santé des abonnements.",
+        "stats": {
+          "active": "Abonnements actifs",
+          "trialing": "{count} en essai",
+          "attention": "En retard",
+          "canceled": "{count} annulés",
+          "mrr": "MRR",
+          "mrrDescription": "Revenu mensuel récurrent",
+          "arr": "ARR",
+          "arrDescription": "Revenu récurrent annualisé"
+        },
+        "planDistribution": {
+          "title": "Répartition des forfaits",
+          "empty": "Aucun abonnement trouvé.",
+          "count": "{count} abonnements"
+        },
+        "subscriptions": {
+          "title": "Abonnements",
+          "empty": "Aucun abonnement trouvé.",
+          "unknownUser": "Inconnu",
+          "cancelsAtPeriodEnd": "Annulation à la fin de la période",
+          "table": {
+            "user": "Utilisateur",
+            "plan": "Forfait",
+            "status": "Statut",
+            "periodEnd": "Fin de période",
+            "dodoSubscription": "Abonnement Dodo"
+          }
+        },
+        "events": {
+          "title": "Événements d'abonnement",
+          "empty": "Aucun événement d'abonnement trouvé.",
+          "table": {
+            "event": "Événement",
+            "status": "Statut",
+            "dodoSubscription": "Abonnement Dodo",
+            "received": "Reçu le"
+          }
+        }
+      },
       "errors": {
         "fetchFailed": "Échec de la récupération des données de facturation.",
         "statsFetchFailed": "Échec de la récupération des statistiques de facturation.",

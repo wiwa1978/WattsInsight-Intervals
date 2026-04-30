@@ -73,6 +73,11 @@ export const apiRoutes = {
       withQuery("/admin/billing/transactions-chart", { timeRange }),
     billingCreditsConsumedChart: (timeRange: "daily" | "weekly" | "monthly" | "yearly") =>
       withQuery("/admin/billing/credits-consumed-chart", { timeRange }),
+    billingSubscriptions: (limit = 20, offset = 0, searchEmail?: string) =>
+      withQuery("/admin/billing/subscriptions", { limit, offset, searchEmail }),
+    billingSubscriptionStats: "/admin/billing/subscription-stats",
+    billingSubscriptionPlanDistribution: "/admin/billing/subscription-plan-distribution",
+    billingSubscriptionEvents: (limit = 50) => withQuery("/admin/billing/subscription-events", { limit }),
     discounts: (limit = 20, offset = 0, search?: string, status?: DiscountStatus) =>
       withQuery("/admin/discounts", { limit, offset, search, status }),
     discount: (discountId: string) => `/admin/discounts/${discountId}`,

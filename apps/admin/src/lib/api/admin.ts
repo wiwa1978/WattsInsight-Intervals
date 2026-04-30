@@ -20,6 +20,10 @@ import type {
   NotificationSendResult,
   PurchasesList,
   RevenuePoint,
+  SubscriptionEvent,
+  SubscriptionPlanDistributionPoint,
+  SubscriptionStats,
+  SubscriptionsList,
   TransactionPoint,
   TransactionsList,
   VoucherAssignmentScope,
@@ -171,6 +175,34 @@ export async function getAdminTransactionDataApi(timeRange: "daily" | "weekly" |
 export async function getAdminCreditsConsumedDataApi(timeRange: "daily" | "weekly" | "monthly" | "yearly") {
   const result = await apiRequest<{ success: boolean; data: CreditsConsumedPoint[] }>(
     `/admin/billing/credits-consumed-chart?timeRange=${timeRange}`,
+  );
+  return result.data;
+}
+
+export async function getAdminBillingSubscriptionsApi(limit = 20, offset = 0, searchEmail?: string) {
+  const result = await apiRequest<{ success: boolean; data: SubscriptionsList }>(
+    apiRoutes.admin.billingSubscriptions(limit, offset, searchEmail),
+  );
+  return result.data;
+}
+
+export async function getAdminBillingSubscriptionStatsApi() {
+  const result = await apiRequest<{ success: boolean; data: SubscriptionStats }>(
+    apiRoutes.admin.billingSubscriptionStats,
+  );
+  return result.data;
+}
+
+export async function getAdminBillingSubscriptionPlanDistributionApi() {
+  const result = await apiRequest<{ success: boolean; data: SubscriptionPlanDistributionPoint[] }>(
+    apiRoutes.admin.billingSubscriptionPlanDistribution,
+  );
+  return result.data;
+}
+
+export async function getAdminBillingSubscriptionEventsApi(limit = 50) {
+  const result = await apiRequest<{ success: boolean; data: SubscriptionEvent[] }>(
+    apiRoutes.admin.billingSubscriptionEvents(limit),
   );
   return result.data;
 }

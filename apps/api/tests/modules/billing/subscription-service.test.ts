@@ -62,4 +62,40 @@ describe("subscription service helpers", () => {
       invoiceUrl: "https://invoices.test/subscription.pdf",
     });
   });
+
+  it("lists subscription plan distribution from local subscription rows", async () => {
+    const groupBy = vi.fn().mockResolvedValue([
+      { planKey: "starter", count: "2" },
+      { planKey: "pro", count: "1" },
+    ]);
+    const from = vi.fn().mockReturnValue({ groupBy });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = createSubscriptionService({ db: { select } as any });
+
+    await expect(service.getPlanDistribution()).resolves.toEqual([
+      { planKey: "starter", count: 2 },
+      { planKey: "pro", count: 1 },
+    ]);
+  });
+
+  it("lists recent subscription events from local event rows", async () => {
+    const events = [
+      {
+        id: "evt_1",
+        userId: "user_1",
+        dodoSubscriptionId: "sub_1",
+        eventType: "subscription.active",
+        status: "active",
+        createdAt: new Date("2026-04-30T10:00:00.000Z"),
+      },
+    ];
+    const limit = vi.fn().mockResolvedValue(events);
+    const orderBy = vi.fn().mockReturnValue({ limit });
+    const from = vi.fn().mockReturnValue({ orderBy });
+    const select = vi.fn().mockReturnValue({ from });
+    const service = createSubscriptionService({ db: { select } as any });
+
+    await expect(service.listSubscriptionEvents(10)).resolves.toEqual(events);
+    expect(limit).toHaveBeenCalledWith(10);
+  });
 });

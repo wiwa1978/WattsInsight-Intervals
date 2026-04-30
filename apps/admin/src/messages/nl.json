@@ -932,6 +932,48 @@
           "next": "Volgende"
         }
       },
+      "subscription": {
+        "title": "Abonnementsfacturatie",
+        "description": "Bewaak terugkerende omzet, planverdeling en abonnementsgezondheid.",
+        "stats": {
+          "active": "Actieve abonnementen",
+          "trialing": "{count} in proefperiode",
+          "attention": "Achterstallig",
+          "canceled": "{count} geannuleerd",
+          "mrr": "MRR",
+          "mrrDescription": "Maandelijkse terugkerende omzet",
+          "arr": "ARR",
+          "arrDescription": "Geannualiseerde terugkerende omzet"
+        },
+        "planDistribution": {
+          "title": "Planverdeling",
+          "empty": "Geen abonnementen gevonden.",
+          "count": "{count} abonnementen"
+        },
+        "subscriptions": {
+          "title": "Abonnementen",
+          "empty": "Geen abonnementen gevonden.",
+          "unknownUser": "Onbekend",
+          "cancelsAtPeriodEnd": "Stopt aan het einde van de periode",
+          "table": {
+            "user": "Gebruiker",
+            "plan": "Plan",
+            "status": "Status",
+            "periodEnd": "Periode eindigt",
+            "dodoSubscription": "Dodo-abonnement"
+          }
+        },
+        "events": {
+          "title": "Abonnementsgebeurtenissen",
+          "empty": "Geen abonnementsgebeurtenissen gevonden.",
+          "table": {
+            "event": "Gebeurtenis",
+            "status": "Status",
+            "dodoSubscription": "Dodo-abonnement",
+            "received": "Ontvangen"
+          }
+        }
+      },
       "errors": {
         "fetchFailed": "Facturatiegegevens ophalen mislukt.",
         "statsFetchFailed": "Facturatiestatistieken ophalen mislukt.",

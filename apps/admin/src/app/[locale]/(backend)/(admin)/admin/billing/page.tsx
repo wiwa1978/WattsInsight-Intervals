@@ -4,17 +4,31 @@ import { Container } from "@/components/ui/container";
 import { StatCard } from "@/components/layout/backend/shared/stat-card";
 import { CreditCard, Wallet, TrendingDown, DollarSign } from "lucide-react";
 import { RevenueChart } from "@/components/layout/backend/admin/billing/revenue-chart";
+import { SubscriptionPlanDistribution } from "@/components/layout/backend/admin/billing/subscription-plan-distribution";
+import { SubscriptionStatsGrid } from "@/components/layout/backend/admin/billing/subscription-stats-grid";
+import { SubscriptionEventsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
 import { AdminTransactionHistoryTable } from "@/components/layout/backend/admin/shared/transaction-history-table";
 import { AdminPurchaseHistoryTable } from "@/components/layout/backend/admin/shared/purchase-history-table";
+import { getMyApplicationConfig } from "@/lib/api/me";
 import {
   getAdminAllPurchases,
   getAdminAllTransactions,
   getAdminBillingStats,
+  getAdminBillingSubscriptionEvents,
+  getAdminBillingSubscriptionPlanDistribution,
+  getAdminBillingSubscriptionStats,
+  getAdminBillingSubscriptions,
   getAdminRevenueData,
 } from "@/lib/services/admin";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default async function AdminBillingPage() {
+  const applicationConfig = await getMyApplicationConfig();
+
+  if (applicationConfig.billing.mode === "subscriptions") {
+    return <AdminSubscriptionBillingPage />;
+  }
+
   const t = await getTranslations("admin.billing");
   const statsT = await getTranslations("admin.billing.stats");
 
@@ -114,6 +128,38 @@ export default async function AdminBillingPage() {
         <Suspense fallback={<TableSkeleton />}>
           <PurchaseHistoryTableWrapper initialData={initialPurchases} />
         </Suspense>
+      </div>
+    </Container>
+  );
+}
+
+async function AdminSubscriptionBillingPage() {
+  const t = await getTranslations("admin.billing.subscription");
+  const [stats, distribution, subscriptions, events] = await Promise.all([
+    getAdminBillingSubscriptionStats(),
+    getAdminBillingSubscriptionPlanDistribution(),
+    getAdminBillingSubscriptions(50, 0),
+    getAdminBillingSubscriptionEvents(50),
+  ]);
+
+  return (
+    <Container className="py-6">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2">{t("description")}</p>
+      </div>
+
+      <div className="mb-8">
+        <SubscriptionStatsGrid stats={stats} />
+      </div>
+
+      <div className="mb-8">
+        <SubscriptionPlanDistribution distribution={distribution} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-1">
+        <SubscriptionTable subscriptions={subscriptions.subscriptions} />
+        <SubscriptionEventsTable events={events} />
       </div>
     </Container>
   );
