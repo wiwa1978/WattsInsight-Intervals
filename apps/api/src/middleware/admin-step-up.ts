@@ -72,6 +72,10 @@ function buildCookie(value: string, maxAgeSeconds: number) {
     `Max-Age=${maxAgeSeconds}`,
   ];
 
+  if (env.COOKIE_DOMAIN) {
+    segments.push(`Domain=${env.COOKIE_DOMAIN}`);
+  }
+
   if (env.NODE_ENV === "production") {
     segments.push("Secure");
   }

@@ -1239,6 +1239,7 @@ describe("API functional routes", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, data: { verified: true } });
     expect(res.headers.get("set-cookie")).toContain("admin_step_up=");
+    expect(res.headers.get("set-cookie")).toContain("Domain=");
   });
 
   // Verifies admin step-up can skip TOTP verification when adminPortalTotpRequired is disabled.
