@@ -45,7 +45,7 @@ export async function getAdminStepUpStatusApi() {
   }>("/admin/step-up/status");
 }
 
-export async function completeAdminStepUpApi(payload: { secret: string; totpCode: string }) {
+export async function completeAdminStepUpApi(payload: { secret: string; totpCode?: string }) {
   return apiRequest<{ success: boolean; data: { verified: boolean } }>("/admin/step-up/complete", {
     method: "POST",
     body: JSON.stringify(payload),
