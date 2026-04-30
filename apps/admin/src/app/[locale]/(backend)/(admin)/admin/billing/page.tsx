@@ -12,6 +12,7 @@ import { AdminPurchaseHistoryTable } from "@/components/layout/backend/admin/sha
 import { getMyApplicationConfig } from "@/lib/api/me";
 import {
   getAdminAllPurchases,
+  getAdminAllSubscriptions,
   getAdminAllTransactions,
   getAdminBillingStats,
   getAdminBillingSubscriptionEvents,
@@ -19,14 +20,23 @@ import {
   getAdminBillingSubscriptionStats,
   getAdminBillingSubscriptions,
   getAdminRevenueData,
+  getAdminSubscriptionStats,
 } from "@/lib/services/admin";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default async function AdminBillingPage() {
   const applicationConfig = await getMyApplicationConfig();
 
-  if (applicationConfig.billing.mode === "subscriptions") {
+  if (!applicationConfig.billing.enabled) {
+    return null;
+  }
+
+  if (applicationConfig.billing.mode === "subscriptions" && applicationConfig.billing.subscriptionSurfacesEnabled) {
     return <AdminSubscriptionBillingPage />;
+  }
+
+  if (!applicationConfig.billing.creditSurfacesEnabled) {
+    return null;
   }
 
   const t = await getTranslations("admin.billing");

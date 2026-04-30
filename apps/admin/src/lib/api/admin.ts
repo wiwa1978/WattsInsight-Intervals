@@ -43,7 +43,12 @@ export async function getAdminDashboardStatsApi() {
   return result.data;
 }
 
-export async function getAdminUsersApi(limit = 20, offset = 0, search?: string) {
+export async function getSystemHealthApi() {
+  const result = await apiRequest<{ success: boolean; data: { status: string } }>("/health");
+  return result.data;
+}
+
+export async function getAdminUsersApi(limit = 20, offset = 0, search?: string, role?: "user" | "admin") {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
@@ -51,6 +56,10 @@ export async function getAdminUsersApi(limit = 20, offset = 0, search?: string) 
 
   if (search?.trim()) {
     params.set("search", search.trim());
+  }
+
+  if (role) {
+    params.set("role", role);
   }
 
   const result = await apiRequest<{ success: boolean; data: AdminUsersList }>(`/admin/users?${params.toString()}`);
@@ -162,6 +171,19 @@ export async function getAdminAllPurchasesApi(limit = 20, offset = 0, searchEmai
   const result = await apiRequest<{ success: boolean; data: PurchasesList }>(
     `/admin/billing/purchases?limit=${limit}&offset=${offset}${search}`,
   );
+  return result.data;
+}
+
+export async function getAdminAllSubscriptionsApi(limit = 20, offset = 0, searchEmail?: string) {
+  const search = searchEmail ? `&searchEmail=${encodeURIComponent(searchEmail)}` : "";
+  const result = await apiRequest<{ success: boolean; data: SubscriptionsList }>(
+    `/admin/billing/subscriptions?limit=${limit}&offset=${offset}${search}`,
+  );
+  return result.data;
+}
+
+export async function getAdminSubscriptionStatsApi() {
+  const result = await apiRequest<{ success: boolean; data: SubscriptionStats }>("/admin/billing/subscription-stats");
   return result.data;
 }
 

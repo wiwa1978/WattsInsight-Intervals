@@ -6,8 +6,9 @@ import { useTranslations } from "next-intl";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { creditPackages } from "@/config/billing";
-import { createCheckoutSession } from "@/lib/api/me";
+import { createCheckoutSession, createCustomerPortalSession } from "@/lib/api/me";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 type CheckoutOutcome = "success" | "cancel" | null;
 
@@ -37,6 +38,9 @@ export function BillingClientWrapper({ children, checkoutOutcome }: BillingClien
   const checkoutMutation = useMutation({
     mutationFn: createCheckoutSession,
   });
+  const portalMutation = useMutation({
+    mutationFn: createCustomerPortalSession,
+  });
 
   const handlePurchase = async (packageKey: string) => {
     if (!session?.user) {
@@ -65,6 +69,26 @@ export function BillingClientWrapper({ children, checkoutOutcome }: BillingClien
     }
   };
 
+  const handleManageBilling = async () => {
+    if (!session?.user) {
+      toast.error(billingT("portal.loginRequired"));
+      return;
+    }
+
+    try {
+      const portalSession = await portalMutation.mutateAsync();
+      if (portalSession.data.portalUrl) {
+        window.location.href = portalSession.data.portalUrl;
+        return;
+      }
+
+      toast.error(billingT("portal.noUrl"));
+    } catch (error) {
+      console.error("Customer portal error:", error);
+      toast.error(billingT("portal.failed"));
+    }
+  };
+
   return (
     <BillingContext.Provider value={{ handlePurchase }}>
       <div className="space-y-6">
@@ -80,6 +104,11 @@ export function BillingClientWrapper({ children, checkoutOutcome }: BillingClien
             <AlertDescription>{billingT("checkout.cancelDescription")}</AlertDescription>
           </Alert>
         ) : null}
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={handleManageBilling} disabled={portalMutation.isPending}>
+            {portalMutation.isPending ? billingT("portal.loading") : billingT("portal.button")}
+          </Button>
+        </div>
         {children}
       </div>
     </BillingContext.Provider>

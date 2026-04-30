@@ -1,6 +1,7 @@
 import {
   banAdminUserApi,
   getAdminAllPurchasesApi,
+  getAdminAllSubscriptionsApi,
   getAdminAllTransactionsApi,
   getAdminBillingStatsApi,
   getAdminBillingSubscriptionEventsApi,
@@ -9,7 +10,9 @@ import {
   getAdminBillingSubscriptionsApi,
   getAdminCreditsConsumedDataApi,
   getAdminDashboardStatsApi,
+  getSystemHealthApi,
   getAdminRevenueDataApi,
+  getAdminSubscriptionStatsApi,
   getAdminTransactionDataApi,
   getAdminUserApi,
   getAdminUserCreditBalanceApi,
@@ -113,6 +116,14 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
   return getAdminDashboardStatsApi();
 }
 
+export async function getAdminSystemHealth() {
+  try {
+    return await getSystemHealthApi();
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
 export async function getAdminUserStats() {
   try {
     const stats: AdminUserStats = await getAdminUserStatsApi();
@@ -203,6 +214,18 @@ export async function getAdminAllPurchases(limit: number = 20, offset: number = 
   }
 }
 
+export async function getAdminAllSubscriptions(
+  limit: number = 20,
+  offset: number = 0,
+  searchEmail?: string,
+): Promise<SubscriptionsList> {
+  return getAdminAllSubscriptionsApi(limit, offset, searchEmail);
+}
+
+export async function getAdminSubscriptionStats(): Promise<SubscriptionStats> {
+  return getAdminSubscriptionStatsApi();
+}
+
 export async function getAdminTransactionData(timeRange: TimeRange): Promise<TransactionPoint[]> {
   return getCreditBillingChartData(() => getAdminTransactionDataApi(timeRange));
 }
@@ -283,9 +306,14 @@ export async function getAdminWebhookEvent(eventId: string): Promise<AdminWebhoo
   }
 }
 
-export async function getUsers(limit = 20, offset = 0, search?: string): Promise<{ data: AdminUsersList; error: string | null }> {
+export async function getUsers(
+  limit = 20,
+  offset = 0,
+  search?: string,
+  role?: "user" | "admin",
+): Promise<{ data: AdminUsersList; error: string | null }> {
   try {
-    const result: AdminUsersList = await getAdminUsersApi(limit, offset, search);
+    const result: AdminUsersList = await getAdminUsersApi(limit, offset, search, role);
 
     return { data: result, error: null };
   } catch {

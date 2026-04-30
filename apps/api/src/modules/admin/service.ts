@@ -46,9 +46,19 @@ export function createAdminService(deps: AdminServiceDeps) {
     return normalized ? normalized.slice(0, 255) : undefined;
   }
 
-  function getUserSearchCondition(search?: string) {
+  function getUserListCondition(search?: string, role?: "user" | "admin") {
     const normalized = search?.trim().slice(0, 255);
-    return normalized ? or(ilike(user.name, `%${normalized}%`), ilike(user.email, `%${normalized}%`)) : undefined;
+    const conditions = [];
+
+    if (normalized) {
+      conditions.push(or(ilike(user.name, `%${normalized}%`), ilike(user.email, `%${normalized}%`)));
+    }
+
+    if (role) {
+      conditions.push(eq(user.role, role));
+    }
+
+    return conditions.length > 0 ? and(...conditions) : undefined;
   }
 
   async function verifyAdminBanSecret(secret: string) {
@@ -197,10 +207,10 @@ export function createAdminService(deps: AdminServiceDeps) {
     };
   }
 
-  async function getUsers(limit = 20, offset = 0, search?: string) {
+  async function getUsers(limit = 20, offset = 0, search?: string, role?: "user" | "admin") {
     const normalizedLimit = normalizeLimit(limit, 100);
     const normalizedOffset = normalizeOffset(offset);
-    const whereCondition = getUserSearchCondition(search);
+    const whereCondition = getUserListCondition(search, role);
 
     const usersQuery = deps.db
       .select({
@@ -287,6 +297,15 @@ export function createAdminService(deps: AdminServiceDeps) {
       .limit(1);
 
     return rows[0] ?? null;
+  }
+
+  async function countActiveAdmins() {
+    const [result] = await deps.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(user)
+      .where(and(eq(user.role, "admin"), eq(user.banned, false)));
+
+    return Number(result?.count ?? 0);
   }
 
   async function getUserCreditBalance(userId: string) {
@@ -575,6 +594,7 @@ export function createAdminService(deps: AdminServiceDeps) {
     searchUsers,
     getUserStats,
     getUserById,
+    countActiveAdmins,
     getUserCreditBalance,
     getUserCreditHistory,
     getUserCreditPurchases,

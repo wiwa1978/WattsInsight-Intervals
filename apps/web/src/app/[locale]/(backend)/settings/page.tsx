@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Shield, Users } from "lucide-react";
+import { User, Shield, Users, FileJson } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -12,6 +12,7 @@ import {
   ActiveSessionsCard,
   LinkedAccountsCard,
   DeleteAccountCard,
+  DataExportCard,
 } from "@/components/layout/backend/settings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -28,7 +29,7 @@ export default function SettingsPage() {
 
       {/* Tabbed Settings */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">{t("tabs.profile")}</span>
@@ -40,6 +41,10 @@ export default function SettingsPage() {
           <TabsTrigger value="accounts" className="gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">{t("tabs.accounts")}</span>
+          </TabsTrigger>
+          <TabsTrigger value="privacy" className="gap-2">
+            <FileJson className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("tabs.privacy")}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -70,6 +75,11 @@ export default function SettingsPage() {
             </h2>
             <DeleteAccountCard />
           </div>
+        </TabsContent>
+
+        {/* Privacy Tab */}
+        <TabsContent value="privacy" className="space-y-6">
+          <DataExportCard />
         </TabsContent>
       </Tabs>
     </div>

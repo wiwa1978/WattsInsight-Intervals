@@ -102,6 +102,11 @@ function extractSafeDodoMetadata(payload: unknown): SafeDodoMetadata {
   };
 }
 
+function contextRequestId(c: unknown) {
+  const value = (c as { get?: (key: string) => unknown }).get?.("requestId");
+  return typeof value === "string" ? value : undefined;
+}
+
 async function recordWebhookFailure(
   options: CreatePaymentsModuleOptions,
   metadata: SafeDodoMetadata,
@@ -125,7 +130,10 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
   const router = new Hono();
 
   router.post("/webhooks/dodo", async (c) => {
+    const startedAt = Date.now();
     const signatureHeader = c.req.header("x-dodo-signature") ?? null;
+    const requestId = contextRequestId(c) ?? c.req.header("x-request-id") ?? null;
+    const correlationId = c.req.header("x-correlation-id") ?? requestId;
     const rawBody = await c.req.text();
 
     const verification: WebhookVerifyResult = options.verifyDodoWebhook
@@ -179,6 +187,9 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
         eventType: event.eventType,
         paymentId: event.paymentId,
         signatureTimestamp: signatureTimestamp(signatureHeader),
+        sanitizedPayload: payload,
+        requestId,
+        correlationId,
       });
 
       if (!claim.claimed) {
@@ -187,10 +198,10 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
 
       try {
         await options.onPaymentEvent(event);
-        await options.webhookEventStore.markProcessed({ provider: event.provider, providerEventId });
+        await options.webhookEventStore.markProcessed({ provider: event.provider, providerEventId, durationMs: Date.now() - startedAt });
         return c.json({ success: true, data: { processed: true } }, 200);
       } catch (error) {
-        await options.webhookEventStore.markFailed({ provider: event.provider, providerEventId, error });
+        await options.webhookEventStore.markFailed({ provider: event.provider, providerEventId, error, durationMs: Date.now() - startedAt });
         await recordWebhookFailure(options, event, "handler_failed");
         throw error;
       }

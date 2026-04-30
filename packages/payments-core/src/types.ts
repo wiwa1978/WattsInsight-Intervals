@@ -49,9 +49,12 @@ export type WebhookEventStore = {
     eventType: string;
     paymentId?: string;
     signatureTimestamp?: Date;
+    sanitizedPayload?: unknown;
+    requestId?: string | null;
+    correlationId?: string | null;
   }) => Promise<{ claimed: true } | { claimed: false; status: WebhookEventProcessingStatus }>;
-  markProcessed: (event: { provider: "dodo"; providerEventId: string }) => Promise<void>;
-  markFailed: (event: { provider: "dodo"; providerEventId: string; error: unknown }) => Promise<void>;
+  markProcessed: (event: { provider: "dodo"; providerEventId: string; durationMs?: number | null }) => Promise<void>;
+  markFailed: (event: { provider: "dodo"; providerEventId: string; error: unknown; durationMs?: number | null }) => Promise<void>;
 };
 
 export type WebhookFailureAuditEvent = {

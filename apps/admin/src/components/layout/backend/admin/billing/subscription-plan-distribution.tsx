@@ -12,17 +12,19 @@ export async function SubscriptionPlanDistribution({ distribution }: Subscriptio
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t("title")}</CardTitle>
+        <CardTitle>{t("planDistribution.title")}</CardTitle>
       </CardHeader>
       <CardContent>
         {distribution.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("empty")}</p>
+          <p className="text-sm text-muted-foreground">{t("planDistribution.empty")}</p>
         ) : (
           <div className="space-y-3">
             {distribution.map((entry) => (
               <div key={entry.planKey} className="flex items-center justify-between rounded-lg border p-3">
                 <span className="font-medium capitalize">{entry.planKey}</span>
-                <span className="text-sm text-muted-foreground">{t("count", { count: entry.count })}</span>
+                <span className="text-sm text-muted-foreground">
+                  {t("planDistribution.count", { count: entry.count })}
+                </span>
               </div>
             ))}
           </div>

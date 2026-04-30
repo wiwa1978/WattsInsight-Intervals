@@ -10,7 +10,10 @@ import {
   getAdminBillingSubscriptions,
   getAdminCreditsConsumedData,
   getAdminRevenueData,
+  getAdminSubscriptionStats,
+  getAdminSystemHealth,
   getAdminTransactionData,
+  getUsers,
   stopAdminImpersonation,
 } from "../../src/lib/services/admin";
 import {
@@ -23,9 +26,12 @@ import {
   getAdminBillingSubscriptionsApi,
   getAdminCreditsConsumedDataApi,
   getAdminRevenueDataApi,
+  getAdminSubscriptionStatsApi,
   getAdminTransactionDataApi,
+  getAdminUsersApi,
+  getSystemHealthApi,
   stopAdminImpersonationApi,
-} from "../../src/lib/api/admin";
+} from "@/lib/api/admin";
 import { ApiRequestError } from "@platform/frontend-shared";
 
 vi.mock("../../src/lib/api/admin", () => ({
@@ -38,7 +44,10 @@ vi.mock("../../src/lib/api/admin", () => ({
   getAdminBillingSubscriptionsApi: vi.fn(),
   getAdminCreditsConsumedDataApi: vi.fn(),
   getAdminRevenueDataApi: vi.fn(),
+  getAdminSubscriptionStatsApi: vi.fn(),
   getAdminTransactionDataApi: vi.fn(),
+  getAdminUsersApi: vi.fn(),
+  getSystemHealthApi: vi.fn(),
   stopAdminImpersonationApi: vi.fn(),
 }));
 
@@ -51,7 +60,10 @@ const getAdminBillingSubscriptionStatsApiMock = vi.mocked(getAdminBillingSubscri
 const getAdminBillingSubscriptionsApiMock = vi.mocked(getAdminBillingSubscriptionsApi);
 const getAdminCreditsConsumedDataApiMock = vi.mocked(getAdminCreditsConsumedDataApi);
 const getAdminRevenueDataApiMock = vi.mocked(getAdminRevenueDataApi);
+const getAdminSubscriptionStatsApiMock = vi.mocked(getAdminSubscriptionStatsApi);
 const getAdminTransactionDataApiMock = vi.mocked(getAdminTransactionDataApi);
+const getAdminUsersApiMock = vi.mocked(getAdminUsersApi);
+const getSystemHealthApiMock = vi.mocked(getSystemHealthApi);
 const stopAdminImpersonationApiMock = vi.mocked(stopAdminImpersonationApi);
 
 const disabledCreditsError = new ApiRequestError({
@@ -83,40 +95,41 @@ describe("admin services", () => {
     await expect(getAdminRevenueData("daily")).resolves.toEqual([]);
   });
 
-  it("returns empty credit billing data when credit billing is disabled", async () => {
-    getAdminBillingStatsApiMock.mockRejectedValue(disabledCreditsError);
-    getAdminAllTransactionsApiMock.mockRejectedValue(disabledCreditsError);
-    getAdminAllPurchasesApiMock.mockRejectedValue(disabledCreditsError);
-
-    await expect(getAdminBillingStats()).resolves.toEqual({
-      totalPurchases: 0,
-      totalCreditsPurchased: 0,
-      purchasedCredits: 0,
-      bonusCredits: 0,
-      totalCreditsConsumed: 0,
-      totalRevenue: 0,
-    });
-    await expect(getAdminAllTransactions()).resolves.toEqual({ transactions: [], total: 0, hasMore: false });
-    await expect(getAdminAllPurchases()).resolves.toEqual({ purchases: [], total: 0, hasMore: false });
-  });
-
-  it("returns empty subscription billing data when subscription billing is disabled", async () => {
-    getAdminBillingSubscriptionStatsApiMock.mockRejectedValue(disabledSubscriptionsError);
-    getAdminBillingSubscriptionsApiMock.mockRejectedValue(disabledSubscriptionsError);
-    getAdminBillingSubscriptionPlanDistributionApiMock.mockRejectedValue(disabledSubscriptionsError);
-    getAdminBillingSubscriptionEventsApiMock.mockRejectedValue(disabledSubscriptionsError);
-
-    await expect(getAdminBillingSubscriptionStats()).resolves.toEqual({
-      totalSubscriptions: 0,
-      activeSubscriptions: 0,
-      trialingSubscriptions: 0,
+  it("delegates subscription stats to the admin API", async () => {
+    const stats = {
+      totalSubscriptions: 3,
+      activeSubscriptions: 2,
+      trialingSubscriptions: 1,
       pastDueSubscriptions: 0,
       canceledSubscriptions: 0,
-      monthlyRecurringRevenue: 0,
-      annualRecurringRevenue: 0,
-    });
-    await expect(getAdminBillingSubscriptions()).resolves.toEqual({ subscriptions: [], total: 0, hasMore: false });
-    await expect(getAdminBillingSubscriptionPlanDistribution()).resolves.toEqual([]);
-    await expect(getAdminBillingSubscriptionEvents()).resolves.toEqual([]);
+      monthlyRecurringRevenue: 49,
+      annualRecurringRevenue: 588,
+    };
+    getAdminSubscriptionStatsApiMock.mockResolvedValue(stats);
+
+    await expect(getAdminSubscriptionStats()).resolves.toBe(stats);
+    expect(getAdminSubscriptionStatsApiMock).toHaveBeenCalledOnce();
+  });
+
+  it("delegates subscription list queries to the admin API", async () => {
+    const subscriptions = { subscriptions: [], total: 0, hasMore: false };
+    getAdminAllSubscriptionsApiMock.mockResolvedValue(subscriptions);
+
+    await expect(getAdminAllSubscriptions(25, 50, "alice@example.com")).resolves.toBe(subscriptions);
+    expect(getAdminAllSubscriptionsApiMock).toHaveBeenCalledWith(25, 50, "alice@example.com");
+  });
+
+  it("delegates admin account list queries with admin role filtering", async () => {
+    const users = { users: [], total: 0 };
+    getAdminUsersApiMock.mockResolvedValue(users);
+
+    await expect(getUsers(20, 40, "alice@example.com", "admin")).resolves.toEqual({ data: users, error: null });
+    expect(getAdminUsersApiMock).toHaveBeenCalledWith(20, 40, "alice@example.com", "admin");
+  });
+
+  it("returns unavailable system health when the health API cannot be reached", async () => {
+    getSystemHealthApiMock.mockRejectedValue(new Error("network"));
+
+    await expect(getAdminSystemHealth()).resolves.toEqual({ status: "unavailable" });
   });
 });

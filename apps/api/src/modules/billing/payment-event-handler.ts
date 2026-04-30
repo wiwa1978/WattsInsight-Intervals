@@ -2,6 +2,7 @@ import type { NormalizedPaymentEvent, PaymentEventHandler } from "@platform/paym
 
 import type { creditPackages as CreditPackagesList } from "../../config/billing";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled } from "../../lib/feature-guards";
+import type { CheckoutIntentRecord, CheckoutIntentsService } from "./checkout-intents";
 import { isDodoSubscriptionWebhookEvent } from "./subscription-webhooks";
 
 type CreditPackage = (typeof CreditPackagesList)[number];
@@ -32,6 +33,7 @@ export type PaymentEventHandlerDeps = {
     processCreditRefund: (paymentId: string, refundId?: string) => Promise<unknown>;
     processCreditDisputeLoss: (paymentId: string, disputeId?: string, disputeStatus?: string) => Promise<unknown>;
   };
+  checkoutIntents?: CheckoutIntentsService;
   subscriptions?: {
     handleDodoSubscriptionWebhook: (payload: unknown) => Promise<void>;
     recordSubscriptionPayment?: (input: {
@@ -53,10 +55,96 @@ export type PaymentEventHandlerDeps = {
 
 const DISPUTE_REVERSAL_EVENTS = new Set(["dispute.accepted", "dispute.lost"]);
 
+type ValidatedCheckoutIntent = {
+  intent: CheckoutIntentRecord;
+  duplicateCompleted: boolean;
+};
+
 function getWebhookDataPayload(raw: unknown) {
   return typeof raw === "object" && raw !== null && "data" in raw
     ? (raw as { data: unknown }).data
     : {};
+}
+
+function getMetadataString(metadata: Record<string, string> | undefined, key: string) {
+  return typeof metadata?.[key] === "string" ? metadata[key] : undefined;
+}
+
+function getCheckoutReferenceId(metadata: Record<string, string> | undefined) {
+  return getMetadataString(metadata, "checkoutReferenceId") ?? getMetadataString(metadata, "referenceId");
+}
+
+async function findAndValidateCheckoutIntent(args: {
+  checkoutIntents?: CheckoutIntentsService;
+  event: NormalizedPaymentEvent;
+  billingMode: "credits" | "subscriptions";
+  userId: string;
+  packageKey?: string | null;
+  planKey?: string | null;
+  productId: string;
+  discountCode?: string | null;
+}): Promise<ValidatedCheckoutIntent> {
+  if (!args.checkoutIntents) {
+    throw new Error(`Refusing payment ${args.event.paymentId}: checkout intent service is not configured.`);
+  }
+
+  const referenceId = getCheckoutReferenceId(args.event.metadata);
+  if (!referenceId) {
+    throw new Error(`Refusing payment ${args.event.paymentId}: checkout intent reference missing.`);
+  }
+
+  const intent = await args.checkoutIntents.findByReferenceId(referenceId);
+  if (!intent) {
+    throw new Error(`Refusing payment ${args.event.paymentId}: checkout intent ${referenceId} was not found.`);
+  }
+
+  if (intent.status === "completed" && intent.paymentId === args.event.paymentId) {
+    return { intent, duplicateCompleted: true };
+  }
+
+  if (intent.status !== "pending") {
+    throw new Error(`Refusing payment ${args.event.paymentId}: checkout intent ${referenceId} is ${intent.status}.`);
+  }
+
+  const metadata = args.event.metadata;
+  const metadataProductId = getMetadataString(metadata, "productId");
+  const metadataDiscountCode = getMetadataString(metadata, "discountCode") ?? null;
+
+  const validations: Array<[boolean, string]> = [
+    [intent.userId === args.userId, "userId"],
+    [intent.billingMode === args.billingMode, "billingMode"],
+    [(intent.packageKey ?? null) === (args.packageKey ?? null), "packageKey"],
+    [(intent.planKey ?? null) === (args.planKey ?? null), "planKey"],
+    [metadataProductId === args.productId, "metadata.productId"],
+    [intent.productId === args.productId, "productId"],
+    [(intent.discountCode ?? null) === metadataDiscountCode, "discountCode"],
+  ];
+
+  const failed = validations.find(([ok]) => !ok);
+  if (failed) {
+    throw new Error(`Refusing payment ${args.event.paymentId}: checkout intent ${failed[1]} mismatch.`);
+  }
+
+  return { intent, duplicateCompleted: false };
+}
+
+async function markCheckoutIntentForPaymentStatus(args: {
+  checkoutIntents: CheckoutIntentsService;
+  intent: CheckoutIntentRecord;
+  paymentId: string;
+  paymentStatus: "completed" | "pending" | "failed";
+}) {
+  if (args.paymentStatus === "completed") {
+    await args.checkoutIntents.markCompleted({ id: args.intent.id, paymentId: args.paymentId });
+    return;
+  }
+
+  if (args.paymentStatus === "failed") {
+    await args.checkoutIntents.markFailed({ id: args.intent.id, paymentId: args.paymentId });
+    return;
+  }
+
+  await args.checkoutIntents.markPending({ id: args.intent.id, paymentId: args.paymentId });
 }
 
 /**
@@ -162,6 +250,21 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
           ? "pending"
           : "failed";
 
+      const checkoutIntentValidation = await findAndValidateCheckoutIntent({
+        checkoutIntents: deps.checkoutIntents,
+        event,
+        billingMode: "subscriptions",
+        userId: foundUser.id,
+        planKey,
+        packageKey: null,
+        productId: event.productId,
+        discountCode: getMetadataString(event.metadata, "discountCode") ?? null,
+      });
+
+      if (checkoutIntentValidation.duplicateCompleted) {
+        return;
+      }
+
       await deps.subscriptions?.recordSubscriptionPayment?.({
         userId: foundUser.id,
         planKey,
@@ -175,6 +278,12 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
           vatAmount: event.taxAmount,
           currency: event.currency,
         },
+      });
+      await markCheckoutIntentForPaymentStatus({
+        checkoutIntents: deps.checkoutIntents!,
+        intent: checkoutIntentValidation.intent,
+        paymentId: event.paymentId,
+        paymentStatus,
       });
       return;
     }
@@ -226,6 +335,30 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         ? "pending"
         : "failed";
 
+    if (getMetadataString(event.metadata, "billingMode") !== "credits") {
+      throw new Error(`Refusing payment ${event.paymentId}: metadata.billingMode mismatch.`);
+    }
+
+    const metadataPackageKey = getMetadataString(event.metadata, "packageKey");
+    if (metadataPackageKey !== matchedPackage.key) {
+      throw new Error(`Refusing payment ${event.paymentId}: metadata.packageKey mismatch.`);
+    }
+
+    const checkoutIntentValidation = await findAndValidateCheckoutIntent({
+      checkoutIntents: deps.checkoutIntents,
+      event,
+      billingMode: "credits",
+      userId: foundUser.id,
+      packageKey: matchedPackage.key,
+      planKey: null,
+      productId: event.productId,
+      discountCode: getMetadataString(event.metadata, "discountCode") ?? null,
+    });
+
+    if (checkoutIntentValidation.duplicateCompleted) {
+      return;
+    }
+
     await deps.billing.processCreditPurchase(
       foundUser.id,
       matchedPackage.key,
@@ -243,5 +376,11 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         customerId: event.customerId,
       },
     );
+    await markCheckoutIntentForPaymentStatus({
+      checkoutIntents: deps.checkoutIntents!,
+      intent: checkoutIntentValidation.intent,
+      paymentId: event.paymentId,
+      paymentStatus,
+    });
   };
 }

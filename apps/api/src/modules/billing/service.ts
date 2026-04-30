@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 import {
   creditPurchases,
@@ -437,6 +437,17 @@ export function createBillingService(deps: BillingServiceDeps) {
     return rows[0] ?? null;
   }
 
+  async function getLatestDodoCustomerId(userId: string) {
+    const [purchase] = await deps.db
+      .select({ dodoCustomerId: creditPurchases.dodoCustomerId })
+      .from(creditPurchases)
+      .where(and(eq(creditPurchases.userId, userId), isNotNull(creditPurchases.dodoCustomerId)))
+      .orderBy(desc(creditPurchases.createdAt))
+      .limit(1);
+
+    return purchase?.dodoCustomerId ?? null;
+  }
+
   async function downloadInvoice(userId: string, paymentId: string) {
     const [purchase] = await deps.db
       .select({
@@ -591,6 +602,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     processCreditDisputeLoss,
     getUserByEmail,
     getUserById,
+    getLatestDodoCustomerId,
     downloadInvoice,
     applyAdminCreditAdjustment,
     consumeCredits,

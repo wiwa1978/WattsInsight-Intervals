@@ -612,6 +612,8 @@
     "description": "Manage users, roles, and system settings.",
     "nav": {
       "overview": "Overview",
+      "system": "System",
+      "admins": "Admins",
       "users": "Users",
       "billing": "Billing",
       "webhooks": "Webhooks",
@@ -651,6 +653,41 @@
         "yearly": "Yearly",
         "creditsConsumed": "Credits Consumed"
       }
+    },
+    "system": {
+      "title": "System",
+      "description": "Review platform health, admin access, and operational signals.",
+      "health": {
+        "title": "API Health",
+        "ok": "Operational",
+        "unavailable": "Unavailable",
+        "description": "Status from the API health endpoint."
+      },
+      "metrics": {
+        "totalUsers": "Total users",
+        "admins": "Admins",
+        "bannedUsers": "Banned users"
+      },
+      "activity": {
+        "title": "System Activity",
+        "description": "High-level counters from existing admin statistics.",
+        "thisMonthUsers": "Users this month",
+        "completedPurchases": "Completed purchases",
+        "pendingPurchases": "Pending purchases",
+        "usageTransactions": "Usage transactions"
+      },
+      "logs": {
+        "title": "Log Streams",
+        "description": "Available API app and audit log files.",
+        "app": "App logs",
+        "audit": "Audit logs"
+      }
+    },
+    "admins": {
+      "title": "Admin Accounts",
+      "description": "View privileged admin users across the system.",
+      "passwordUpdated": "Password updated. New password copied to clipboard.",
+      "passwordUpdateFailed": "Failed to set password."
     },
     "backToPortal": "Back to Portal",
     "impersonation": {
@@ -932,23 +969,23 @@
           "next": "Next"
         }
       },
-      "subscription": {
+      "subscriptionsMode": {
         "title": "Subscription Billing",
         "description": "Monitor recurring revenue, plan distribution, and subscription health.",
         "stats": {
-          "active": "Active subscriptions",
-          "trialing": "{count} trialing",
-          "attention": "Past due",
-          "canceled": "{count} canceled",
-          "mrr": "MRR",
-          "mrrDescription": "Monthly recurring revenue",
-          "arr": "ARR",
-          "arrDescription": "Annualized recurring revenue"
+          "activeSubscriptions": "Active subscriptions",
+          "activeSubscriptionsDescription": "{trialing} trialing · {total} total",
+          "pastDueSubscriptions": "Past due",
+          "pastDueSubscriptionsDescription": "{canceled} canceled",
+          "monthlyRecurringRevenue": "MRR",
+          "monthlyRecurringRevenueDescription": "Monthly recurring revenue",
+          "annualRecurringRevenue": "ARR",
+          "annualRecurringRevenueDescription": "Annualized recurring revenue"
         },
         "planDistribution": {
           "title": "Plan distribution",
           "empty": "No subscriptions found.",
-          "count": "{count} subscriptions"
+          "count": "{count, plural, one {# subscription} other {# subscriptions}}"
         },
         "subscriptions": {
           "title": "Subscriptions",
@@ -960,17 +997,15 @@
             "plan": "Plan",
             "status": "Status",
             "periodEnd": "Period end",
-            "dodoSubscription": "Dodo subscription"
-          }
-        },
-        "events": {
-          "title": "Subscription events",
-          "empty": "No subscription events found.",
-          "table": {
-            "event": "Event",
-            "status": "Status",
-            "dodoSubscription": "Dodo subscription",
-            "received": "Received"
+            "subscriptionId": "Dodo subscription"
+          },
+          "status": {
+            "active": "Active",
+            "trialing": "Trialing",
+            "past_due": "Past due",
+            "canceled": "Canceled",
+            "expired": "Expired",
+            "paused": "Paused"
           }
         }
       },

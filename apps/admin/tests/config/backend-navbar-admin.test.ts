@@ -8,6 +8,8 @@ describe("admin backend nav config", () => {
     expect(new Set(urls).size).toBe(urls.length);
     expect(urls).toEqual([
       "/admin/overview",
+      "/admin/system",
+      "/admin/admins",
       "/admin/users",
       "/admin/billing",
       "/admin/webhooks",

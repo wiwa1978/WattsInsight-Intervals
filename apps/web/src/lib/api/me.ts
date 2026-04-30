@@ -1,5 +1,5 @@
 import { createCreditsApi } from "@platform/frontend-shared/credits";
-import { createMeApi, type CountryRecord } from "@platform/frontend-shared/me-api";
+import { createMeApi, type CountryRecord, type CreateUserDataExportResponse, type UserDataExportSummary } from "@platform/frontend-shared/me-api";
 import { createNotificationsApi } from "@platform/frontend-shared/notifications";
 
 import { apiRequest } from "./client";
@@ -7,6 +7,7 @@ import type { Notification } from "@/schemas/notification";
 import type { ApplicationConfig, SubscriptionPayment, UserSubscription } from "@platform/contracts";
 
 export type { CountryRecord } from "@platform/frontend-shared/me-api";
+export type { CreateUserDataExportResponse, UserDataExportSummary } from "@platform/frontend-shared/me-api";
 
 const creditsApi = createCreditsApi(apiRequest);
 const notificationsApi = createNotificationsApi(apiRequest);
@@ -96,4 +97,25 @@ export async function createCheckoutSession(packageKey: string) {
 
 export async function createSubscriptionCheckoutSession(planKey: string, discountCode?: string) {
   return meApi.createSubscriptionCheckoutSession(planKey, discountCode) as Promise<{ success: boolean; data: { checkoutUrl: string } }>;
+}
+
+export async function createCustomerPortalSession() {
+  return meApi.createCustomerPortalSession() as Promise<{ success: boolean; data: { portalUrl: string } }>;
+}
+
+export async function listMyDataExports() {
+  const result = await meApi.listDataExports() as { success: boolean; data: UserDataExportSummary[] };
+  return result.data;
+}
+
+export async function createMyDataExport() {
+  return meApi.createDataExport() as Promise<{ success: boolean; data?: CreateUserDataExportResponse; error?: string }>;
+}
+
+export async function cancelMyDataExport(exportId: string) {
+  return meApi.cancelDataExport(exportId) as Promise<{ success: boolean; data?: UserDataExportSummary; error?: string }>;
+}
+
+export function buildMyDataExportDownloadUrl(exportId: string, token: string) {
+  return `/api/me/data-exports/${encodeURIComponent(exportId)}/download?token=${encodeURIComponent(token)}`;
 }

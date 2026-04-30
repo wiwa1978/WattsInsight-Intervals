@@ -86,6 +86,10 @@ describe("service factories", () => {
       path: "/payments/checkout",
       init: { method: "POST", body: JSON.stringify({ billingMode: "subscriptions", planKey: "pro" }) },
     });
+    await expect(me.createCustomerPortalSession()).resolves.toEqual({
+      path: "/me/customer-portal",
+      init: { method: "POST" },
+    });
   });
 
   it("keeps the client query provider out of the root barrel", () => {
