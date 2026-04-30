@@ -1219,9 +1219,42 @@
     },
     "subscription": {
       "description": "Kies een abonnement om door te gaan.",
+      "currentTitle": "Huidig abonnement",
+      "managedThroughPortal": "Je abonnement wordt beheerd via het facturatieportaal.",
+      "noActive": "Nog geen actief abonnement. Kies hieronder een abonnement om te starten.",
+      "planLabel": "Plan",
+      "statusLabel": "Status",
+      "renewsLabel": "Verlengt",
+      "unknownPeriod": "Onbekend",
+      "upgrade": "Upgraden",
       "mostPopular": "Meest populair",
       "planDescription": "Terugkerende SaaS-toegang, gefactureerd per {interval}",
       "choosePlan": "Kies {plan}",
+      "discount": {
+        "label": "Kortingscode",
+        "placeholder": "Voer kortingscode in",
+        "apply": "Toepassen",
+        "applied": "Korting {code} toegepast",
+        "appliedDescription": "Kortingscode {code} wordt meegestuurd met je volgende abonnementscheckout."
+      },
+      "history": {
+        "title": "Abonnementsfacturen",
+        "description": "Je abonnementsbetalingen en downloadbare facturen.",
+        "empty": "Nog geen abonnementsbetalingen.",
+        "downloadInvoice": "Factuur downloaden",
+        "invoiceDownloaded": "Factuur succesvol geopend",
+        "invoiceUnavailable": "Factuur-URL niet beschikbaar",
+        "invoiceFailed": "Factuur downloaden mislukt",
+        "table": {
+          "plan": "Plan",
+          "amount": "Bedrag",
+          "exclVat": "excl. btw: €{amount}",
+          "status": "Status",
+          "date": "Datum",
+          "invoice": "Factuur",
+          "notAvailable": "N/B"
+        }
+      },
       "checkout": {
         "successDescription": "Abonnement checkout voltooid. Je abonnement wordt bijgewerkt zodra de betaling is verwerkt.",
         "cancelDescription": "Abonnement checkout is geannuleerd."
@@ -1265,5 +1298,10 @@
     "upgrade": "Upgraden",
     "loading": "Tegoed laden...",
     "error": "Tegoed laden mislukt"
+  },
+  "subscriptionProgressBar": {
+    "label": "Abonnement",
+    "starter": "Starter",
+    "upgrade": "Upgraden"
   }
 }
