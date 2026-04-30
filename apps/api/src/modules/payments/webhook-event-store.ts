@@ -7,11 +7,43 @@ type PaymentWebhookEventStoreDeps = {
   db: any;
 };
 
+const REDACTED = "[redacted]";
+const SENSITIVE_KEYS = /authorization|card|cvv|email|password|secret|signature|token/i;
+
+function sanitizeJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+        key,
+        SENSITIVE_KEYS.test(key) ? REDACTED : sanitizeJson(child),
+      ]),
+    );
+  }
+
+  return value;
+}
+
+function numericDetail(error: Error & Record<string, unknown>, key: string) {
+  const value = error[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function stringDetail(error: Error & Record<string, unknown>, key: string) {
+  const value = error[key];
+  return typeof value === "string" && value ? value : undefined;
+}
+
 function safeErrorDetails(error: unknown) {
   if (error instanceof Error) {
+    const record = error as Error & Record<string, unknown>;
     return {
       name: error.name,
       message: error.message,
+      ...(stringDetail(record, "code") ? { code: stringDetail(record, "code") } : {}),
+      ...(numericDetail(record, "status") ? { status: numericDetail(record, "status") } : {}),
+      ...(numericDetail(record, "statusCode") ? { statusCode: numericDetail(record, "statusCode") } : {}),
+      ...(error.stack ? { stack: error.stack } : {}),
     };
   }
 
@@ -31,6 +63,9 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
           eventType: event.eventType,
           paymentId: event.paymentId,
           signatureTimestamp: event.signatureTimestamp,
+          sanitizedPayload: sanitizeJson(event.sanitizedPayload),
+          requestId: event.requestId ?? null,
+          correlationId: event.correlationId ?? null,
           processingStatus: "processing",
         })
         .onConflictDoNothing({ target: [paymentWebhookEvents.provider, paymentWebhookEvents.providerEventId] })
@@ -54,6 +89,10 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
             eventType: event.eventType,
             paymentId: event.paymentId,
             signatureTimestamp: event.signatureTimestamp,
+            sanitizedPayload: sanitizeJson(event.sanitizedPayload),
+            requestId: event.requestId ?? null,
+            correlationId: event.correlationId ?? null,
+            durationMs: null,
             processingStatus: "processing",
             errorDetails: null,
             failedAt: null,
@@ -81,6 +120,7 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
         .update(paymentWebhookEvents)
         .set({
           processingStatus: "processed",
+          durationMs: event.durationMs ?? null,
           processedAt: new Date(),
           failedAt: null,
           errorDetails: null,
@@ -99,6 +139,7 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
         .update(paymentWebhookEvents)
         .set({
           processingStatus: "failed",
+          durationMs: event.durationMs ?? null,
           failedAt: new Date(),
           errorDetails: safeErrorDetails(event.error),
           updatedAt: new Date(),

@@ -322,7 +322,8 @@
     "tabs": {
       "profile": "Profile",
       "security": "Security",
-      "accounts": "Accounts"
+      "accounts": "Accounts",
+      "privacy": "Privacy"
     },
     "profile": {
       "title": "Profile",
@@ -499,6 +500,31 @@
       "deleting": "Deleting...",
       "success": "Account deleted successfully.",
       "error": "Failed to delete account"
+    },
+    "dataExport": {
+      "title": "Data export",
+      "description": "Create a JSON export of your profile, sessions, billing history, notifications, vouchers, discounts, and audit references. Sensitive tokens and password hashes are redacted.",
+      "loading": "Loading export requests...",
+      "empty": "No data exports requested yet.",
+      "requestButton": "Request data export",
+      "requesting": "Generating export...",
+      "refreshButton": "Refresh",
+      "downloadButton": "Download JSON",
+      "cancelButton": "Cancel",
+      "success": "Data export is ready to download.",
+      "failed": "Failed to generate data export",
+      "loadFailed": "Failed to load data exports",
+      "cancelSuccess": "Data export cancelled",
+      "cancelFailed": "Failed to cancel data export",
+      "createdAt": "Requested {date}",
+      "createdUnknown": "Request date unknown",
+      "status": {
+        "pending": "Pending",
+        "ready": "Ready",
+        "downloaded": "Downloaded",
+        "expired": "Expired",
+        "failed": "Failed"
+      }
     }
   },
   "analytics": {
@@ -1162,6 +1188,13 @@
       "cancelTitle": "Checkout canceled",
       "cancelDescription": "No credits were purchased."
     },
+    "portal": {
+      "button": "Manage billing",
+      "loading": "Opening billing portal...",
+      "loginRequired": "Please login to manage billing",
+      "noUrl": "Customer portal URL not available",
+      "failed": "Failed to open customer portal"
+    },
     "stats": {
       "available": "Total Available Credits",
       "availableDescription": "Credits ready to use",
@@ -1257,7 +1290,13 @@
       },
       "checkout": {
         "successDescription": "Subscription checkout completed. Your subscription will update once payment processing completes.",
-        "cancelDescription": "Subscription checkout was canceled."
+        "cancelDescription": "Subscription checkout was canceled.",
+        "portal": {
+          "button": "Customer portal",
+          "loading": "Opening customer portal...",
+          "noUrl": "Customer portal URL not available",
+          "failed": "Failed to open customer portal"
+        }
       }
     }
   },

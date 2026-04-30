@@ -612,6 +612,8 @@
     "description": "Gérez les utilisateurs, les rôles et les paramètres système.",
     "nav": {
       "overview": "Aperçu",
+      "system": "Système",
+      "admins": "Admins",
       "users": "Utilisateurs",
       "billing": "Facturation",
       "webhooks": "Webhooks",
@@ -619,6 +621,41 @@
       "discounts": "Codes de réduction",
       "vouchers": "Bons",
       "logs": "Journaux"
+    },
+    "system": {
+      "title": "Système",
+      "description": "Consultez la santé de la plateforme, les accès admin et les signaux opérationnels.",
+      "health": {
+        "title": "Santé API",
+        "ok": "Opérationnel",
+        "unavailable": "Indisponible",
+        "description": "Statut provenant du point de terminaison de santé de l'API."
+      },
+      "metrics": {
+        "totalUsers": "Utilisateurs totaux",
+        "admins": "Admins",
+        "bannedUsers": "Utilisateurs bannis"
+      },
+      "activity": {
+        "title": "Activité système",
+        "description": "Compteurs de haut niveau issus des statistiques admin existantes.",
+        "thisMonthUsers": "Utilisateurs ce mois-ci",
+        "completedPurchases": "Achats terminés",
+        "pendingPurchases": "Achats en attente",
+        "usageTransactions": "Transactions d'utilisation"
+      },
+      "logs": {
+        "title": "Flux de journaux",
+        "description": "Fichiers de journaux app et audit disponibles pour l'API.",
+        "app": "Journaux app",
+        "audit": "Journaux audit"
+      }
+    },
+    "admins": {
+      "title": "Comptes admin",
+      "description": "Affichez les utilisateurs admin privilégiés dans le système.",
+      "passwordUpdated": "Mot de passe mis à jour. Nouveau mot de passe copié dans le presse-papiers.",
+      "passwordUpdateFailed": "Échec de la définition du mot de passe."
     },
     "backToPortal": "Retour au Portail",
     "impersonation": {
@@ -898,6 +935,46 @@
           "page": "Page {current} sur {total}",
           "previous": "Précédent",
           "next": "Suivant"
+        }
+      },
+      "subscriptionsMode": {
+        "title": "Facturation des abonnements",
+        "description": "Surveillez les revenus récurrents, la répartition des offres et la santé des abonnements.",
+        "stats": {
+          "activeSubscriptions": "Abonnements actifs",
+          "activeSubscriptionsDescription": "{trialing} en essai · {total} au total",
+          "pastDueSubscriptions": "En retard",
+          "pastDueSubscriptionsDescription": "{canceled} annulés",
+          "monthlyRecurringRevenue": "MRR",
+          "monthlyRecurringRevenueDescription": "Revenu mensuel récurrent",
+          "annualRecurringRevenue": "ARR",
+          "annualRecurringRevenueDescription": "Revenu récurrent annualisé"
+        },
+        "planDistribution": {
+          "title": "Répartition des offres",
+          "empty": "Aucun abonnement trouvé.",
+          "count": "{count, plural, one {# abonnement} other {# abonnements}}"
+        },
+        "subscriptions": {
+          "title": "Abonnements",
+          "empty": "Aucun abonnement trouvé.",
+          "unknownUser": "Inconnu",
+          "cancelsAtPeriodEnd": "Annulation en fin de période",
+          "table": {
+            "user": "Utilisateur",
+            "plan": "Offre",
+            "status": "Statut",
+            "periodEnd": "Fin de période",
+            "subscriptionId": "Abonnement Dodo"
+          },
+          "status": {
+            "active": "Actif",
+            "trialing": "En essai",
+            "past_due": "En retard",
+            "canceled": "Annulé",
+            "expired": "Expiré",
+            "paused": "En pause"
+          }
         }
       },
       "errors": {

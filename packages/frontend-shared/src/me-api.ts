@@ -1,11 +1,34 @@
 import type { ApiRequest } from "./credits";
 import type { ApplicationConfig, CreateCheckoutResponse, SubscriptionPayment, UserSubscription } from "@platform/contracts";
 
+type CustomerPortalResponse = {
+  success: true;
+  data: {
+    portalUrl: string;
+  };
+};
+
 export type CountryRecord = {
   id: string;
   name: string;
   code: string;
   language: string;
+};
+
+export type UserDataExportSummary = {
+  id: string;
+  status: "pending" | "ready" | "downloaded" | "expired" | "failed";
+  fileName: string | null;
+  fileSizeBytes: number | null;
+  expiresAt: string | null;
+  downloadedAt: string | null;
+  failedReason: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type CreateUserDataExportResponse = UserDataExportSummary & {
+  downloadToken: string;
 };
 
 export function createMeApi(apiRequest: ApiRequest) {
@@ -49,6 +72,27 @@ export function createMeApi(apiRequest: ApiRequest) {
         method: "POST",
         body: JSON.stringify({ billingMode: "subscriptions", planKey, discountCode }),
       });
+    },
+    async createCustomerPortalSession() {
+      return apiRequest<CustomerPortalResponse>("/me/customer-portal", {
+        method: "POST",
+      });
+    },
+    async listDataExports() {
+      return apiRequest<{ success: boolean; data: UserDataExportSummary[] }>("/me/data-exports");
+    },
+    async createDataExport() {
+      return apiRequest<{ success: boolean; data?: CreateUserDataExportResponse; error?: string }>("/me/data-exports", {
+        method: "POST",
+      });
+    },
+    async cancelDataExport(exportId: string) {
+      return apiRequest<{ success: boolean; data?: UserDataExportSummary; error?: string }>(`/me/data-exports/${encodeURIComponent(exportId)}`, {
+        method: "DELETE",
+      });
+    },
+    async downloadDataExport(exportId: string, token: string) {
+      return apiRequest<string>(`/me/data-exports/${encodeURIComponent(exportId)}/download?token=${encodeURIComponent(token)}`);
     },
   };
 }

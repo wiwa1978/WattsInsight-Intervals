@@ -168,6 +168,7 @@ export function WebhookEventsMonitor({ events, stats, limit, activeFilters }: We
                     <TableHead>Status</TableHead>
                     <TableHead>Webhook ID</TableHead>
                     <TableHead>Payment</TableHead>
+                    <TableHead>Duration</TableHead>
                     <TableHead>Processed</TableHead>
                     <TableHead className="text-right">Details</TableHead>
                   </TableRow>
@@ -175,7 +176,7 @@ export function WebhookEventsMonitor({ events, stats, limit, activeFilters }: We
                 <TableBody>
                   {events.events.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-muted-foreground py-10 text-center">
+                      <TableCell colSpan={9} className="text-muted-foreground py-10 text-center">
                         No webhook events match the current filters.
                       </TableCell>
                     </TableRow>
@@ -187,6 +188,7 @@ export function WebhookEventsMonitor({ events, stats, limit, activeFilters }: We
                       <TableCell><Badge variant={statusVariant(event.processingStatus)}>{event.processingStatus}</Badge></TableCell>
                       <TableCell className="max-w-56 truncate font-mono text-xs" title={event.providerEventId}>{event.providerEventId}</TableCell>
                       <TableCell className="max-w-56 truncate font-mono text-xs" title={event.paymentId ?? undefined}>{event.paymentId ?? "-"}</TableCell>
+                      <TableCell className="font-mono text-xs">{event.durationMs === null ? "-" : `${event.durationMs}ms`}</TableCell>
                       <TableCell>{event.processedAt ? formatDate(event.processedAt) : event.failedAt ? formatDate(event.failedAt) : "-"}</TableCell>
                       <TableCell className="text-right">
                         <Button type="button" size="sm" variant="outline" onClick={() => setSelectedEvent(event)}>View</Button>
@@ -212,6 +214,9 @@ export function WebhookEventsMonitor({ events, stats, limit, activeFilters }: We
                 <DetailItem label="Database ID" value={selectedEvent.id} />
                 <DetailItem label="Webhook ID" value={selectedEvent.providerEventId} />
                 <DetailItem label="Payment ID" value={selectedEvent.paymentId} />
+                <DetailItem label="Request ID" value={selectedEvent.requestId} />
+                <DetailItem label="Correlation ID" value={selectedEvent.correlationId} />
+                <DetailItem label="Duration" value={selectedEvent.durationMs === null ? null : `${selectedEvent.durationMs}ms`} />
                 <DetailItem label="Signature time" value={selectedEvent.signatureTimestamp ? formatDate(selectedEvent.signatureTimestamp) : null} />
                 <DetailItem label="Received" value={formatDate(selectedEvent.createdAt)} />
                 <DetailItem label="Processed" value={selectedEvent.processedAt ? formatDate(selectedEvent.processedAt) : null} />
@@ -222,10 +227,14 @@ export function WebhookEventsMonitor({ events, stats, limit, activeFilters }: We
               <Tabs defaultValue={selectedEvent.errorDetails ? "error" : "metadata"}>
                 <TabsList>
                   <TabsTrigger value="metadata">Metadata</TabsTrigger>
+                  <TabsTrigger value="payload">Payload</TabsTrigger>
                   <TabsTrigger value="error">Error</TabsTrigger>
                 </TabsList>
                 <TabsContent value="metadata" className="mt-3">
                   <JsonPanel title="Event" value={selectedEvent} />
+                </TabsContent>
+                <TabsContent value="payload" className="mt-3">
+                  <JsonPanel title="Sanitized payload" value={selectedEvent.sanitizedPayload} />
                 </TabsContent>
                 <TabsContent value="error" className="mt-3">
                   <JsonPanel title="Error" value={selectedEvent.errorDetails} />

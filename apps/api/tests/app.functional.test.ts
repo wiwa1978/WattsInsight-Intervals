@@ -8,9 +8,29 @@ const mocks = vi.hoisted(() => {
     getCreditHistory: vi.fn(),
     getCreditPurchases: vi.fn(),
     downloadInvoice: vi.fn(),
+    getLatestDodoCustomerId: vi.fn(),
     processCreditPurchase: vi.fn(),
     getUserByEmail: vi.fn(),
     consumeCredits: vi.fn(),
+  };
+  const checkoutIntentsService = {
+    create: vi.fn(async () => ({ referenceId: "checkout-ref-functional" })),
+    findByReferenceId: vi.fn(),
+    markPending: vi.fn(),
+    markCompleted: vi.fn(),
+    markFailed: vi.fn(),
+  };
+
+  const subscriptionService = {
+    getUserSubscription: vi.fn(),
+    listUserSubscriptionPayments: vi.fn(),
+    downloadSubscriptionInvoice: vi.fn(),
+    getLatestDodoCustomerId: vi.fn(),
+    upsertUserSubscription: vi.fn(),
+    recordSubscriptionPayment: vi.fn(),
+    recordSubscriptionEvent: vi.fn(),
+    listSubscriptions: vi.fn(),
+    getSubscriptionStats: vi.fn(),
   };
 
   const adminService = {
@@ -29,6 +49,7 @@ const mocks = vi.hoisted(() => {
     getTransactionData: vi.fn(),
     getCreditsConsumedData: vi.fn(),
     searchUsers: vi.fn(),
+    countActiveAdmins: vi.fn(),
   };
 
   const notificationsService = {
@@ -64,6 +85,9 @@ const mocks = vi.hoisted(() => {
     updateVoucher: vi.fn(),
     searchUsers: vi.fn(),
     redeemVoucher: vi.fn(),
+  };
+  const dodoCustomerPortal = {
+    create: vi.fn(),
   };
   const auditService = {
     recordAuditEntry: vi.fn(),
@@ -143,18 +167,22 @@ const mocks = vi.hoisted(() => {
   };
   return {
     billingService,
+    checkoutIntentsService,
+    subscriptionService,
     adminService,
     notificationsService,
     discountsService,
     vouchersService,
     auditService,
     adminAuthApi,
+    dodoCustomerPortal,
     db,
     env: {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
       API_URL: "http://localhost:8787",
       DODO_PAYMENTS_ENVIRONMENT: "test_mode" as const,
+      DODO_PAYMENTS_API_KEY: "dodo-api-key",
       BETTER_AUTH_SECRET: "this-is-a-long-enough-secret",
       JWT_SECRET: "this-is-a-long-enough-jwt-secret",
       JWT_ISSUER: "api",
@@ -181,6 +209,15 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("../src/modules/billing/service", () => ({
   createBillingService: () => mocks.billingService,
+}));
+
+vi.mock("../src/modules/billing/checkout-intents", () => ({
+  createCheckoutIntentsService: () => mocks.checkoutIntentsService,
+}));
+
+vi.mock("../src/modules/billing/subscription-service", () => ({
+  createSubscriptionService: () => mocks.subscriptionService,
+  normalizeSubscriptionStatus: vi.fn((status: string) => (status === "cancelled" ? "canceled" : status)),
 }));
 
 vi.mock("../src/modules/admin/service", () => ({
@@ -245,7 +282,7 @@ vi.mock("@platform/auth-core", () => ({
     });
 
     const passThrough = async (c: any, next: any) => {
-      c.set("authUser", { id: "auth-user" });
+      c.set("authUser", { id: c.req.header("x-test-auth-user-id") ?? "auth-user" });
       await next();
     };
 
@@ -274,9 +311,29 @@ vi.mock("@platform/payments-core", () => ({
   },
 }));
 
+vi.mock("dodopayments", () => ({
+  default: vi.fn(() => ({
+    customers: {
+      customerPortal: mocks.dodoCustomerPortal,
+    },
+  })),
+}));
+
 vi.mock("@platform/platform-db", () => ({
   createPlatformDb: () => ({ db: mocks.db }),
+  account: {},
+  auditEntries: {},
+  creditPurchases: {},
+  creditTransactions: {},
   mobileRefreshToken: {},
+  notification: {},
+  session: {},
+  user: {},
+  userCredits: {},
+  userDataExportRequests: {},
+  userDiscounts: {},
+  voucherAssignments: {},
+  voucherRedemptions: {},
   country: {
     id: "id",
     name: "name",
@@ -385,6 +442,7 @@ describe("API functional routes", () => {
     vi.clearAllMocks();
     mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
     mocks.auditService.listAuditEntries.mockResolvedValue([]);
+    mocks.subscriptionService.getLatestDodoCustomerId.mockResolvedValue(null);
     clearRequestGuardrailStateForTests();
   });
 
@@ -600,6 +658,7 @@ describe("API functional routes", () => {
       "limit",
       "offset",
       "search",
+      "role",
     ]);
     expect(sendAllOperation?.requestBody?.content?.["application/json"]?.schema?.properties).toEqual(
       expect.objectContaining({ title: expect.anything(), message: expect.anything() }),
@@ -667,8 +726,19 @@ describe("API functional routes", () => {
     );
     expect(url.searchParams.get("metadata_userId")).toBe("auth-user");
     expect(url.searchParams.get("metadata_packageKey")).toBe("silver");
+    expect(url.searchParams.get("metadata_referenceId")).toBe("checkout-ref-functional");
+    expect(url.searchParams.get("metadata_checkoutReferenceId")).toBe("checkout-ref-functional");
     expect(url.searchParams.get("redirect_url")).toBe("http://localhost:3100/billing?success=true");
     expect(url.searchParams.get("cancel_url")).toBe("http://localhost:3100/billing?cancel=true");
+    expect(mocks.checkoutIntentsService.create).toHaveBeenCalledWith({
+      userId: "auth-user",
+      billingMode: "credits",
+      packageKey: "silver",
+      planKey: undefined,
+      productId: "pdt_0NUzkvLtA4UmSIekBVTcX",
+      discountCode: undefined,
+      metadata: expect.objectContaining({ source: "payments.checkout" }),
+    });
   });
 
   // Verifies checkout ignores client-controlled return URLs and uses server config.
@@ -688,6 +758,38 @@ describe("API functional routes", () => {
     const url = new URL(payload.data.checkoutUrl);
     expect(url.searchParams.get("redirect_url")).toBe("http://localhost:3100/billing?success=true");
     expect(url.searchParams.get("cancel_url")).toBe("http://localhost:3100/billing?cancel=true");
+  });
+
+  // Verifies customer portal endpoint creates a Dodo portal session for the authenticated user's known Dodo customer.
+  it("returns a customer portal URL for the authenticated user", async () => {
+    mocks.billingService.getLatestDodoCustomerId.mockResolvedValueOnce("cus_auth_user");
+    mocks.dodoCustomerPortal.create.mockResolvedValueOnce({ link: "https://test.customer.dodopayments.com/session/portal_123" });
+
+    const res = await app.request("/me/customer-portal", { method: "POST" });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { portalUrl: "https://test.customer.dodopayments.com/session/portal_123" },
+    });
+    expect(mocks.billingService.getLatestDodoCustomerId).toHaveBeenCalledWith("auth-user");
+    expect(mocks.dodoCustomerPortal.create).toHaveBeenCalledWith("cus_auth_user", {
+      return_url: "http://localhost:3100/billing",
+    });
+  });
+
+  // Verifies customer portal endpoint returns a client-safe error before calling Dodo when no customer is known.
+  it("returns 404 when the authenticated user has no Dodo customer", async () => {
+    mocks.billingService.getLatestDodoCustomerId.mockResolvedValueOnce(null);
+
+    const res = await app.request("/me/customer-portal", { method: "POST" });
+
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: "No billing customer found",
+    });
+    expect(mocks.dodoCustomerPortal.create).not.toHaveBeenCalled();
   });
 
   // Verifies user detail endpoint returns 404 for unknown users.
@@ -863,14 +965,14 @@ describe("API functional routes", () => {
     await expect(statsRes.json()).resolves.toEqual({ success: true, data: { totalUsers: 10, totalAdmins: 2, totalBanned: 1 } });
   });
 
-  // Verifies admin user listing forwards submitted server-side search.
-  it("passes pagination and search to admin users endpoint", async () => {
+  // Verifies admin user listing forwards submitted server-side filters.
+  it("passes pagination, search, and role to admin users endpoint", async () => {
     mocks.adminService.getUsers.mockResolvedValueOnce({ users: [{ id: "u1" }], total: 1 });
 
-    const res = await app.request("/admin/users?limit=20&offset=0&search=%20alice%20");
+    const res = await app.request("/admin/users?limit=20&offset=0&search=%20alice%20&role=admin");
 
     expect(res.status).toBe(200);
-    expect(mocks.adminService.getUsers).toHaveBeenCalledWith(20, 0, "alice");
+    expect(mocks.adminService.getUsers).toHaveBeenCalledWith(20, 0, "alice", "admin");
     await expect(res.json()).resolves.toEqual({
       success: true,
       data: { users: [{ id: "u1" }], total: 1 },
@@ -957,10 +1059,105 @@ describe("API functional routes", () => {
     expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
   });
 
+  it("blocks admins from changing their own role while allowing unchanged self role sets", async () => {
+    const authUserId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminService.getUserById.mockResolvedValue({ id: authUserId, role: "admin", banned: false });
+    mocks.adminAuthApi.setRole.mockResolvedValue({ success: true });
+
+    const demoteRes = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-auth-user-id": authUserId },
+      body: JSON.stringify({ userId: authUserId, role: "user" }),
+    });
+    const unchangedRes = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-auth-user-id": authUserId },
+      body: JSON.stringify({ userId: authUserId, role: "admin" }),
+    });
+
+    expect(demoteRes.status).toBe(403);
+    await expect(demoteRes.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "FORBIDDEN",
+    });
+    expect(unchangedRes.status).toBe(200);
+    expect(mocks.adminAuthApi.setRole).toHaveBeenCalledTimes(1);
+    expect(mocks.adminAuthApi.setRole).toHaveBeenCalledWith(expect.objectContaining({
+      body: { userId: authUserId, role: "admin" },
+    }));
+  });
+
+  it("blocks demoting the last active admin", async () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+    mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "admin", banned: false });
+    mocks.adminService.countActiveAdmins.mockResolvedValue(1);
+
+    const res = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, role: "user" }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "FORBIDDEN",
+    });
+    expect(mocks.adminAuthApi.setRole).not.toHaveBeenCalled();
+    expect(mocks.adminAuthApi.revokeUserSessions).not.toHaveBeenCalled();
+  });
+
+  it("revokes target sessions after a successful role change", async () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+    mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "user", banned: false });
+    mocks.adminAuthApi.setRole.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.revokeUserSessions.mockResolvedValueOnce({ success: true });
+
+    const res = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, role: "admin" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.adminAuthApi.setRole).toHaveBeenCalledWith(expect.objectContaining({
+      body: { userId, role: "admin" },
+    }));
+    expect(mocks.adminAuthApi.revokeUserSessions).toHaveBeenCalledWith(expect.objectContaining({
+      body: { userId },
+    }));
+  });
+
+  it("blocks banning the last active admin", async () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "admin", banned: false });
+    mocks.adminService.countActiveAdmins.mockResolvedValue(1);
+
+    const res = await app.request("/admin/users/ban", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        banReason: "policy violation",
+        secret: "ban-secret-value",
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "FORBIDDEN",
+    });
+    expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
+  });
+
   it("records audit entries for admin auth mutations", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
     mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "user", banned: false });
     mocks.adminAuthApi.setRole.mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.revokeUserSessions.mockResolvedValue({ success: true });
     mocks.adminAuthApi.banUser.mockResolvedValueOnce({ success: true });
     mocks.adminAuthApi.unbanUser.mockResolvedValueOnce({ success: true });
     mocks.adminAuthApi.impersonateUser.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));

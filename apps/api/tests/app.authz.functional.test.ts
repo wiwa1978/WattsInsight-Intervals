@@ -97,7 +97,22 @@ vi.mock("@platform/auth-core", () => ({
 }));
 
 vi.mock("@platform/payments-core", () => ({ createPaymentsModule: () => ({ router: new Hono() }) }));
-vi.mock("@platform/platform-db", () => ({ createPlatformDb: () => ({ db: {} }), mobileRefreshToken: {} }));
+vi.mock("@platform/platform-db", () => ({
+  account: {},
+  auditEntries: {},
+  creditPurchases: {},
+  creditTransactions: {},
+  createPlatformDb: () => ({ db: {} }),
+  mobileRefreshToken: {},
+  notification: {},
+  session: {},
+  user: {},
+  userCredits: {},
+  userDataExportRequests: {},
+  userDiscounts: {},
+  voucherAssignments: {},
+  voucherRedemptions: {},
+}));
 vi.mock("@platform/email-core", () => ({ createEmailModule: () => ({ sendTemplate: vi.fn() }), createResendProvider: () => ({ send: vi.fn() }) }));
 vi.mock("../src/modules/billing/service", () => ({ createBillingService: () => mocks.billingService }));
 vi.mock("../src/modules/admin/service", () => ({ createAdminService: () => mocks.adminService }));

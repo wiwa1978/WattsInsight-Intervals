@@ -18,6 +18,37 @@ function createBillingDeps() {
   };
 }
 
+function createCheckoutIntent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "intent-1",
+    userId: "user-1",
+    billingMode: "credits",
+    packageKey: "bronze",
+    planKey: null,
+    productId: "pdt_1",
+    discountCode: null,
+    referenceId: "checkout-ref-1",
+    paymentId: null,
+    status: "pending",
+    metadata: null,
+    createdAt: new Date("2026-04-30T10:00:00.000Z"),
+    updatedAt: new Date("2026-04-30T10:00:00.000Z"),
+    completedAt: null,
+    failedAt: null,
+    ...overrides,
+  };
+}
+
+function createCheckoutIntentDeps(intent = createCheckoutIntent()) {
+  return {
+    create: vi.fn(),
+    findByReferenceId: vi.fn().mockResolvedValue(intent),
+    markPending: vi.fn().mockResolvedValue({}),
+    markCompleted: vi.fn().mockResolvedValue({}),
+    markFailed: vi.fn().mockResolvedValue({}),
+  };
+}
+
 describe("payment event handler billing modes", () => {
   it("rejects credit payments when subscription mode is configured", async () => {
     (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "subscriptions";
@@ -79,9 +110,16 @@ describe("payment event handler billing modes", () => {
     (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "subscriptions";
     const billing = createBillingDeps();
     const recordSubscriptionPayment = vi.fn().mockResolvedValue({});
+    const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({
+      billingMode: "subscriptions",
+      packageKey: null,
+      planKey: "starter",
+      productId: "pdt_subscription_starter",
+    }));
     const handler = createPaymentEventHandler({
       creditPackages: [],
       billing,
+      checkoutIntents,
       subscriptions: {
         handleDodoSubscriptionWebhook: vi.fn(),
         recordSubscriptionPayment,
@@ -93,7 +131,14 @@ describe("payment event handler billing modes", () => {
       eventType: "payment.succeeded",
       paymentId: "pay_sub_1",
       productId: "pdt_subscription_starter",
-      metadata: { billingMode: "subscriptions", userId: "user-1", planKey: "starter", subscriptionId: "sub_1" },
+      metadata: {
+        billingMode: "subscriptions",
+        userId: "user-1",
+        planKey: "starter",
+        productId: "pdt_subscription_starter",
+        checkoutReferenceId: "checkout-ref-1",
+        subscriptionId: "sub_1",
+      },
       customerId: "cus_1",
       currency: "EUR",
       totalAmount: 1900,
@@ -116,5 +161,170 @@ describe("payment event handler billing modes", () => {
       },
     });
     expect(billing.processCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it("requires a matching pending checkout intent before completing credit payments", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "credits";
+    const billing = createBillingDeps();
+    const checkoutIntents = createCheckoutIntentDeps(null as never);
+    const handler = createPaymentEventHandler({
+      creditPackages: [{ key: "bronze", credits: 100, price: 1000, productId: "pdt_1" }],
+      billing,
+      checkoutIntents,
+    });
+
+    await expect(handler({
+      provider: "dodo",
+      eventType: "payment.succeeded",
+      paymentId: "pay_1",
+      productId: "pdt_1",
+      metadata: {
+        userId: "user-1",
+        billingMode: "credits",
+        packageKey: "bronze",
+        productId: "pdt_1",
+        checkoutReferenceId: "checkout-ref-1",
+      },
+      currency: "EUR",
+      totalAmount: 1000,
+      taxAmount: 0,
+      raw: {},
+    })).rejects.toThrow(/checkout intent/);
+
+    expect(checkoutIntents.findByReferenceId).toHaveBeenCalledWith("checkout-ref-1");
+    expect(billing.processCreditPurchase).not.toHaveBeenCalled();
+    expect(checkoutIntents.markCompleted).not.toHaveBeenCalled();
+  });
+
+  it("validates checkout intent metadata and completes credit payments", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "credits";
+    const billing = createBillingDeps();
+    const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent());
+    const handler = createPaymentEventHandler({
+      creditPackages: [{ key: "bronze", credits: 100, price: 1000, productId: "pdt_1" }],
+      billing,
+      checkoutIntents,
+    });
+
+    await handler({
+      provider: "dodo",
+      eventType: "payment.succeeded",
+      paymentId: "pay_1",
+      productId: "pdt_1",
+      metadata: {
+        userId: "user-1",
+        billingMode: "credits",
+        packageKey: "bronze",
+        productId: "pdt_1",
+        checkoutReferenceId: "checkout-ref-1",
+      },
+      customerId: "cus_1",
+      currency: "EUR",
+      totalAmount: 1000,
+      taxAmount: 0,
+      raw: {},
+    });
+
+    expect(billing.processCreditPurchase).toHaveBeenCalledWith(
+      "user-1",
+      "bronze",
+      "pay_1",
+      "completed",
+      "cus_1",
+      {
+        priceExclVat: 1000,
+        priceInclVat: 1000,
+        vatAmount: 0,
+        currency: "EUR",
+      },
+      {
+        provider: "dodo",
+        customerId: "cus_1",
+      },
+    );
+    expect(checkoutIntents.markCompleted).toHaveBeenCalledWith({ id: "intent-1", paymentId: "pay_1" });
+  });
+
+  it("does not retry duplicate completed credit payment events for the same payment", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "credits";
+    const billing = createBillingDeps();
+    const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({ status: "completed", paymentId: "pay_1" }));
+    const handler = createPaymentEventHandler({
+      creditPackages: [{ key: "bronze", credits: 100, price: 1000, productId: "pdt_1" }],
+      billing,
+      checkoutIntents,
+    });
+
+    await handler({
+      provider: "dodo",
+      eventType: "payment.succeeded",
+      paymentId: "pay_1",
+      productId: "pdt_1",
+      metadata: {
+        userId: "user-1",
+        billingMode: "credits",
+        packageKey: "bronze",
+        productId: "pdt_1",
+        checkoutReferenceId: "checkout-ref-1",
+      },
+      currency: "EUR",
+      totalAmount: 1000,
+      taxAmount: 0,
+      raw: {},
+    });
+
+    expect(billing.processCreditPurchase).not.toHaveBeenCalled();
+    expect(checkoutIntents.markCompleted).not.toHaveBeenCalled();
+  });
+
+  it("validates checkout intent metadata and records subscription payments", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "subscriptions";
+    const billing = createBillingDeps();
+    const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({
+      billingMode: "subscriptions",
+      packageKey: null,
+      planKey: "starter",
+      productId: "pdt_subscription_starter",
+      discountCode: "SAVE10",
+    }));
+    const recordSubscriptionPayment = vi.fn().mockResolvedValue({});
+    const handler = createPaymentEventHandler({
+      creditPackages: [],
+      billing,
+      checkoutIntents,
+      subscriptions: {
+        handleDodoSubscriptionWebhook: vi.fn(),
+        recordSubscriptionPayment,
+      },
+    });
+
+    await handler({
+      provider: "dodo",
+      eventType: "payment.succeeded",
+      paymentId: "pay_sub_1",
+      productId: "pdt_subscription_starter",
+      metadata: {
+        billingMode: "subscriptions",
+        userId: "user-1",
+        planKey: "starter",
+        discountCode: "SAVE10",
+        productId: "pdt_subscription_starter",
+        checkoutReferenceId: "checkout-ref-1",
+        subscriptionId: "sub_1",
+      },
+      customerId: "cus_1",
+      currency: "EUR",
+      totalAmount: 1900,
+      taxAmount: 190,
+      raw: {},
+    });
+
+    expect(recordSubscriptionPayment).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user-1",
+      planKey: "starter",
+      paymentId: "pay_sub_1",
+      paymentStatus: "completed",
+    }));
+    expect(checkoutIntents.markCompleted).toHaveBeenCalledWith({ id: "intent-1", paymentId: "pay_sub_1" });
   });
 });

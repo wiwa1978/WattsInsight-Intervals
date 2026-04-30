@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getAdminAllPurchasesApi,
+  getAdminAllSubscriptionsApi,
   getAdminAllTransactionsApi,
+  getAdminSubscriptionStatsApi,
   getAdminUsersApi,
   stopAdminImpersonationApi,
 } from "../../src/lib/api/admin";
@@ -25,6 +27,12 @@ describe("admin API", () => {
     expect(apiRequestMock).toHaveBeenCalledWith("/admin/users?limit=50&offset=100&search=alice%40example.com");
   });
 
+  it("forwards role filter when fetching admin users", async () => {
+    await getAdminUsersApi(20, 0, undefined, "admin");
+
+    expect(apiRequestMock).toHaveBeenCalledWith("/admin/users?limit=20&offset=0&role=admin");
+  });
+
   it("encodes search email when fetching admin billing transactions", async () => {
     await getAdminAllTransactionsApi(20, 40, "alice+admin@example.com");
 
@@ -39,6 +47,20 @@ describe("admin API", () => {
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/admin/billing/purchases?limit=20&offset=60&searchEmail=alice%2Badmin%40example.com",
     );
+  });
+
+  it("encodes search email when fetching admin billing subscriptions", async () => {
+    await getAdminAllSubscriptionsApi(25, 50, "alice+admin@example.com");
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/admin/billing/subscriptions?limit=25&offset=50&searchEmail=alice%2Badmin%40example.com",
+    );
+  });
+
+  it("fetches admin subscription billing stats", async () => {
+    await getAdminSubscriptionStatsApi();
+
+    expect(apiRequestMock).toHaveBeenCalledWith("/admin/billing/subscription-stats");
   });
 
   it("posts to the stop impersonation endpoint", async () => {

@@ -10,6 +10,7 @@ import {
   countriesResponseSchema,
   countriesQuerySchema,
   createCheckoutRequestSchema,
+  createCheckoutResponseSchema,
   discountIdParamSchema,
   discountListQuerySchema,
   errorResultSchema,
@@ -78,6 +79,9 @@ const cookieOrBearerAuth: Array<Record<string, string[]>> = [{ cookieAuth: [] },
 const genericSuccessSchema = z.object({ success: z.literal(true) }).passthrough();
 const genericErrorSchema = errorResultSchema.passthrough();
 const genericObjectSchema = z.object({}).passthrough();
+const customerPortalResponseSchema = createCheckoutResponseSchema.extend({
+  data: z.object({ portalUrl: z.string().url() }),
+});
 const notificationSendResultResponseSchema = z.object({
   success: z.literal(true),
   data: notificationSendResultSchema,
@@ -218,7 +222,11 @@ const paginationParameters = [
   queryParameter("limit", paginationQuerySchema.shape.limit),
   queryParameter("offset", paginationQuerySchema.shape.offset),
 ];
-const adminUsersParameters = [...paginationParameters, queryParameter("search", z.string().optional())];
+const adminUsersParameters = [
+  ...paginationParameters,
+  queryParameter("search", z.string().optional()),
+  queryParameter("role", z.enum(["user", "admin"]).optional()),
+];
 const optionalLimitParameters = [queryParameter("limit", optionalLimitQuerySchema.shape.limit)];
 const billingRangeParameters = [queryParameter("timeRange", billingRangeQuerySchema.shape.timeRange)];
 const billingListParameters = [
@@ -297,6 +305,35 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
       "200": jsonResponse("Application capabilities", applicationConfigResponseSchema),
       "401": jsonResponse("Unauthorized", genericErrorSchema),
     },
+  }),
+  route("post", "/me/customer-portal", ["Me"], "Create a customer portal session", {
+    security: cookieOrBearerAuth,
+    responses: {
+      "200": jsonResponse("Customer portal session", customerPortalResponseSchema),
+      "400": jsonResponse("Bad request", genericErrorSchema),
+      "401": jsonResponse("Unauthorized", genericErrorSchema),
+      "404": jsonResponse("No billing customer", genericErrorSchema),
+      "502": jsonResponse("Provider error", genericErrorSchema),
+      "503": jsonResponse("Provider not configured", genericErrorSchema),
+    },
+  }),
+  route("get", "/me/data-exports", ["Me"], "List current user data export requests", {
+    security: cookieOrBearerAuth,
+    responses: defaultResponses("Data export requests", ["401"]),
+  }),
+  route("post", "/me/data-exports", ["Me"], "Create a user data export request", {
+    security: cookieOrBearerAuth,
+    responses: defaultResponses("Data export request created", ["400", "401", "409"]),
+  }),
+  route("delete", "/me/data-exports/{exportId}", ["Me"], "Cancel a user data export request", {
+    security: cookieOrBearerAuth,
+    parameters: [pathParameter("exportId", z.string().uuid())],
+    responses: defaultResponses("Data export request cancelled", ["400", "401", "404"]),
+  }),
+  route("get", "/me/data-exports/{exportId}/download", ["Me"], "Download a ready user data export", {
+    security: cookieOrBearerAuth,
+    parameters: [pathParameter("exportId", z.string().uuid())],
+    responses: defaultResponses("Data export downloaded", ["400", "401", "404"]),
   }),
   route("get", "/me/credits/balance", ["Me"], "Get current user credit balance", {
     security: cookieOrBearerAuth,

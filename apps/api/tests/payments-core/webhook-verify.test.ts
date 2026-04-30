@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createPaymentsModule } from "@platform/payments-core";
+import { createPaymentsModule } from "../../../../packages/payments-core/src/create-payments-module";
 import {
   DODO_WEBHOOK_DEFAULT_TOLERANCE_SECONDS,
   type NormalizedPaymentEvent,
@@ -475,6 +475,35 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(store.markFailed).not.toHaveBeenCalled();
   });
 
+  it("passes webhook observability fields to the event store", async () => {
+    const store = {
+      claim: vi.fn(async () => ({ claimed: true as const })),
+      markProcessed: vi.fn(async () => {}),
+      markFailed: vi.fn(async () => {}),
+    };
+    const { app } = build({ webhookEventStore: store });
+    const t = Math.floor(Date.now() / 1000);
+    const { header } = sign(samplePayload, t);
+
+    const res = await app.request("/webhooks/dodo", {
+      method: "POST",
+      headers: { "x-dodo-signature": header, "x-request-id": "req_123", "x-correlation-id": "corr_123" },
+      body: samplePayload,
+    });
+
+    expect(res.status).toBe(200);
+    expect(store.claim).toHaveBeenCalledWith(expect.objectContaining({
+      providerEventId: "evt_test_123",
+      requestId: "req_123",
+      correlationId: "corr_123",
+      sanitizedPayload: JSON.parse(samplePayload),
+    }));
+    expect(store.markProcessed).toHaveBeenCalledWith(expect.objectContaining({
+      providerEventId: "evt_test_123",
+      durationMs: expect.any(Number),
+    }));
+  });
+
   it("400 rejects DB-backed webhook processing without a provider event id", async () => {
     const store = {
       claim: vi.fn(async () => ({ claimed: true as const })),
@@ -589,7 +618,11 @@ describe("POST /webhooks/dodo response codes", () => {
 
     expect(res.status).toBe(200);
     expect(onPaymentEvent).toHaveBeenCalledOnce();
-    expect(store.markProcessed).toHaveBeenCalledWith({ provider: "dodo", providerEventId: "evt_test_123" });
+    expect(store.markProcessed).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "dodo",
+      providerEventId: "evt_test_123",
+      durationMs: expect.any(Number),
+    }));
     expect(store.markFailed).not.toHaveBeenCalled();
   });
 
@@ -618,7 +651,12 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(res.status).toBe(500);
     expect(onPaymentEvent).toHaveBeenCalledOnce();
     expect(store.markProcessed).not.toHaveBeenCalled();
-    expect(store.markFailed).toHaveBeenCalledWith({ provider: "dodo", providerEventId: "evt_test_123", error: handlerError });
+    expect(store.markFailed).toHaveBeenCalledWith(expect.objectContaining({
+      provider: "dodo",
+      providerEventId: "evt_test_123",
+      error: handlerError,
+      durationMs: expect.any(Number),
+    }));
   });
 
   it("500 reports safe webhook failure metadata when handler throws", async () => {

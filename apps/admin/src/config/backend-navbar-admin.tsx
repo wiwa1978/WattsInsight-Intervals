@@ -1,6 +1,8 @@
 import {
   Bell,
   CreditCard,
+  ServerCog,
+  ShieldCheck,
   LayoutDashboard,
   LucideIcon,
   Logs,
@@ -22,6 +24,18 @@ export const BackendNavAdminItems: BackendNavAdminItem[] = [
     title: "admin.nav.overview",
     url: "/admin/overview",
     icon: LayoutDashboard,
+  },
+
+  {
+    title: "admin.nav.system",
+    url: "/admin/system",
+    icon: ServerCog,
+  },
+
+  {
+    title: "admin.nav.admins",
+    url: "/admin/admins",
+    icon: ShieldCheck,
   },
 
   {

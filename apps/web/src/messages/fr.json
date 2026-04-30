@@ -322,7 +322,8 @@
     "tabs": {
       "profile": "Profil",
       "security": "Sécurité",
-      "accounts": "Comptes"
+      "accounts": "Comptes",
+      "privacy": "Confidentialité"
     },
     "profile": {
       "title": "Profil",
@@ -499,6 +500,31 @@
       "deleting": "Suppression...",
       "success": "Compte supprimé avec succès.",
       "error": "Échec de la suppression du compte"
+    },
+    "dataExport": {
+      "title": "Export des données",
+      "description": "Créez un export JSON de votre profil, de vos sessions, de votre historique de facturation, de vos notifications, de vos bons, de vos remises et de vos références d'audit. Les jetons sensibles et les empreintes de mot de passe sont masqués.",
+      "loading": "Chargement des demandes d'export...",
+      "empty": "Aucun export de données demandé pour le moment.",
+      "requestButton": "Demander un export",
+      "requesting": "Génération de l'export...",
+      "refreshButton": "Actualiser",
+      "downloadButton": "Télécharger le JSON",
+      "cancelButton": "Annuler",
+      "success": "L'export de données est prêt à télécharger.",
+      "failed": "Échec de la génération de l'export",
+      "loadFailed": "Échec du chargement des exports",
+      "cancelSuccess": "Export annulé",
+      "cancelFailed": "Échec de l'annulation de l'export",
+      "createdAt": "Demandé le {date}",
+      "createdUnknown": "Date de demande inconnue",
+      "status": {
+        "pending": "En attente",
+        "ready": "Prêt",
+        "downloaded": "Téléchargé",
+        "expired": "Expiré",
+        "failed": "Échoué"
+      }
     }
   },
   "analytics": {
@@ -1162,6 +1188,13 @@
       "cancelTitle": "Paiement annule",
       "cancelDescription": "Aucun credit n'a ete achete."
     },
+    "portal": {
+      "button": "Gerer la facturation",
+      "loading": "Ouverture du portail de facturation...",
+      "loginRequired": "Veuillez vous connecter pour gerer la facturation",
+      "noUrl": "URL du portail client indisponible",
+      "failed": "Impossible d'ouvrir le portail client"
+    },
     "stats": {
       "available": "Crédits Disponibles Totaux",
       "availableDescription": "Crédits prêts à utiliser",
@@ -1219,12 +1252,51 @@
     },
     "subscription": {
       "description": "Choisissez un abonnement pour continuer.",
+      "currentTitle": "Abonnement actuel",
+      "managedThroughPortal": "Votre abonnement est gere via le portail de facturation.",
+      "noActive": "Aucun abonnement actif pour le moment. Choisissez une formule ci-dessous pour commencer.",
+      "planLabel": "Formule",
+      "statusLabel": "Statut",
+      "renewsLabel": "Renouvellement",
+      "unknownPeriod": "Inconnu",
+      "upgrade": "Ameliorer",
       "mostPopular": "Le plus populaire",
       "planDescription": "Accès SaaS récurrent facturé chaque {interval}",
       "choosePlan": "Choisir {plan}",
+      "discount": {
+        "label": "Code de reduction",
+        "placeholder": "Entrez un code de reduction",
+        "apply": "Appliquer",
+        "applied": "Reduction {code} appliquee",
+        "appliedDescription": "Le code de reduction {code} sera envoye avec votre prochain paiement d'abonnement."
+      },
+      "history": {
+        "title": "Factures d'abonnement",
+        "description": "Vos paiements d'abonnement et factures telechargeables.",
+        "empty": "Aucun paiement d'abonnement pour le moment.",
+        "downloadInvoice": "Telecharger la facture",
+        "invoiceDownloaded": "Facture ouverte avec succes",
+        "invoiceUnavailable": "URL de facture indisponible",
+        "invoiceFailed": "Echec du telechargement de la facture",
+        "table": {
+          "plan": "Formule",
+          "amount": "Montant",
+          "exclVat": "hors TVA : €{amount}",
+          "status": "Statut",
+          "date": "Date",
+          "invoice": "Facture",
+          "notAvailable": "N/A"
+        }
+      },
       "checkout": {
         "successDescription": "Le paiement de l'abonnement est terminé. Votre abonnement sera mis à jour une fois le paiement traité.",
-        "cancelDescription": "Le paiement de l'abonnement a été annulé."
+        "cancelDescription": "Le paiement de l'abonnement a été annulé.",
+        "portal": {
+          "button": "Portail client",
+          "loading": "Ouverture du portail client...",
+          "noUrl": "URL du portail client indisponible",
+          "failed": "Impossible d'ouvrir le portail client"
+        }
       }
     }
   },
@@ -1265,5 +1337,10 @@
     "upgrade": "Améliorer",
     "loading": "Chargement des crédits...",
     "error": "Échec du chargement des crédits"
+  },
+  "subscriptionProgressBar": {
+    "label": "Abonnement",
+    "starter": "Starter",
+    "upgrade": "Ameliorer"
   }
 }

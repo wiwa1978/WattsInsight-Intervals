@@ -16,6 +16,7 @@ export function buildDodoCheckoutUrl(args: {
   packageKey?: string;
   planKey?: string;
   billingMode?: "credits" | "subscriptions";
+  referenceId?: string;
   discountCode?: string;
   customerEmail?: string | null;
   successUrl?: string;
@@ -23,6 +24,7 @@ export function buildDodoCheckoutUrl(args: {
 }) {
   const url = new URL(`${args.baseUrl}/buy/${args.productId}`);
   url.searchParams.set("metadata_userId", args.userId);
+  url.searchParams.set("metadata_productId", args.productId);
   if (args.billingMode) {
     url.searchParams.set("metadata_billingMode", args.billingMode);
   }
@@ -31,6 +33,10 @@ export function buildDodoCheckoutUrl(args: {
   }
   if (args.planKey) {
     url.searchParams.set("metadata_planKey", args.planKey);
+  }
+  if (args.referenceId) {
+    url.searchParams.set("metadata_referenceId", args.referenceId);
+    url.searchParams.set("metadata_checkoutReferenceId", args.referenceId);
   }
   if (args.discountCode) {
     url.searchParams.set("metadata_discountCode", args.discountCode);

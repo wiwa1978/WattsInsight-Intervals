@@ -236,4 +236,34 @@ describe("createAdminService", () => {
     expect(countWhere).toHaveBeenCalledWith(listWhere.mock.calls[0]?.[0]);
     expect(result).toEqual({ users: listRows, total: 1 });
   });
+
+  // Verifies privileged account listings can reuse the users API with role filtering.
+  it("filters admin user listing by role", async () => {
+    const listRows = [{ id: "admin-1", name: "Alice", email: "alice@example.com", role: "admin" }];
+    const listOffset = vi.fn().mockResolvedValue(listRows);
+    const listLimit = vi.fn().mockReturnValue({ offset: listOffset });
+    const listOrderBy = vi.fn().mockReturnValue({ limit: listLimit });
+    const listWhere = vi.fn().mockReturnValue({ orderBy: listOrderBy });
+    const listFrom = vi.fn().mockReturnValue({ where: listWhere, orderBy: listOrderBy });
+
+    const countRows = [{ count: 1 }];
+    const countWhere = vi.fn().mockResolvedValue(countRows);
+    const countFrom = vi.fn().mockReturnValue({ where: countWhere });
+
+    const select = vi.fn()
+      .mockReturnValueOnce({ from: listFrom })
+      .mockReturnValueOnce({ from: countFrom });
+
+    const service = createAdminService({
+      db: { select } as any,
+      adminBanSecret: "secret",
+    });
+
+    const result = await service.getUsers(20, 0, undefined, "admin");
+
+    expect(listWhere).toHaveBeenCalledOnce();
+    expect(countWhere).toHaveBeenCalledOnce();
+    expect(countWhere).toHaveBeenCalledWith(listWhere.mock.calls[0]?.[0]);
+    expect(result).toEqual({ users: listRows, total: 1 });
+  });
 });

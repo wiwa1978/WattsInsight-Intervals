@@ -19,12 +19,14 @@ import { getDodoCheckoutProductsForBillingMode } from "./lib/dodo-billing-produc
 import { createAdminService } from "./modules/admin/service";
 import { createAuditService } from "./modules/audit/service";
 import { createBillingService } from "./modules/billing/service";
+import { createCheckoutIntentsService } from "./modules/billing/checkout-intents";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
 import { createSubscriptionService } from "./modules/billing/subscription-service";
 import { createSubscriptionWebhookHandler } from "./modules/billing/subscription-webhooks";
 import { createPaymentWebhookEventStore } from "./modules/payments/webhook-event-store";
 import { createNotificationsService } from "./modules/notifications/service";
+import { createPrivacyService } from "./modules/privacy/service";
 import { createVouchersService } from "./modules/vouchers/service";
 
 const adminAllowlist = new Set(
@@ -56,12 +58,14 @@ const emailModule = createEmailModule({
 });
 
 const notificationsService = createNotificationsService({ db });
+const privacyService = createPrivacyService({ db });
 const billingService = createBillingService({
   db,
   env,
   notifications: notificationsService,
 });
 const subscriptionService = createSubscriptionService({ db, env });
+const checkoutIntentsService = createCheckoutIntentsService({ db });
 const adminService = createAdminService({
   db,
   adminBanSecret: env.ADMIN_BAN_SECRET,
@@ -359,6 +363,7 @@ const paymentsModule = createPaymentsModule({
   onPaymentEvent: createPaymentEventHandler({
     creditPackages,
     billing: billingService,
+    checkoutIntents: checkoutIntentsService,
     subscriptions: {
       handleDodoSubscriptionWebhook: createSubscriptionWebhookHandler({
         subscriptions: subscriptionService,
@@ -374,9 +379,12 @@ export const bootstrap = {
   adminService,
   auditService,
   billingService,
+  checkoutIntentsService,
   subscriptionService,
   discountsService,
   notificationsService,
+  privacyService,
   vouchersService,
   paymentsModule,
+  dodoPaymentsClient,
 };

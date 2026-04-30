@@ -17,6 +17,7 @@ describe("buildDodoCheckoutUrl", () => {
         productId,
         userId: "user-123",
         packageKey: "silver",
+        referenceId: "checkout-ref-123",
         customerEmail: "buyer@example.com",
         successUrl: "https://app.example.com/billing?success=true",
         cancelUrl: "https://app.example.com/billing?cancel=true",
@@ -25,7 +26,10 @@ describe("buildDodoCheckoutUrl", () => {
 
     expect(url.origin + url.pathname).toBe(`${baseUrl}/buy/${productId}`);
     expect(url.searchParams.get("metadata_userId")).toBe("user-123");
+    expect(url.searchParams.get("metadata_productId")).toBe(productId);
     expect(url.searchParams.get("metadata_packageKey")).toBe("silver");
+    expect(url.searchParams.get("metadata_referenceId")).toBe("checkout-ref-123");
+    expect(url.searchParams.get("metadata_checkoutReferenceId")).toBe("checkout-ref-123");
     expect(url.searchParams.get("customer_email")).toBe("buyer@example.com");
     expect(url.searchParams.get("redirect_url")).toBe(
       "https://app.example.com/billing?success=true",
@@ -75,7 +79,13 @@ describe("createPaymentEventHandler", () => {
     eventType: "payment.succeeded",
     paymentId: "pay_valid",
     productId: samplePackage.productId,
-    metadata: { userId: "real-user-id" },
+    metadata: {
+      userId: "real-user-id",
+      billingMode: "credits",
+      packageKey: samplePackage.key,
+      productId: samplePackage.productId,
+      checkoutReferenceId: "checkout-ref-valid",
+    },
     currency: "EUR",
     totalAmount: samplePackage.price,
     taxAmount: 200,
@@ -99,6 +109,7 @@ describe("createPaymentEventHandler", () => {
 
   function makeDeps(overrides?: {
     findUser?: (id: string) => Promise<{ id: string } | null>;
+    checkoutIntentUserId?: string;
   }) {
     const processCreditPurchase = vi.fn(async () => ({ ok: true }));
     const processCreditRefund = vi.fn(async () => ({ ok: true }));
@@ -106,13 +117,38 @@ describe("createPaymentEventHandler", () => {
     const getUserById = vi.fn(
       overrides?.findUser ?? (async (id: string) => ({ id })),
     );
+    const checkoutIntents = {
+      create: vi.fn(),
+      findByReferenceId: vi.fn(async () => ({
+        id: "intent-valid",
+        userId: overrides?.checkoutIntentUserId ?? "real-user-id",
+        billingMode: "credits" as const,
+        packageKey: samplePackage.key,
+        planKey: null,
+        productId: samplePackage.productId,
+        discountCode: null,
+        referenceId: "checkout-ref-valid",
+        paymentId: null,
+        status: "pending" as const,
+        metadata: null,
+        createdAt: new Date("2026-04-30T10:00:00.000Z"),
+        updatedAt: new Date("2026-04-30T10:00:00.000Z"),
+        completedAt: null,
+        failedAt: null,
+      })),
+      markPending: vi.fn(async () => ({})),
+      markCompleted: vi.fn(async () => ({})),
+      markFailed: vi.fn(async () => ({})),
+    };
     return {
       processCreditPurchase,
       processCreditRefund,
       processCreditDisputeLoss,
       getUserById,
+      checkoutIntents,
       handler: createPaymentEventHandler({
         creditPackages,
+        checkoutIntents,
         billing: {
           getUserById,
           processCreditPurchase,
@@ -144,6 +180,7 @@ describe("createPaymentEventHandler", () => {
   it("refuses payment.succeeded when metadata.userId does not resolve", async () => {
     const { handler, processCreditPurchase } = makeDeps({
       findUser: async () => null,
+      checkoutIntentUserId: "ghost-user",
     });
 
     await expect(
@@ -171,7 +208,13 @@ describe("createPaymentEventHandler", () => {
       // attacker-controlled email pointing at a different account
       customerEmail: "attacker@example.com",
       customerId: "cus_abc",
-      metadata: { userId: "real-user-id" },
+      metadata: {
+        userId: "real-user-id",
+        billingMode: "credits",
+        packageKey: samplePackage.key,
+        productId: samplePackage.productId,
+        checkoutReferenceId: "checkout-ref-valid",
+      },
       currency: "EUR",
       totalAmount: samplePackage.price,
       taxAmount: 200,

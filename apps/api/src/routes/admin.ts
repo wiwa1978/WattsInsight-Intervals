@@ -61,6 +61,7 @@ type AdminAuthAuditDetails<T> = {
 
 const adminUsersQuerySchema = paginationQuerySchema.extend({
   search: z.string().optional(),
+  role: z.enum(["user", "admin"]).optional(),
 });
 
 function getAuthUser(c: Context<AppEnv>) {
@@ -157,6 +158,15 @@ function isSuccessfulMutationResult(result: unknown) {
   return !isRecord(result) || result.success !== false;
 }
 
+function isActiveAdmin(userRecord: { role?: string | null; banned?: boolean | null }) {
+  return userRecord.role === "admin" && userRecord.banned !== true;
+}
+
+type AdminUserGovernanceRecord = {
+  role?: string | null;
+  banned?: boolean | null;
+} | null;
+
 function notificationSendHistoryItem(entry: Record<string, unknown>) {
   const after = isRecord(entry.after) ? entry.after : {};
   const metadata = isRecord(entry.metadata) ? entry.metadata : {};
@@ -196,6 +206,10 @@ function publicWebhookEvent(event: WebhookEventRow) {
     eventType: event.eventType,
     paymentId: event.paymentId,
     signatureTimestamp: isoDate(event.signatureTimestamp),
+    sanitizedPayload: event.sanitizedPayload ?? null,
+    requestId: event.requestId,
+    correlationId: event.correlationId,
+    durationMs: event.durationMs,
     processingStatus: event.processingStatus,
     errorDetails: event.errorDetails ?? null,
     processedAt: isoDate(event.processedAt),
@@ -338,6 +352,45 @@ export function createAdminRouter() {
     }).catch(() => undefined);
   }
 
+  function blockIfSelfRoleChange(c: AdminContext, targetUserId: string, targetUser: AdminUserGovernanceRecord, nextRole: string) {
+    const actor = getAuthUser(c);
+    if (actor.id !== targetUserId) {
+      return null;
+    }
+
+    if (!targetUser || targetUser.role === nextRole) {
+      return null;
+    }
+
+    return forbidden(c, "You cannot change your own role.");
+  }
+
+  async function blockIfLastActiveAdminRoleChange(c: AdminContext, targetUser: AdminUserGovernanceRecord, nextRole: string) {
+    if (!targetUser || !isActiveAdmin(targetUser) || nextRole === "admin") {
+      return null;
+    }
+
+    const activeAdminCount = await bootstrap.adminService.countActiveAdmins();
+    if (activeAdminCount <= 1) {
+      return forbidden(c, "Cannot demote the last active admin.");
+    }
+
+    return null;
+  }
+
+  async function blockIfLastActiveAdminBan(c: AdminContext, targetUser: AdminUserGovernanceRecord) {
+    if (!targetUser || !isActiveAdmin(targetUser)) {
+      return null;
+    }
+
+    const activeAdminCount = await bootstrap.adminService.countActiveAdmins();
+    if (activeAdminCount <= 1) {
+      return forbidden(c, "Cannot ban the last active admin.");
+    }
+
+    return null;
+  }
+
   function withUserIdParam(c: AdminContext, handler: (userId: string) => Response | Promise<Response>) {
     return withParams(c, userIdParamSchema, { userId: c.req.param("userId") ?? "" }, "Invalid user id", ({ userId }) => handler(userId));
   }
@@ -430,6 +483,7 @@ export function createAdminRouter() {
       limit: c.req.query("limit"),
       offset: c.req.query("offset"),
       search: c.req.query("search"),
+      role: c.req.query("role"),
     });
 
     if (!parsedQuery.success) {
@@ -441,17 +495,38 @@ export function createAdminRouter() {
       parsedQuery.data.limit,
       parsedQuery.data.offset,
       trimmedSearch || undefined,
+      parsedQuery.data.role,
     );
     return c.json({ success: true, data: users });
   });
 
-  registerAdminAuthJsonAction("/users/set-role", setRoleSchema, "Invalid role payload", (body, headers) => {
-    return requireAdminAuthApi().setRole({ body, headers });
-  }, {
-    action: "admin.user.set_role",
-    targetType: "user",
-    targetId: (body) => body.userId,
-    after: (body) => ({ role: body.role }),
+  router.post("/users/set-role", (c) => {
+    return withJsonBody(c, setRoleSchema, "Invalid role payload", async (body) => {
+      const targetUser = await bootstrap.adminService.getUserById(body.userId);
+      const selfRoleChangeBlock = blockIfSelfRoleChange(c, body.userId, targetUser, body.role);
+      if (selfRoleChangeBlock) return selfRoleChangeBlock;
+
+      const lastAdminBlock = await blockIfLastActiveAdminRoleChange(c, targetUser, body.role);
+      if (lastAdminBlock) return lastAdminBlock;
+
+      const adminAuthApi = requireAdminAuthApi();
+      const result = await adminAuthApi.setRole({ body, headers: c.req.raw.headers });
+      if (isSuccessfulMutationResult(result)) {
+        const roleChanged = !targetUser || targetUser.role !== body.role;
+        if (roleChanged && typeof adminAuthApi.revokeUserSessions === "function") {
+          await adminAuthApi.revokeUserSessions({ body: { userId: body.userId }, headers: c.req.raw.headers }).catch((error: unknown) => {
+            logger.warn("Failed to revoke user sessions after admin role change", { userId: body.userId, error });
+          });
+        }
+        await recordAdminAuthAudit(c, body, {
+          action: "admin.user.set_role",
+          targetType: "user",
+          targetId: (body) => body.userId,
+          after: (body) => ({ role: body.role }),
+        });
+      }
+      return c.json(result);
+    });
   });
 
   registerAdminAuthJsonAction("/users/unban", userOnlySchema, "Invalid unban payload", (body, headers) => {
@@ -469,6 +544,10 @@ export function createAdminRouter() {
       if (!secretResult.success) {
         return forbidden(c, secretResult.error ?? "Invalid admin ban secret");
       }
+
+      const targetUser = await bootstrap.adminService.getUserById(body.userId);
+      const lastAdminBlock = await blockIfLastActiveAdminBan(c, targetUser);
+      if (lastAdminBlock) return lastAdminBlock;
 
       const { secret: _secret, ...banBody } = body;
       const result = await requireAdminAuthApi().banUser({ body: banBody, headers: c.req.raw.headers });

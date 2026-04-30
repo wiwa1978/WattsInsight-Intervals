@@ -5,7 +5,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { createSubscriptionCheckoutSession } from "@/lib/api/me";
+import { createCustomerPortalSession, createSubscriptionCheckoutSession } from "@/lib/api/me";
+import { Button } from "@/components/ui/button";
 
 interface SubscriptionBillingClientWrapperProps {
   children: ReactNode;
@@ -34,6 +35,9 @@ export function SubscriptionBillingClientWrapper({ children, checkoutOutcome }: 
   const checkoutMutation = useMutation({
     mutationFn: (planKey: string) => createSubscriptionCheckoutSession(planKey, appliedDiscountCode ?? undefined),
   });
+  const portalMutation = useMutation({
+    mutationFn: createCustomerPortalSession,
+  });
 
   const handleSelectPlan = async (planKey: string) => {
     try {
@@ -50,6 +54,21 @@ export function SubscriptionBillingClientWrapper({ children, checkoutOutcome }: 
     }
   };
 
+  const handleManageBilling = async () => {
+    try {
+      const portalSession = await portalMutation.mutateAsync();
+      if (portalSession.data.portalUrl) {
+        window.location.href = portalSession.data.portalUrl;
+        return;
+      }
+
+      toast.error(t("portal.noUrl"));
+    } catch (error) {
+      console.error("Customer portal error:", error);
+      toast.error(t("portal.failed"));
+    }
+  };
+
   return (
     <SubscriptionBillingContext.Provider value={{ appliedDiscountCode, setAppliedDiscountCode, handleSelectPlan }}>
       <div className="space-y-6">
@@ -63,6 +82,11 @@ export function SubscriptionBillingClientWrapper({ children, checkoutOutcome }: 
             {t("cancelDescription")}
           </div>
         ) : null}
+        <div className="flex justify-end">
+          <Button type="button" variant="outline" onClick={handleManageBilling} disabled={portalMutation.isPending}>
+            {portalMutation.isPending ? t("portal.loading") : t("portal.button")}
+          </Button>
+        </div>
         {children}
       </div>
     </SubscriptionBillingContext.Provider>

@@ -12,6 +12,7 @@ import {
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { applicationConfig } from "../config/application";
+import { env } from "../env";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { ok, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 import { isCreditBillingMode, isSubscriptionBillingMode } from "../lib/billing-mode";
@@ -34,6 +35,19 @@ function billingModeErrorResponse(c: Context<AppEnv>, error: unknown) {
   throw error;
 }
 
+async function getLatestDodoCustomerId(userId: string) {
+  const [subscriptionCustomerId, creditCustomerId] = await Promise.all([
+    bootstrap.subscriptionService.getLatestDodoCustomerId(userId),
+    bootstrap.billingService.getLatestDodoCustomerId(userId),
+  ]);
+
+  return subscriptionCustomerId ?? creditCustomerId ?? null;
+}
+
+function createPortalReturnUrl() {
+  return new URL("/billing", env.APP_URL).toString();
+}
+
 export function createMeRouter() {
   const router = new Hono<AppEnv>();
   router.use("/*", bootstrap.authModule.requireAuth);
@@ -54,6 +68,76 @@ export function createMeRouter() {
         vouchers: applicationConfig.features.vouchers,
         discounts: applicationConfig.features.discounts,
         notifications: applicationConfig.features.notifications,
+      },
+    });
+  });
+
+  router.post("/customer-portal", async (c) => {
+    if (!applicationConfig.features.billing) {
+      return c.json({ success: false, error: "Billing is disabled" }, 400);
+    }
+
+    const authUser = getAuthUser(c);
+    const dodoCustomerId = await getLatestDodoCustomerId(authUser.id);
+    if (!dodoCustomerId) {
+      return c.json({ success: false, error: "No billing customer found" }, 404);
+    }
+
+    const dodoCustomerPortal = bootstrap.dodoPaymentsClient?.customers?.customerPortal;
+    if (!dodoCustomerPortal) {
+      return c.json({ success: false, error: "Customer portal is not configured" }, 503);
+    }
+
+    try {
+      const session = await dodoCustomerPortal.create(dodoCustomerId, {
+        return_url: createPortalReturnUrl(),
+      });
+
+      if (!session?.link) {
+        return c.json({ success: false, error: "Customer portal URL not available" }, 502);
+      }
+
+      return c.json({ success: true, data: { portalUrl: session.link } });
+    } catch (error) {
+      console.error("Customer portal error:", error);
+      return c.json({ success: false, error: "Failed to create customer portal session" }, 502);
+    }
+  });
+
+  router.get("/data-exports", async (c) => {
+    const authUser = getAuthUser(c);
+    const exports = await bootstrap.privacyService.listExports(authUser.id);
+    return c.json({ success: true, data: exports });
+  });
+
+  router.post("/data-exports", async (c) => {
+    const authUser = getAuthUser(c);
+    const result = await bootstrap.privacyService.createExport(authUser.id);
+    return c.json({ success: result.ok, ...(result.ok ? { data: result.data } : { error: result.error }) }, result.ok ? 201 : 400);
+  });
+
+  router.delete("/data-exports/:exportId", async (c) => {
+    const authUser = getAuthUser(c);
+    const exportId = c.req.param("exportId");
+    const result = await bootstrap.privacyService.cancelExport(authUser.id, exportId);
+    return c.json({ success: result.ok, ...(result.ok ? { data: result.data } : { error: result.error }) }, result.ok ? 200 : 404);
+  });
+
+  router.get("/data-exports/:exportId/download", async (c) => {
+    const authUser = getAuthUser(c);
+    const exportId = c.req.param("exportId");
+    const token = c.req.query("token") ?? "";
+
+    const result = await bootstrap.privacyService.downloadExport(authUser.id, exportId, token);
+    if (!result.ok) {
+      const status = result.error === "EXPORT_EXPIRED" ? 410 : result.error === "EXPORT_NOT_READY" ? 409 : 404;
+      return c.json({ success: false, error: result.error }, status);
+    }
+
+    return new Response(result.contents, {
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "content-disposition": `attachment; filename="${result.fileName}"`,
       },
     });
   });

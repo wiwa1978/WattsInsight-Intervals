@@ -612,6 +612,8 @@
     "description": "Beheer gebruikers, rollen en systeeminstellingen.",
     "nav": {
       "overview": "Overzicht",
+      "system": "Systeem",
+      "admins": "Admins",
       "users": "Gebruikers",
       "billing": "Facturatie",
       "webhooks": "Webhooks",
@@ -619,6 +621,41 @@
       "discounts": "Kortingscodes",
       "vouchers": "Vouchers",
       "logs": "Logs"
+    },
+    "system": {
+      "title": "Systeem",
+      "description": "Bekijk platformgezondheid, admin-toegang en operationele signalen.",
+      "health": {
+        "title": "API-gezondheid",
+        "ok": "Operationeel",
+        "unavailable": "Niet beschikbaar",
+        "description": "Status van het API-health endpoint."
+      },
+      "metrics": {
+        "totalUsers": "Totaal gebruikers",
+        "admins": "Admins",
+        "bannedUsers": "Geblokkeerde gebruikers"
+      },
+      "activity": {
+        "title": "Systeemactiviteit",
+        "description": "Hoofdtellers uit bestaande admin-statistieken.",
+        "thisMonthUsers": "Gebruikers deze maand",
+        "completedPurchases": "Voltooide aankopen",
+        "pendingPurchases": "Openstaande aankopen",
+        "usageTransactions": "Gebruikstransacties"
+      },
+      "logs": {
+        "title": "Logstreams",
+        "description": "Beschikbare API app- en auditlogbestanden.",
+        "app": "App-logs",
+        "audit": "Auditlogs"
+      }
+    },
+    "admins": {
+      "title": "Admin-accounts",
+      "description": "Bekijk geprivilegieerde admin-gebruikers in het systeem.",
+      "passwordUpdated": "Wachtwoord bijgewerkt. Nieuw wachtwoord gekopieerd naar klembord.",
+      "passwordUpdateFailed": "Kan wachtwoord niet instellen."
     },
     "backToPortal": "Terug naar Portaal",
     "impersonation": {
@@ -930,6 +967,46 @@
           "page": "Pagina {current} van {total}",
           "previous": "Vorige",
           "next": "Volgende"
+        }
+      },
+      "subscriptionsMode": {
+        "title": "Abonnementsfacturatie",
+        "description": "Monitor terugkerende omzet, planverdeling en abonnementsgezondheid.",
+        "stats": {
+          "activeSubscriptions": "Actieve abonnementen",
+          "activeSubscriptionsDescription": "{trialing} in proefperiode · {total} totaal",
+          "pastDueSubscriptions": "Achterstallig",
+          "pastDueSubscriptionsDescription": "{canceled} geannuleerd",
+          "monthlyRecurringRevenue": "MRR",
+          "monthlyRecurringRevenueDescription": "Maandelijkse terugkerende omzet",
+          "annualRecurringRevenue": "ARR",
+          "annualRecurringRevenueDescription": "Geannualiseerde terugkerende omzet"
+        },
+        "planDistribution": {
+          "title": "Planverdeling",
+          "empty": "Geen abonnementen gevonden.",
+          "count": "{count, plural, one {# abonnement} other {# abonnementen}}"
+        },
+        "subscriptions": {
+          "title": "Abonnementen",
+          "empty": "Geen abonnementen gevonden.",
+          "unknownUser": "Onbekend",
+          "cancelsAtPeriodEnd": "Annuleert aan het einde van de periode",
+          "table": {
+            "user": "Gebruiker",
+            "plan": "Plan",
+            "status": "Status",
+            "periodEnd": "Periode-einde",
+            "subscriptionId": "Dodo-abonnement"
+          },
+          "status": {
+            "active": "Actief",
+            "trialing": "Proefperiode",
+            "past_due": "Achterstallig",
+            "canceled": "Geannuleerd",
+            "expired": "Verlopen",
+            "paused": "Gepauzeerd"
+          }
         }
       },
       "errors": {

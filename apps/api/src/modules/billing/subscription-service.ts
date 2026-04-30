@@ -1,4 +1,4 @@
-import { desc, eq, like, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, like, sql } from "drizzle-orm";
 
 import { subscriptionEvents, subscriptionPayments, type SubscriptionStatus, user, userSubscriptions } from "@platform/platform-db";
 
@@ -266,6 +266,28 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     };
   }
 
+  async function getLatestDodoCustomerId(userId: string) {
+    const [subscription] = await deps.db
+      .select({ dodoCustomerId: userSubscriptions.dodoCustomerId })
+      .from(userSubscriptions)
+      .where(and(eq(userSubscriptions.userId, userId), isNotNull(userSubscriptions.dodoCustomerId)))
+      .orderBy(desc(userSubscriptions.createdAt))
+      .limit(1);
+
+    if (subscription?.dodoCustomerId) {
+      return subscription.dodoCustomerId;
+    }
+
+    const [payment] = await deps.db
+      .select({ dodoCustomerId: subscriptionPayments.dodoCustomerId })
+      .from(subscriptionPayments)
+      .where(and(eq(subscriptionPayments.userId, userId), isNotNull(subscriptionPayments.dodoCustomerId)))
+      .orderBy(desc(subscriptionPayments.createdAt))
+      .limit(1);
+
+    return payment?.dodoCustomerId ?? null;
+  }
+
   async function upsertUserSubscription(input: UpsertUserSubscriptionInput) {
     const status = normalizeSubscriptionStatus(input.status);
     const values = {
@@ -370,6 +392,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     recordSubscriptionPayment,
     listUserSubscriptionPayments,
     downloadSubscriptionInvoice,
+    getLatestDodoCustomerId,
     upsertUserSubscription,
     recordSubscriptionEvent,
     listSubscriptions,

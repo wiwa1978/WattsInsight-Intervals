@@ -23,6 +23,8 @@ export type SubscriptionStatus =
   | "expired"
   | "paused";
 
+export type CheckoutIntentStatus = "pending" | "completed" | "failed" | "cancelled" | "expired";
+
 export const userCredits = pgTable(
   "user_credits",
   {
@@ -114,6 +116,10 @@ export const paymentWebhookEvents = pgTable(
     eventType: text("event_type").notNull(),
     paymentId: text("payment_id"),
     signatureTimestamp: timestamp("signature_timestamp", { withTimezone: true }),
+    sanitizedPayload: jsonb("sanitized_payload"),
+    requestId: text("request_id"),
+    correlationId: text("correlation_id"),
+    durationMs: integer("duration_ms"),
     processingStatus: text("processing_status").$type<"processing" | "processed" | "failed">().default("processing").notNull(),
     errorDetails: jsonb("error_details"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
@@ -126,6 +132,35 @@ export const paymentWebhookEvents = pgTable(
     index("payment_webhook_events_payment_id_idx").on(table.paymentId),
     index("payment_webhook_events_event_type_idx").on(table.eventType),
     index("payment_webhook_events_processing_status_idx").on(table.processingStatus),
+  ],
+);
+
+export const checkoutIntents = pgTable(
+  "checkout_intents",
+  {
+    id,
+    userId: uuid("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    billingMode: text("billing_mode").$type<"credits" | "subscriptions">().notNull(),
+    packageKey: text("package_key"),
+    planKey: text("plan_key"),
+    productId: text("product_id").notNull(),
+    discountCode: text("discount_code"),
+    referenceId: text("reference_id").notNull(),
+    paymentId: text("payment_id"),
+    status: text("status").$type<CheckoutIntentStatus>().default("pending").notNull(),
+    metadata: jsonb("metadata"),
+    createdAt,
+    updatedAt,
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("checkout_intents_user_id_idx").on(table.userId),
+    uniqueIndex("checkout_intents_reference_id_idx").on(table.referenceId),
+    index("checkout_intents_payment_id_idx").on(table.paymentId),
+    index("checkout_intents_status_created_at_idx").on(table.status, table.createdAt),
   ],
 );
 
@@ -368,6 +403,13 @@ export const creditUsageEventsRelations = relations(creditUsageEvents, ({ one })
 export const creditPurchasesRelations = relations(creditPurchases, ({ one }) => ({
   user: one(user, {
     fields: [creditPurchases.userId],
+    references: [user.id],
+  }),
+}));
+
+export const checkoutIntentsRelations = relations(checkoutIntents, ({ one }) => ({
+  user: one(user, {
+    fields: [checkoutIntents.userId],
     references: [user.id],
   }),
 }));

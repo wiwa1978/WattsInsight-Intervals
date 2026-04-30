@@ -77,6 +77,18 @@ export function createPaymentsRouter() {
       path: CHECKOUT_CANCEL_RETURN_PATH,
     });
 
+    const checkoutIntent = await bootstrap.checkoutIntentsService.create({
+      userId: authUser.id,
+      billingMode: requestMode,
+      packageKey,
+      planKey,
+      productId: selectedProduct.productId,
+      discountCode,
+      metadata: {
+        source: "payments.checkout",
+      },
+    });
+
     const checkoutUrl = buildDodoCheckoutUrl({
       baseUrl,
       productId: selectedProduct.productId,
@@ -84,6 +96,7 @@ export function createPaymentsRouter() {
       billingMode: requestMode,
       ...(requestMode === "credits" ? { packageKey } : { planKey }),
       ...(requestMode === "subscriptions" && discountCode ? { discountCode } : {}),
+      referenceId: checkoutIntent.referenceId,
       customerEmail: authUser.email ?? null,
       successUrl,
       cancelUrl,

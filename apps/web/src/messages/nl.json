@@ -322,7 +322,8 @@
     "tabs": {
       "profile": "Profiel",
       "security": "Beveiliging",
-      "accounts": "Accounts"
+      "accounts": "Accounts",
+      "privacy": "Privacy"
     },
     "profile": {
       "title": "Profiel",
@@ -499,6 +500,31 @@
       "deleting": "Verwijderen...",
       "success": "Account succesvol verwijderd.",
       "error": "Kon account niet verwijderen"
+    },
+    "dataExport": {
+      "title": "Gegevensexport",
+      "description": "Maak een JSON-export van je profiel, sessies, factuurgeschiedenis, meldingen, vouchers, kortingen en auditverwijzingen. Gevoelige tokens en wachtwoordhashes worden verwijderd.",
+      "loading": "Exportaanvragen laden...",
+      "empty": "Nog geen gegevensexports aangevraagd.",
+      "requestButton": "Gegevensexport aanvragen",
+      "requesting": "Export genereren...",
+      "refreshButton": "Vernieuwen",
+      "downloadButton": "JSON downloaden",
+      "cancelButton": "Annuleren",
+      "success": "Gegevensexport is klaar om te downloaden.",
+      "failed": "Kon gegevensexport niet genereren",
+      "loadFailed": "Kon gegevensexports niet laden",
+      "cancelSuccess": "Gegevensexport geannuleerd",
+      "cancelFailed": "Kon gegevensexport niet annuleren",
+      "createdAt": "Aangevraagd op {date}",
+      "createdUnknown": "Aanvraagdatum onbekend",
+      "status": {
+        "pending": "In behandeling",
+        "ready": "Klaar",
+        "downloaded": "Gedownload",
+        "expired": "Verlopen",
+        "failed": "Mislukt"
+      }
     }
   },
   "analytics": {
@@ -1162,6 +1188,13 @@
       "cancelTitle": "Afrekenen geannuleerd",
       "cancelDescription": "Er zijn geen credits gekocht."
     },
+    "portal": {
+      "button": "Facturatie beheren",
+      "loading": "Facturatieportaal openen...",
+      "loginRequired": "Log in om facturatie te beheren",
+      "noUrl": "URL van klantportaal niet beschikbaar",
+      "failed": "Klantportaal openen mislukt"
+    },
     "stats": {
       "available": "Totaal Beschikbaar Tegoed",
       "availableDescription": "Tegoed klaar voor gebruik",
@@ -1219,12 +1252,51 @@
     },
     "subscription": {
       "description": "Kies een abonnement om door te gaan.",
+      "currentTitle": "Huidig abonnement",
+      "managedThroughPortal": "Je abonnement wordt beheerd via het facturatieportaal.",
+      "noActive": "Nog geen actief abonnement. Kies hieronder een plan om te beginnen.",
+      "planLabel": "Plan",
+      "statusLabel": "Status",
+      "renewsLabel": "Vernieuwt",
+      "unknownPeriod": "Onbekend",
+      "upgrade": "Upgraden",
       "mostPopular": "Meest populair",
       "planDescription": "Terugkerende SaaS-toegang, gefactureerd per {interval}",
       "choosePlan": "Kies {plan}",
+      "discount": {
+        "label": "Kortingscode",
+        "placeholder": "Voer kortingscode in",
+        "apply": "Toepassen",
+        "applied": "Korting {code} toegepast",
+        "appliedDescription": "Kortingscode {code} wordt meegestuurd met je volgende abonnementscheckout."
+      },
+      "history": {
+        "title": "Abonnementsfacturen",
+        "description": "Je abonnementsbetalingen en downloadbare facturen.",
+        "empty": "Nog geen abonnementsbetalingen.",
+        "downloadInvoice": "Factuur downloaden",
+        "invoiceDownloaded": "Factuur succesvol geopend",
+        "invoiceUnavailable": "Factuur-URL niet beschikbaar",
+        "invoiceFailed": "Factuur downloaden mislukt",
+        "table": {
+          "plan": "Plan",
+          "amount": "Bedrag",
+          "exclVat": "excl. btw: €{amount}",
+          "status": "Status",
+          "date": "Datum",
+          "invoice": "Factuur",
+          "notAvailable": "N.v.t."
+        }
+      },
       "checkout": {
         "successDescription": "Abonnement checkout voltooid. Je abonnement wordt bijgewerkt zodra de betaling is verwerkt.",
-        "cancelDescription": "Abonnement checkout is geannuleerd."
+        "cancelDescription": "Abonnement checkout is geannuleerd.",
+        "portal": {
+          "button": "Klantportaal",
+          "loading": "Klantportaal openen...",
+          "noUrl": "URL van klantportaal niet beschikbaar",
+          "failed": "Klantportaal openen mislukt"
+        }
       }
     }
   },
@@ -1265,5 +1337,10 @@
     "upgrade": "Upgraden",
     "loading": "Tegoed laden...",
     "error": "Tegoed laden mislukt"
+  },
+  "subscriptionProgressBar": {
+    "label": "Abonnement",
+    "starter": "Starter",
+    "upgrade": "Upgraden"
   }
 }
