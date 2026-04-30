@@ -387,6 +387,38 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     };
   }
 
+  async function getPlanDistribution() {
+    const rows = await deps.db
+      .select({
+        planKey: userSubscriptions.planKey,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(userSubscriptions)
+      .groupBy(userSubscriptions.planKey);
+
+    return rows.map((row: { planKey: string; count: number | string | bigint }) => ({
+      planKey: row.planKey,
+      count: Number(row.count),
+    }));
+  }
+
+  async function listSubscriptionEvents(limit = 50) {
+    const normalizedLimit = normalizeLimit(limit, 100);
+
+    return deps.db
+      .select({
+        id: subscriptionEvents.id,
+        userId: subscriptionEvents.userId,
+        dodoSubscriptionId: subscriptionEvents.dodoSubscriptionId,
+        eventType: subscriptionEvents.eventType,
+        status: subscriptionEvents.status,
+        createdAt: subscriptionEvents.createdAt,
+      })
+      .from(subscriptionEvents)
+      .orderBy(desc(subscriptionEvents.createdAt))
+      .limit(normalizedLimit);
+  }
+
   return {
     getUserSubscription,
     recordSubscriptionPayment,
@@ -397,5 +429,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     recordSubscriptionEvent,
     listSubscriptions,
     getSubscriptionStats,
+    getPlanDistribution,
+    listSubscriptionEvents,
   };
 }

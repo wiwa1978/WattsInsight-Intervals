@@ -4,7 +4,10 @@ import {
   getAdminAllPurchasesApi,
   getAdminAllSubscriptionsApi,
   getAdminAllTransactionsApi,
-  getAdminSubscriptionStatsApi,
+  getAdminBillingSubscriptionEventsApi,
+  getAdminBillingSubscriptionPlanDistributionApi,
+  getAdminBillingSubscriptionStatsApi,
+  getAdminBillingSubscriptionsApi,
   getAdminUsersApi,
   stopAdminImpersonationApi,
 } from "../../src/lib/api/admin";
@@ -18,6 +21,7 @@ const apiRequestMock = vi.mocked(apiRequest);
 
 describe("admin API", () => {
   beforeEach(() => {
+    apiRequestMock.mockClear();
     apiRequestMock.mockResolvedValue({ success: true, data: { users: [], total: 0 } });
   });
 
@@ -70,5 +74,20 @@ describe("admin API", () => {
       method: "POST",
       body: JSON.stringify({}),
     });
+  });
+
+  it("calls subscription billing endpoints", async () => {
+    await getAdminBillingSubscriptionStatsApi();
+    await getAdminBillingSubscriptionPlanDistributionApi();
+    await getAdminBillingSubscriptionEventsApi(25);
+    await getAdminBillingSubscriptionsApi(20, 40, "alice+admin@example.com");
+
+    expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/admin/billing/subscription-stats");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/billing/subscription-plan-distribution");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(3, "/admin/billing/subscription-events?limit=25");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      4,
+      "/admin/billing/subscriptions?limit=20&offset=40&searchEmail=alice%2Badmin%40example.com",
+    );
   });
 });

@@ -820,6 +820,34 @@ export function createAdminRouter() {
     return c.json({ success: true, data });
   });
 
+  router.get("/billing/subscription-plan-distribution", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const data = await bootstrap.subscriptionService.getPlanDistribution();
+    return c.json({ success: true, data });
+  });
+
+  router.get("/billing/subscription-events", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const parsedQuery = parseQuery(optionalLimitQuerySchema, { limit: c.req.query("limit") });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid subscription events query");
+    }
+
+    const data = await bootstrap.subscriptionService.listSubscriptionEvents(parsedQuery.data.limit);
+    return c.json({ success: true, data });
+  });
+
   router.get("/webhooks", async (c) => {
     const parsedQuery = parseQuery(webhookEventsQuerySchema, {
       limit: c.req.query("limit"),

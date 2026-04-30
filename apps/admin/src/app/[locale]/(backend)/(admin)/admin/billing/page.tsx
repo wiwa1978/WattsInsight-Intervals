@@ -6,7 +6,7 @@ import { CreditCard, Wallet, TrendingDown, DollarSign } from "lucide-react";
 import { RevenueChart } from "@/components/layout/backend/admin/billing/revenue-chart";
 import { SubscriptionPlanDistribution } from "@/components/layout/backend/admin/billing/subscription-plan-distribution";
 import { SubscriptionStatsGrid } from "@/components/layout/backend/admin/billing/subscription-stats-grid";
-import { SubscriptionsTable } from "@/components/layout/backend/admin/billing/subscriptions-table";
+import { SubscriptionEventsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
 import { AdminTransactionHistoryTable } from "@/components/layout/backend/admin/shared/transaction-history-table";
 import { AdminPurchaseHistoryTable } from "@/components/layout/backend/admin/shared/purchase-history-table";
 import { getMyApplicationConfig } from "@/lib/api/me";
@@ -15,6 +15,10 @@ import {
   getAdminAllSubscriptions,
   getAdminAllTransactions,
   getAdminBillingStats,
+  getAdminBillingSubscriptionEvents,
+  getAdminBillingSubscriptionPlanDistribution,
+  getAdminBillingSubscriptionStats,
+  getAdminBillingSubscriptions,
   getAdminRevenueData,
   getAdminSubscriptionStats,
 } from "@/lib/services/admin";
@@ -140,10 +144,12 @@ export default async function AdminBillingPage() {
 }
 
 async function AdminSubscriptionBillingPage() {
-  const t = await getTranslations("admin.billing.subscriptionsMode");
-  const [stats, subscriptionsResponse] = await Promise.all([
-    getAdminSubscriptionStats(),
-    getAdminAllSubscriptions(20, 0),
+  const t = await getTranslations("admin.billing.subscription");
+  const [stats, distribution, subscriptions, events] = await Promise.all([
+    getAdminBillingSubscriptionStats(),
+    getAdminBillingSubscriptionPlanDistribution(),
+    getAdminBillingSubscriptions(50, 0),
+    getAdminBillingSubscriptionEvents(50),
   ]);
 
   return (
@@ -154,15 +160,16 @@ async function AdminSubscriptionBillingPage() {
       </div>
 
       <div className="mb-8">
-        <SubscriptionStatsGrid stats={stats} t={t} />
+        <SubscriptionStatsGrid stats={stats} />
       </div>
 
       <div className="mb-8">
-        <SubscriptionPlanDistribution subscriptions={subscriptionsResponse.subscriptions} t={t} />
+        <SubscriptionPlanDistribution distribution={distribution} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-1">
-        <SubscriptionsTable subscriptions={subscriptionsResponse.subscriptions} t={t} />
+        <SubscriptionTable subscriptions={subscriptions.subscriptions} />
+        <SubscriptionEventsTable events={events} />
       </div>
     </Container>
   );

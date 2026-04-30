@@ -4,6 +4,10 @@ import {
   getAdminAllSubscriptionsApi,
   getAdminAllTransactionsApi,
   getAdminBillingStatsApi,
+  getAdminBillingSubscriptionEventsApi,
+  getAdminBillingSubscriptionPlanDistributionApi,
+  getAdminBillingSubscriptionStatsApi,
+  getAdminBillingSubscriptionsApi,
   getAdminCreditsConsumedDataApi,
   getAdminDashboardStatsApi,
   getSystemHealthApi,
@@ -43,6 +47,8 @@ import type {
   CreditsConsumedPoint,
   PurchasesList,
   RevenuePoint,
+  SubscriptionEvent,
+  SubscriptionPlanDistributionPoint,
   SubscriptionStats,
   SubscriptionsList,
   TransactionPoint,
@@ -59,6 +65,36 @@ function isCreditBillingDisabledError(error: unknown) {
     error.message.includes("Billing mode disabled: credits")
   );
 }
+
+function isSubscriptionBillingDisabledError(error: unknown) {
+  return (
+    error instanceof ApiRequestError &&
+    error.status === 400 &&
+    error.message.includes("Billing mode disabled: subscriptions")
+  );
+}
+
+const emptyBillingStats: BillingStats = {
+  totalPurchases: 0,
+  totalCreditsPurchased: 0,
+  purchasedCredits: 0,
+  bonusCredits: 0,
+  totalCreditsConsumed: 0,
+  totalRevenue: 0,
+};
+
+const emptyTransactionsList: TransactionsList = { transactions: [], total: 0, hasMore: false };
+const emptyPurchasesList: PurchasesList = { purchases: [], total: 0, hasMore: false };
+const emptySubscriptionStats: SubscriptionStats = {
+  totalSubscriptions: 0,
+  activeSubscriptions: 0,
+  trialingSubscriptions: 0,
+  pastDueSubscriptions: 0,
+  canceledSubscriptions: 0,
+  monthlyRecurringRevenue: 0,
+  annualRecurringRevenue: 0,
+};
+const emptySubscriptionsList: SubscriptionsList = { subscriptions: [], total: 0, hasMore: false };
 
 async function getCreditBillingChartData<T>(loadData: () => Promise<T[]>): Promise<T[]> {
   try {
@@ -139,7 +175,15 @@ export async function getAdminUserCreditPurchases(userId: string, limit: number 
 }
 
 export async function getAdminBillingStats(): Promise<BillingStats> {
-  return getAdminBillingStatsApi();
+  try {
+    return await getAdminBillingStatsApi();
+  } catch (error) {
+    if (isCreditBillingDisabledError(error)) {
+      return emptyBillingStats;
+    }
+
+    throw error;
+  }
 }
 
 export async function getAdminRevenueData(timeRange: TimeRange): Promise<RevenuePoint[]> {
@@ -147,11 +191,27 @@ export async function getAdminRevenueData(timeRange: TimeRange): Promise<Revenue
 }
 
 export async function getAdminAllTransactions(limit: number = 20, offset: number = 0, searchEmail?: string) {
-  return getAdminAllTransactionsApi(limit, offset, searchEmail);
+  try {
+    return await getAdminAllTransactionsApi(limit, offset, searchEmail);
+  } catch (error) {
+    if (isCreditBillingDisabledError(error)) {
+      return emptyTransactionsList;
+    }
+
+    throw error;
+  }
 }
 
 export async function getAdminAllPurchases(limit: number = 20, offset: number = 0, searchEmail?: string) {
-  return getAdminAllPurchasesApi(limit, offset, searchEmail);
+  try {
+    return await getAdminAllPurchasesApi(limit, offset, searchEmail);
+  } catch (error) {
+    if (isCreditBillingDisabledError(error)) {
+      return emptyPurchasesList;
+    }
+
+    throw error;
+  }
 }
 
 export async function getAdminAllSubscriptions(
@@ -172,6 +232,54 @@ export async function getAdminTransactionData(timeRange: TimeRange): Promise<Tra
 
 export async function getAdminCreditsConsumedData(timeRange: TimeRange): Promise<CreditsConsumedPoint[]> {
   return getCreditBillingChartData(() => getAdminCreditsConsumedDataApi(timeRange));
+}
+
+export async function getAdminBillingSubscriptionStats(): Promise<SubscriptionStats> {
+  try {
+    return await getAdminBillingSubscriptionStatsApi();
+  } catch (error) {
+    if (isSubscriptionBillingDisabledError(error)) {
+      return emptySubscriptionStats;
+    }
+
+    throw error;
+  }
+}
+
+export async function getAdminBillingSubscriptions(limit: number = 20, offset: number = 0, searchEmail?: string): Promise<SubscriptionsList> {
+  try {
+    return await getAdminBillingSubscriptionsApi(limit, offset, searchEmail);
+  } catch (error) {
+    if (isSubscriptionBillingDisabledError(error)) {
+      return emptySubscriptionsList;
+    }
+
+    throw error;
+  }
+}
+
+export async function getAdminBillingSubscriptionPlanDistribution(): Promise<SubscriptionPlanDistributionPoint[]> {
+  try {
+    return await getAdminBillingSubscriptionPlanDistributionApi();
+  } catch (error) {
+    if (isSubscriptionBillingDisabledError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+export async function getAdminBillingSubscriptionEvents(limit: number = 50): Promise<SubscriptionEvent[]> {
+  try {
+    return await getAdminBillingSubscriptionEventsApi(limit);
+  } catch (error) {
+    if (isSubscriptionBillingDisabledError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function getAdminWebhookEvents(query: AdminWebhookEventsQuery = {}): Promise<AdminWebhookEventsList> {

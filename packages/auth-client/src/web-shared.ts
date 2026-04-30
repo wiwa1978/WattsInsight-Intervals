@@ -7,12 +7,14 @@ import { authAdditionalUserFields } from "@platform/auth-shared";
 import type { CreateWebAuthClientOptions } from "./types";
 
 export function createBasePlugins(options: CreateWebAuthClientOptions) {
+  const features = options.features ?? {};
+
   return [
     inferAdditionalFields({ user: authAdditionalUserFields }),
-    dodopaymentsClient(),
-    twoFactorClient(),
-    passkeyClient(),
-    magicLinkClient(),
+    ...(features.billing === false ? [] : [dodopaymentsClient()]),
+    ...(features.twoFactor === false ? [] : [twoFactorClient()]),
+    ...(features.passkeys === false ? [] : [passkeyClient()]),
+    ...(features.magicLink === false ? [] : [magicLinkClient()]),
     ...(options.plugins ?? []),
   ];
 }

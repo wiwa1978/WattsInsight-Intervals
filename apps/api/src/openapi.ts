@@ -499,6 +499,8 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/billing/credits-consumed-chart", ["Admin Billing"], "Get credits consumed chart", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Credits consumed chart", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscriptions", ["Admin Billing"], "List billing subscriptions", { security: cookieOrBearerAuth, parameters: billingListParameters, responses: defaultResponses("Billing subscriptions", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-stats", ["Admin Billing"], "Get subscription billing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription billing statistics", ["400", "401", "403"]) }),
+  route("get", "/admin/billing/subscription-plan-distribution", ["Admin Billing"], "Get subscription plan distribution", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription plan distribution", ["400", "401", "403"]) }),
+  route("get", "/admin/billing/subscription-events", ["Admin Billing"], "List subscription events", { security: cookieOrBearerAuth, parameters: optionalLimitParameters, responses: defaultResponses("Subscription events", ["400", "401", "403"]) }),
 
   route("get", "/admin/webhooks", ["Admin Webhooks"], "List payment webhook events", { security: cookieOrBearerAuth, parameters: webhookEventsParameters, responses: defaultResponses("Webhook events", ["400", "401", "403"]) }),
   route("get", "/admin/webhooks/stats", ["Admin Webhooks"], "Get payment webhook processing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Webhook statistics", ["401", "403"]) }),

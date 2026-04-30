@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import {
   Check,
   CreditCard,
@@ -62,6 +63,11 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
   const router = useRouter();
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSignOut = async () => {
     await signOut({
@@ -101,11 +107,45 @@ export function UserDropdown({ compact = false, className }: UserDropdownProps) 
     }
   };
 
+  const userInitial = session?.user?.name?.charAt(0).toUpperCase() || "U";
+
+  if (!mounted) {
+    return compact ? (
+      <Button
+        variant="ghost"
+        className={cn(
+          "h-8 w-8 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors p-0",
+          className
+        )}
+        disabled
+        aria-hidden="true"
+      >
+        <span className="text-sm font-medium text-primary">{userInitial}</span>
+      </Button>
+    ) : (
+      <Button
+        variant="ghost"
+        className={cn(
+          "h-auto w-full justify-start gap-3 py-2 hover:bg-muted",
+          className
+        )}
+        disabled
+        aria-hidden="true"
+      >
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <span className="text-sm font-medium text-primary">{userInitial}</span>
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="text-sm font-medium truncate">&nbsp;</p>
+          <p className="text-xs text-muted-foreground truncate">&nbsp;</p>
+        </div>
+      </Button>
+    );
+  }
+
   if (!session?.user) {
     return null;
   }
-
-  const userInitial = session.user.name?.charAt(0).toUpperCase() || "U";
 
   return (
     <DropdownMenu>

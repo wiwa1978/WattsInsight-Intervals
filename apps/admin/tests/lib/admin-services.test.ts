@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  getAdminAllSubscriptions,
+  getAdminAllPurchases,
+  getAdminAllTransactions,
+  getAdminBillingStats,
+  getAdminBillingSubscriptionEvents,
+  getAdminBillingSubscriptionPlanDistribution,
+  getAdminBillingSubscriptionStats,
+  getAdminBillingSubscriptions,
   getAdminCreditsConsumedData,
   getAdminRevenueData,
   getAdminSubscriptionStats,
@@ -11,7 +17,13 @@ import {
   stopAdminImpersonation,
 } from "../../src/lib/services/admin";
 import {
-  getAdminAllSubscriptionsApi,
+  getAdminAllPurchasesApi,
+  getAdminAllTransactionsApi,
+  getAdminBillingStatsApi,
+  getAdminBillingSubscriptionEventsApi,
+  getAdminBillingSubscriptionPlanDistributionApi,
+  getAdminBillingSubscriptionStatsApi,
+  getAdminBillingSubscriptionsApi,
   getAdminCreditsConsumedDataApi,
   getAdminRevenueDataApi,
   getAdminSubscriptionStatsApi,
@@ -22,8 +34,14 @@ import {
 } from "@/lib/api/admin";
 import { ApiRequestError } from "@platform/frontend-shared";
 
-vi.mock("@/lib/api/admin", () => ({
-  getAdminAllSubscriptionsApi: vi.fn(),
+vi.mock("../../src/lib/api/admin", () => ({
+  getAdminAllPurchasesApi: vi.fn(),
+  getAdminAllTransactionsApi: vi.fn(),
+  getAdminBillingStatsApi: vi.fn(),
+  getAdminBillingSubscriptionEventsApi: vi.fn(),
+  getAdminBillingSubscriptionPlanDistributionApi: vi.fn(),
+  getAdminBillingSubscriptionStatsApi: vi.fn(),
+  getAdminBillingSubscriptionsApi: vi.fn(),
   getAdminCreditsConsumedDataApi: vi.fn(),
   getAdminRevenueDataApi: vi.fn(),
   getAdminSubscriptionStatsApi: vi.fn(),
@@ -33,7 +51,13 @@ vi.mock("@/lib/api/admin", () => ({
   stopAdminImpersonationApi: vi.fn(),
 }));
 
-const getAdminAllSubscriptionsApiMock = vi.mocked(getAdminAllSubscriptionsApi);
+const getAdminAllPurchasesApiMock = vi.mocked(getAdminAllPurchasesApi);
+const getAdminAllTransactionsApiMock = vi.mocked(getAdminAllTransactionsApi);
+const getAdminBillingStatsApiMock = vi.mocked(getAdminBillingStatsApi);
+const getAdminBillingSubscriptionEventsApiMock = vi.mocked(getAdminBillingSubscriptionEventsApi);
+const getAdminBillingSubscriptionPlanDistributionApiMock = vi.mocked(getAdminBillingSubscriptionPlanDistributionApi);
+const getAdminBillingSubscriptionStatsApiMock = vi.mocked(getAdminBillingSubscriptionStatsApi);
+const getAdminBillingSubscriptionsApiMock = vi.mocked(getAdminBillingSubscriptionsApi);
 const getAdminCreditsConsumedDataApiMock = vi.mocked(getAdminCreditsConsumedDataApi);
 const getAdminRevenueDataApiMock = vi.mocked(getAdminRevenueDataApi);
 const getAdminSubscriptionStatsApiMock = vi.mocked(getAdminSubscriptionStatsApi);
@@ -41,6 +65,16 @@ const getAdminTransactionDataApiMock = vi.mocked(getAdminTransactionDataApi);
 const getAdminUsersApiMock = vi.mocked(getAdminUsersApi);
 const getSystemHealthApiMock = vi.mocked(getSystemHealthApi);
 const stopAdminImpersonationApiMock = vi.mocked(stopAdminImpersonationApi);
+
+const disabledCreditsError = new ApiRequestError({
+  status: 400,
+  message: "API request failed (400): Billing mode disabled: credits",
+});
+
+const disabledSubscriptionsError = new ApiRequestError({
+  status: 400,
+  message: "API request failed (400): Billing mode disabled: subscriptions",
+});
 
 describe("admin services", () => {
   it("delegates stopping impersonation to the admin API", async () => {
@@ -52,10 +86,6 @@ describe("admin services", () => {
   });
 
   it("returns empty credit chart data when credit billing is disabled", async () => {
-    const disabledCreditsError = new ApiRequestError({
-      status: 400,
-      message: "API request failed (400): Billing mode disabled: credits",
-    });
     getAdminTransactionDataApiMock.mockRejectedValue(disabledCreditsError);
     getAdminCreditsConsumedDataApiMock.mockRejectedValue(disabledCreditsError);
     getAdminRevenueDataApiMock.mockRejectedValue(disabledCreditsError);

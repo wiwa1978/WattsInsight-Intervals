@@ -2,7 +2,7 @@ export type BillingMode = "credits" | "subscriptions";
 
 export const applicationConfig = {
   billing: {
-    mode: "credits" as BillingMode,
+    mode: "subscriptions" as BillingMode,
   },
   features: {
     billing: true,

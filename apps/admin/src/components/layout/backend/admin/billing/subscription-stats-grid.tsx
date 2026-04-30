@@ -1,5 +1,5 @@
 import { CreditCard, DollarSign, TrendingDown, Users } from "lucide-react";
-import type { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 
 import { StatCard } from "@/components/layout/backend/shared/stat-card";
 import type { SubscriptionStats } from "@platform/contracts";

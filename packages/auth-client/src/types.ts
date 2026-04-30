@@ -3,6 +3,12 @@ import type { BetterAuthClientPlugin } from "better-auth";
 export type CreateWebAuthClientOptions = {
   baseURL: string;
   plugins?: BetterAuthClientPlugin[];
+  features?: {
+    billing?: boolean;
+    twoFactor?: boolean;
+    passkeys?: boolean;
+    magicLink?: boolean;
+  };
   onError?: (ctx: { error: unknown; context: unknown }) => void;
 };
 

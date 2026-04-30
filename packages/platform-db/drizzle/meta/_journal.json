@@ -57,6 +57,13 @@
       "when": 1777420800000,
       "tag": "0007_phase9_credit_usage_idempotency",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777507200000,
+      "tag": "0008_add_subscription_payments",
+      "breakpoints": true
     }
   ]
 }
