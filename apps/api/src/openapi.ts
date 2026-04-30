@@ -417,6 +417,15 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     security: cookieOrBearerAuth,
     responses: defaultResponses("Admin access status", ["401", "403"]),
   }),
+  route("get", "/admin/step-up/status", ["Admin"], "Get admin step-up status", {
+    security: cookieOrBearerAuth,
+    responses: defaultResponses("Admin step-up status", ["401", "403"]),
+  }),
+  route("post", "/admin/step-up/complete", ["Admin"], "Complete admin step-up verification", {
+    security: cookieOrBearerAuth,
+    requestBody: requestBody(genericObjectSchema),
+    responses: defaultResponses("Admin step-up completed", ["400", "401", "403", "413"]),
+  }),
   route("post", "/admin/verify-ban-secret", ["Admin"], "Verify admin ban secret", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(verifyBanSecretSchema),

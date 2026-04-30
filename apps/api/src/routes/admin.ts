@@ -37,9 +37,11 @@ import { paymentWebhookEvents } from "@platform/platform-db";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
+import { authConfig } from "../config/auth";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
+import { getAdminSessionTokenFromHeaders, issueAdminStepUpCookie, isAdminStepUpVerified } from "../middleware/admin-step-up";
 import { getAuditRequestContext } from "../modules/audit/service";
 import { logger } from "../observability/logger";
 
@@ -62,6 +64,11 @@ type AdminAuthAuditDetails<T> = {
 const adminUsersQuerySchema = paginationQuerySchema.extend({
   search: z.string().optional(),
   role: z.enum(["user", "admin"]).optional(),
+});
+
+const adminStepUpSchema = z.object({
+  secret: z.string().min(1),
+  totpCode: z.string().regex(/^\d{6}$/).optional(),
 });
 
 function getAuthUser(c: Context<AppEnv>) {
@@ -453,12 +460,102 @@ export function createAdminRouter() {
   });
 
   router.get("/status", async (c) => {
+    const authUser = getAuthUser(c);
+    const stepUpVerified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
+    const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
+      | { user?: { twoFactorEnabled?: boolean | null } }
+      | null;
+    const twoFactorEnabled = Boolean(currentSession?.user?.twoFactorEnabled);
+
     return c.json({
       success: true,
       data: {
         message: "Admin access granted.",
+        stepUpRequired: !stepUpVerified,
+        totpRequired: authConfig.adminPortalTotpRequired,
+        twoFactorEnabled,
       },
     });
+  });
+
+  router.get("/step-up/status", async (c) => {
+    const authUser = getAuthUser(c);
+    const stepUpVerified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
+    const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
+      | { user?: { twoFactorEnabled?: boolean | null } }
+      | null;
+    const twoFactorEnabled = Boolean(currentSession?.user?.twoFactorEnabled);
+
+    return c.json({
+      success: true,
+      data: {
+        stepUpRequired: !stepUpVerified,
+        totpRequired: authConfig.adminPortalTotpRequired,
+        twoFactorEnabled,
+      },
+    });
+  });
+
+  router.post("/step-up/complete", async (c) => {
+    const authUser = getAuthUser(c);
+    const parsedBody = parseJsonBody(adminStepUpSchema, await c.req.json().catch(() => null));
+
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid admin step-up payload");
+    }
+
+    const verifyAdminLoginSecret = bootstrap.adminService.verifyAdminLoginSecret ?? bootstrap.adminService.verifyAdminBanSecret;
+    const secretResult = await verifyAdminLoginSecret(parsedBody.data.secret);
+    if (!secretResult.success) {
+      return forbidden(c, "Invalid admin step-up credentials");
+    }
+
+    if (!bootstrap.authModule.auth.api?.getSession) {
+      return c.json({ success: false, error: "Unable to verify TOTP session" }, 500);
+    }
+
+    const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
+      | { user?: { twoFactorEnabled?: boolean | null } }
+      | null;
+
+    if (authConfig.adminPortalTotpRequired && !currentSession?.user?.twoFactorEnabled) {
+      return c.json({ success: false, error: "Two-factor setup is required for admin access" }, 403);
+    }
+
+    const verifyTotp = (bootstrap.authModule.auth.api as unknown as {
+      verifyTotp?: (args: {
+        body: { code: string };
+        headers: Headers;
+      }) => Promise<{ error?: { message?: string } | string } | null>;
+    }).verifyTotp;
+
+    if (authConfig.adminPortalTotpRequired) {
+      if (!verifyTotp) {
+        return c.json({ success: false, error: "Unable to verify TOTP" }, 500);
+      }
+
+      if (!parsedBody.data.totpCode) {
+        return validationError(c, "Invalid admin step-up payload");
+      }
+
+      const totpResult = await verifyTotp({
+        body: { code: parsedBody.data.totpCode },
+        headers: c.req.raw.headers,
+      });
+
+      if (totpResult && resultError(totpResult, "").length > 0) {
+        return forbidden(c, "Invalid admin step-up credentials");
+      }
+    }
+
+    const sessionToken = getAdminSessionTokenFromHeaders(c.req.raw.headers);
+    if (!sessionToken) {
+      return c.json({ success: false, error: "Missing session token" }, 401);
+    }
+
+    const response = c.json({ success: true, data: { verified: true } });
+    response.headers.append("Set-Cookie", issueAdminStepUpCookie(authUser.id, sessionToken));
+    return response;
   });
 
   router.post("/verify-ban-secret", async (c) => {

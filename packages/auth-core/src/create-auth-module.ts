@@ -13,6 +13,7 @@ import { normalizeAuthRole } from "@platform/auth-shared";
 import { createRequireAuth } from "./middleware/require-auth";
 import { requireAdmin } from "./middleware/require-admin";
 import { createRequireAdminAccess } from "./middleware/require-admin-access";
+import { requireAdminStepUp } from "./middleware/require-admin-step-up";
 import { enforceMobileSignInGate } from "./mobile-sign-in-gate";
 import { createTokenService } from "./token-service";
 import type { AuthContextVariables, AuthModuleOptions } from "./types";
@@ -315,5 +316,6 @@ export function createAuthModule(options: AuthModuleOptions) {
     requireAuth,
     requireAdmin,
     requireAdminAccess,
+    requireAdminStepUp,
   };
 }

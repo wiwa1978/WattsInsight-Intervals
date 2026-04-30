@@ -1,6 +1,8 @@
+import type { AuthRole } from "@platform/auth-shared";
+
 export type AuthUser = {
   id: string;
-  role?: string | null;
+  role?: AuthRole | null;
   email?: string | null;
 };
 
@@ -9,6 +11,7 @@ export type AppEnv = {
     requestId?: string;
     authUser?: AuthUser;
     authSession?: unknown;
+    adminStepUpVerified?: boolean;
     clientLogRemaining?: number;
   };
 };

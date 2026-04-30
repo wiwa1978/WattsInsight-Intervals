@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => {
 
   const adminService = {
     verifyAdminBanSecret: vi.fn(),
+    verifyAdminLoginSecret: vi.fn(),
     getDashboardStats: vi.fn(),
     getUsers: vi.fn(),
     getUserStats: vi.fn(),
@@ -126,6 +127,8 @@ const mocks = vi.hoisted(() => {
       },
       components: {},
     })),
+    getSession: vi.fn(async () => ({ user: { twoFactorEnabled: true } })),
+    verifyTotp: vi.fn(async () => null),
   };
   const countries = [
     { id: "country-be-nl", name: "Belgie", code: "BE", language: "nl" },
@@ -307,6 +310,7 @@ vi.mock("@platform/auth-core", () => ({
       requireAuth: passThrough,
       requireAdmin: passThrough,
       requireAdminAccess: passThrough,
+      requireAdminStepUp: passThrough,
     };
   },
 }));
@@ -388,6 +392,8 @@ const [
   import("../src/config/application"),
 ]);
 
+const issueAdminStepUpCookie = (await import("../src/middleware/admin-step-up")).issueAdminStepUpCookie;
+
 function setBillingModeForTest(mode: "credits" | "subscriptions") {
   (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = mode;
 }
@@ -460,6 +466,9 @@ describe("API functional routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setBillingModeForTest("credits");
+    mocks.adminService.verifyAdminLoginSecret.mockResolvedValue({ success: true });
+    mocks.adminAuthApi.verifyTotp.mockResolvedValue(null);
+    mocks.adminAuthApi.getSession.mockResolvedValue({ user: { twoFactorEnabled: true } });
     mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
     mocks.auditService.listAuditEntries.mockResolvedValue([]);
     mocks.subscriptionService.getLatestDodoCustomerId.mockResolvedValue(null);
@@ -1142,6 +1151,89 @@ describe("API functional routes", () => {
 
     expect(okRes.status).toBe(200);
     expect(failRes.status).toBe(400);
+  });
+
+  // Verifies admin step-up status endpoint reports missing step-up state.
+  it("returns step-up required when marker is missing", async () => {
+    const res = await app.request("/admin/step-up/status", {
+      method: "GET",
+      headers: {
+        cookie: "better-auth.session_token=session-token",
+      },
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        stepUpRequired: true,
+        totpRequired: true,
+        twoFactorEnabled: true,
+      },
+    });
+  });
+
+  // Verifies admin step-up status endpoint reports verified state when marker is valid.
+  it("returns step-up complete when marker is valid", async () => {
+    const stepUpCookie = issueAdminStepUpCookie("auth-user", "session-token").split(";")[0] ?? "";
+    const res = await app.request("/admin/step-up/status", {
+      method: "GET",
+      headers: {
+        cookie: `better-auth.session_token=session-token; ${stepUpCookie}`,
+      },
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        stepUpRequired: false,
+        totpRequired: true,
+        twoFactorEnabled: true,
+      },
+    });
+  });
+
+  // Verifies admin step-up completion validates secret and TOTP and returns cookie marker.
+  it("completes admin step-up and sets marker cookie", async () => {
+    mocks.adminService.verifyAdminLoginSecret = vi.fn().mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.verifyTotp.mockResolvedValueOnce(null);
+
+    const res = await app.request("/admin/step-up/complete", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: "better-auth.session_token=session-token",
+      },
+      body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true, data: { verified: true } });
+    expect(res.headers.get("set-cookie")).toContain("admin_step_up=");
+  });
+
+  // Verifies admin step-up can skip TOTP verification when adminPortalTotpRequired is disabled.
+  it("completes admin step-up without TOTP when TOTP is disabled in config", async () => {
+    mocks.adminAuthApi.getSession.mockResolvedValueOnce({ user: { twoFactorEnabled: false } });
+
+    const authSharedConfig = await import("@platform/auth-shared");
+    const previous = authSharedConfig.authConfig.adminPortalTotpRequired;
+    (authSharedConfig.authConfig as { adminPortalTotpRequired: boolean }).adminPortalTotpRequired = false;
+
+    const res = await app.request("/admin/step-up/complete", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: "better-auth.session_token=session-token",
+      },
+      body: JSON.stringify({ secret: "secret" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.adminAuthApi.verifyTotp).not.toHaveBeenCalled();
+
+    (authSharedConfig.authConfig as { adminPortalTotpRequired: boolean }).adminPortalTotpRequired = previous;
   });
 
   // Verifies verify-ban-secret rejects malformed payloads.

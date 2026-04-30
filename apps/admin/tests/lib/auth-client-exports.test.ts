@@ -10,6 +10,7 @@ describe("admin auth client exports", () => {
     const authExports = await import("../../src/lib/auth-client");
 
     expect(Object.prototype.hasOwnProperty.call(authExports, "admin")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(authExports, "twoFactor")).toBe(true);
   });
 
   it("imports the admin-capable auth client subpath", async () => {

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => {
     allowAuth: false,
     allowAdmin: false,
     allowAdminAccess: false,
+    allowAdminStepUp: false,
+    twoFactorEnabled: true,
   };
 
   const adminService = {
@@ -23,6 +25,7 @@ const mocks = vi.hoisted(() => {
     getTransactionData: vi.fn(),
     getCreditsConsumedData: vi.fn(),
     verifyAdminBanSecret: vi.fn(),
+    verifyAdminLoginSecret: vi.fn(),
   };
 
   const billingService = {
@@ -78,7 +81,7 @@ vi.mock("@platform/auth-core", () => ({
       if (!mocks.authState.allowAuth) {
         return c.json({ success: false, error: "Unauthorized" }, 401);
       }
-      c.set("authUser", { id: "u1" });
+      c.set("authUser", { id: "u1", role: "admin", email: "admin@example.com" });
       await next();
     },
     requireAdmin: async (c: any, next: any) => {
@@ -92,6 +95,18 @@ vi.mock("@platform/auth-core", () => ({
         return c.json({ success: false, error: "Forbidden" }, 403);
       }
       await next();
+    },
+    requireAdminStepUp: async (c: any, next: any) => {
+      if (!mocks.authState.allowAdminStepUp) {
+        return c.json({ success: false, error: "Admin step-up required" }, 403);
+      }
+      await next();
+    },
+    auth: {
+      api: {
+        getSession: async () => ({ user: { twoFactorEnabled: mocks.authState.twoFactorEnabled } }),
+        verifyTotp: async () => null,
+      },
     },
   }),
 }));
@@ -139,6 +154,8 @@ describe("authz contract", () => {
     mocks.authState.allowAuth = false;
     mocks.authState.allowAdmin = false;
     mocks.authState.allowAdminAccess = false;
+    mocks.authState.allowAdminStepUp = false;
+    mocks.authState.twoFactorEnabled = true;
     vi.clearAllMocks();
   });
 
@@ -172,7 +189,12 @@ describe("authz contract", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       success: true,
-      data: { message: "Admin access granted." },
+      data: {
+        message: "Admin access granted.",
+        stepUpRequired: true,
+        totpRequired: true,
+        twoFactorEnabled: true,
+      },
     });
   });
 
@@ -188,8 +210,20 @@ describe("authz contract", () => {
     expect(stillForbidden.status).toBe(403);
 
     mocks.authState.allowAdminAccess = true;
+    mocks.authState.allowAdminStepUp = true;
     const ok = await app.request("/admin/dashboard/stats");
     expect(ok.status).toBe(200);
     await expect(ok.json()).resolves.toEqual({ success: true, data: { totalUsers: 10 } });
+  });
+
+  // Ensures admin routes also enforce successful admin step-up verification.
+  it("rejects /admin routes when step-up is missing", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.allowAdminStepUp = false;
+
+    const res = await app.request("/admin/dashboard/stats");
+
+    expect(res.status).toBe(403);
   });
 });
