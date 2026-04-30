@@ -58,6 +58,7 @@ const mocks = vi.hoisted(() => {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
       API_URL: "http://localhost:8787",
+      ADMIN_ALLOWLIST: "admin@example.com",
       DODO_PAYMENTS_ENVIRONMENT: "test_mode" as const,
       BETTER_AUTH_SECRET: "this-is-a-long-enough-secret",
       JWT_SECRET: "this-is-a-long-enough-jwt-secret",
@@ -194,6 +195,7 @@ describe("authz contract", () => {
         stepUpRequired: true,
         totpRequired: true,
         twoFactorEnabled: true,
+        canEnrollTotp: true,
       },
     });
   });

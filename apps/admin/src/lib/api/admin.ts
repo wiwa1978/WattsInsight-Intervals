@@ -41,7 +41,7 @@ export async function verifyAdminBanSecretApi(secret: string) {
 export async function getAdminStepUpStatusApi() {
   return apiRequest<{
     success: boolean;
-    data: { stepUpRequired: boolean; totpRequired: boolean; twoFactorEnabled: boolean };
+    data: { stepUpRequired: boolean; totpRequired: boolean; twoFactorEnabled: boolean; canEnrollTotp: boolean };
   }>("/admin/step-up/status");
 }
 

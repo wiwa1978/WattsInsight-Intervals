@@ -197,6 +197,7 @@ const mocks = vi.hoisted(() => {
       DATABASE_URL: "postgres://postgres:postgres@localhost:5432/test",
       APP_URL: "http://localhost:3100",
       API_URL: "http://localhost:8787",
+      ADMIN_ALLOWLIST: "admin@example.com",
       DODO_PAYMENTS_ENVIRONMENT: "test_mode" as const,
       DODO_PAYMENTS_API_KEY: "dodo-api-key",
       BETTER_AUTH_SECRET: "this-is-a-long-enough-secret",
@@ -298,7 +299,11 @@ vi.mock("@platform/auth-core", () => ({
     });
 
     const passThrough = async (c: any, next: any) => {
-      c.set("authUser", { id: c.req.header("x-test-auth-user-id") ?? "auth-user" });
+      c.set("authUser", {
+        id: c.req.header("x-test-auth-user-id") ?? "auth-user",
+        role: "admin",
+        email: c.req.header("x-test-auth-user-email") ?? "admin@example.com",
+      });
       await next();
     };
 
@@ -1169,6 +1174,7 @@ describe("API functional routes", () => {
         stepUpRequired: true,
         totpRequired: true,
         twoFactorEnabled: true,
+        canEnrollTotp: true,
       },
     });
   });
@@ -1190,8 +1196,30 @@ describe("API functional routes", () => {
         stepUpRequired: false,
         totpRequired: true,
         twoFactorEnabled: true,
+        canEnrollTotp: true,
       },
     });
+  });
+
+  it("rejects admin step-up completion when enrollment is not allowlisted", async () => {
+    mocks.adminAuthApi.getSession.mockResolvedValueOnce({ user: { twoFactorEnabled: false } });
+
+    const res = await app.request("/admin/step-up/complete", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: "better-auth.session_token=session-token",
+        "x-test-auth-user-email": "outsider@example.com",
+      },
+      body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "FORBIDDEN",
+    });
+    expect(mocks.adminAuthApi.verifyTotp).not.toHaveBeenCalled();
   });
 
   // Verifies admin step-up completion validates secret and TOTP and returns cookie marker.
