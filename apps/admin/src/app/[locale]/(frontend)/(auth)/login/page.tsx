@@ -34,7 +34,7 @@ const DEFAULT_REDIRECT = "/admin/overview";
 
 const adminLoginSchema = signInSchema.extend({
   adminSecret: z.string().min(1, "Admin secret is required"),
-  totpCode: z.string().optional(),
+  totpCode: z.string().regex(/^\d{6}$/, "Enter a valid 6-digit authentication code").optional().or(z.literal("")),
 });
 
 type AdminLoginInput = z.infer<typeof adminLoginSchema>;
@@ -189,7 +189,7 @@ function LoginPageContent() {
 
       await completeAdminStepUp({
         secret: values.adminSecret,
-        totpCode: values.totpCode ?? "",
+        ...(values.totpCode ? { totpCode: values.totpCode } : {}),
       });
     } catch {
       passwordForm.setError("root", {

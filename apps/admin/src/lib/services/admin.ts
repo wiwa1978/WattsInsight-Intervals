@@ -118,7 +118,7 @@ export async function getAdminStepUpStatus() {
   return getAdminStepUpStatusApi();
 }
 
-export async function completeAdminStepUp(payload: { secret: string; totpCode: string }) {
+export async function completeAdminStepUp(payload: { secret: string; totpCode?: string }) {
   return completeAdminStepUpApi(payload);
 }
 
