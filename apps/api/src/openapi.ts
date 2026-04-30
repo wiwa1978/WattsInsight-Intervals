@@ -326,6 +326,16 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     security: cookieOrBearerAuth,
     responses: defaultResponses("Current subscription", ["400", "401"]),
   }),
+  route("get", "/me/subscription/payments", ["Me"], "Get current user subscription payments", {
+    security: cookieOrBearerAuth,
+    parameters: optionalLimitParameters,
+    responses: defaultResponses("Subscription payments", ["400", "401"]),
+  }),
+  route("post", "/me/subscription/invoice", ["Me"], "Download invoice for a subscription payment", {
+    security: cookieOrBearerAuth,
+    requestBody: requestBody(invoiceRequestSchema),
+    responses: defaultResponses("Invoice URL", ["400", "401"]),
+  }),
   route("post", "/me/vouchers/redeem", ["Me"], "Redeem a voucher", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(redeemVoucherSchema),

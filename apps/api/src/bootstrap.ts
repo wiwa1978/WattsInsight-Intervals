@@ -61,7 +61,7 @@ const billingService = createBillingService({
   env,
   notifications: notificationsService,
 });
-const subscriptionService = createSubscriptionService({ db });
+const subscriptionService = createSubscriptionService({ db, env });
 const adminService = createAdminService({
   db,
   adminBanSecret: env.ADMIN_BAN_SECRET,
@@ -363,6 +363,7 @@ const paymentsModule = createPaymentsModule({
       handleDodoSubscriptionWebhook: createSubscriptionWebhookHandler({
         subscriptions: subscriptionService,
       }),
+      recordSubscriptionPayment: subscriptionService.recordSubscriptionPayment,
     },
   }),
 });

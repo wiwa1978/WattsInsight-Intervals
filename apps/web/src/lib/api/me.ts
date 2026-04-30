@@ -4,7 +4,7 @@ import { createNotificationsApi } from "@platform/frontend-shared/notifications"
 
 import { apiRequest } from "./client";
 import type { Notification } from "@/schemas/notification";
-import type { ApplicationConfig } from "@platform/contracts";
+import type { ApplicationConfig, SubscriptionPayment, UserSubscription } from "@platform/contracts";
 
 export type { CountryRecord } from "@platform/frontend-shared/me-api";
 
@@ -20,6 +20,20 @@ export async function getMyCreditBalance() {
 export async function getMyApplicationConfig() {
   const result = await meApi.getApplicationConfig() as { success: boolean; data: ApplicationConfig };
   return result.data;
+}
+
+export async function getMySubscription() {
+  const result = await meApi.getSubscription() as { success: boolean; data: UserSubscription | null };
+  return result.data;
+}
+
+export async function getMySubscriptionPayments(limit = 50) {
+  const result = await meApi.getSubscriptionPayments(limit) as { success: boolean; data: SubscriptionPayment[] };
+  return result.data;
+}
+
+export async function downloadMySubscriptionInvoice(paymentId: string) {
+  return meApi.downloadSubscriptionInvoice(paymentId) as Promise<{ success: boolean; invoiceUrl?: string; error?: string }>;
 }
 
 export async function getMyCreditHistory(limit = 50) {
@@ -80,6 +94,6 @@ export async function createCheckoutSession(packageKey: string) {
   return meApi.createCheckoutSession(packageKey) as Promise<{ success: boolean; data: { checkoutUrl: string } }>;
 }
 
-export async function createSubscriptionCheckoutSession(planKey: string) {
-  return meApi.createSubscriptionCheckoutSession(planKey) as Promise<{ success: boolean; data: { checkoutUrl: string } }>;
+export async function createSubscriptionCheckoutSession(planKey: string, discountCode?: string) {
+  return meApi.createSubscriptionCheckoutSession(planKey, discountCode) as Promise<{ success: boolean; data: { checkoutUrl: string } }>;
 }

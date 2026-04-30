@@ -1,8 +1,7 @@
 import { queryKeys } from "@platform/frontend-shared/query-keys";
 
-export const webQueryKeys = {
+export const adminQueryKeys = {
   applicationConfig: queryKeys.me.applicationConfig,
-  subscription: queryKeys.me.subscription,
   creditBalance: queryKeys.credits.balance,
   notifications: queryKeys.notifications.list,
   unreadNotifications: queryKeys.notifications.unreadCount,

@@ -66,6 +66,12 @@ describe("service factories", () => {
 
     await expect(me.getSession()).resolves.toEqual({ path: "/me/session", init: undefined });
     await expect(me.getApplicationConfig()).resolves.toEqual({ path: "/me/application-config", init: undefined });
+    await expect(me.getSubscription()).resolves.toEqual({ path: "/me/subscription", init: undefined });
+    await expect(me.getSubscriptionPayments(12)).resolves.toEqual({ path: "/me/subscription/payments?limit=12", init: undefined });
+    await expect(me.downloadSubscriptionInvoice("pay_sub_123")).resolves.toEqual({
+      path: "/me/subscription/invoice",
+      init: { method: "POST", body: JSON.stringify({ paymentId: "pay_sub_123" }) },
+    });
     await expect(me.redeemVoucher("WELCOME")).resolves.toEqual({
       path: "/me/vouchers/redeem",
       init: { method: "POST", body: JSON.stringify({ code: "WELCOME" }) },

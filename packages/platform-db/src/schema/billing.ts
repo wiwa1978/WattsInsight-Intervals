@@ -174,6 +174,39 @@ export const subscriptionEvents = pgTable(
   ],
 );
 
+export const subscriptionPayments = pgTable(
+  "subscription_payments",
+  {
+    id,
+    userId: uuid("user_id")
+      .references(() => user.id, { onDelete: "cascade" })
+      .notNull(),
+    planKey: text("plan_key").notNull(),
+    dodoCustomerId: text("dodo_customer_id"),
+    dodoSubscriptionId: text("dodo_subscription_id"),
+    paymentProvider: text("payment_provider").default("dodo").notNull(),
+    paymentId: text("payment_id").notNull(),
+    paymentStatus: text("payment_status")
+      .$type<"pending" | "completed" | "failed" | "refunded">()
+      .default("pending")
+      .notNull(),
+    priceExclVat: integer("price_excl_vat").notNull(),
+    priceInclVat: integer("price_incl_vat").notNull(),
+    vatAmount: integer("vat_amount").notNull(),
+    currency: text("currency").default("EUR").notNull(),
+    paymentSnapshot: jsonb("payment_snapshot"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("subscription_payments_user_id_idx").on(table.userId),
+    uniqueIndex("subscription_payments_provider_payment_id_idx").on(table.paymentProvider, table.paymentId),
+    index("subscription_payments_payment_id_idx").on(table.paymentId),
+    index("subscription_payments_subscription_id_idx").on(table.dodoSubscriptionId),
+    index("subscription_payments_status_created_at_idx").on(table.paymentStatus, table.createdAt),
+  ],
+);
+
 export const discounts = pgTable(
   "discounts",
   {
@@ -345,6 +378,7 @@ export const userSubscriptionsRelations = relations(userSubscriptions, ({ one, m
     references: [user.id],
   }),
   events: many(subscriptionEvents),
+  payments: many(subscriptionPayments),
 }));
 
 export const subscriptionEventsRelations = relations(subscriptionEvents, ({ one }) => ({
@@ -354,6 +388,17 @@ export const subscriptionEventsRelations = relations(subscriptionEvents, ({ one 
   }),
   subscription: one(userSubscriptions, {
     fields: [subscriptionEvents.dodoSubscriptionId],
+    references: [userSubscriptions.dodoSubscriptionId],
+  }),
+}));
+
+export const subscriptionPaymentsRelations = relations(subscriptionPayments, ({ one }) => ({
+  user: one(user, {
+    fields: [subscriptionPayments.userId],
+    references: [user.id],
+  }),
+  subscription: one(userSubscriptions, {
+    fields: [subscriptionPayments.dodoSubscriptionId],
     references: [userSubscriptions.dodoSubscriptionId],
   }),
 }));

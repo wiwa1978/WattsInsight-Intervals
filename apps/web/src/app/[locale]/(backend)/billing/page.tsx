@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getServerSession } from "@/lib/auth-session";
-import { getMyApplicationConfig } from "@/lib/api/me";
+import { getMyApplicationConfig, getMySubscription, getMySubscriptionPayments } from "@/lib/api/me";
 import { getCreditPurchases } from "@/lib/services/credits";
 import { PurchaseHistory } from "@/components/layout/backend/billing/purchase-history";
 import { CreditPricing } from "@/components/layout/backend/billing/credit-pricing";
@@ -15,6 +15,9 @@ import {
 import { BillingClientWrapper } from "./client-wrapper";
 import { SubscriptionBillingClientWrapper } from "./subscription-client-wrapper";
 import { SubscriptionPricing } from "@/components/layout/backend/billing/subscription-pricing";
+import { SubscriptionStatus } from "@/components/layout/backend/billing/subscription-status";
+import { SubscriptionDiscountForm } from "@/components/layout/backend/billing/subscription-discount-form";
+import { SubscriptionHistory } from "@/components/layout/backend/billing/subscription-history";
 
 type BillingPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -85,6 +88,10 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
 async function SubscriptionBillingPage({ checkoutOutcome }: { checkoutOutcome: CheckoutOutcome }) {
   const t = await getTranslations("billing");
   const subscriptionT = await getTranslations("billing.subscription");
+  const [subscription, payments] = await Promise.all([
+    getMySubscription(),
+    getMySubscriptionPayments(50),
+  ]);
 
   return (
     <SubscriptionBillingClientWrapper checkoutOutcome={checkoutOutcome}>
@@ -94,7 +101,10 @@ async function SubscriptionBillingPage({ checkoutOutcome }: { checkoutOutcome: C
           <p className="text-muted-foreground">{subscriptionT("description")}</p>
         </div>
 
+        <SubscriptionStatus subscription={subscription} />
         <SubscriptionPricing />
+        <SubscriptionDiscountForm />
+        <SubscriptionHistory payments={payments} />
       </div>
     </SubscriptionBillingClientWrapper>
   );

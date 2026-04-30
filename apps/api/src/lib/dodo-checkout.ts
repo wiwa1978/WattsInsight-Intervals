@@ -15,17 +15,25 @@ export function buildDodoCheckoutUrl(args: {
   userId: string;
   packageKey?: string;
   planKey?: string;
+  billingMode?: "credits" | "subscriptions";
+  discountCode?: string;
   customerEmail?: string | null;
   successUrl?: string;
   cancelUrl?: string;
 }) {
   const url = new URL(`${args.baseUrl}/buy/${args.productId}`);
   url.searchParams.set("metadata_userId", args.userId);
+  if (args.billingMode) {
+    url.searchParams.set("metadata_billingMode", args.billingMode);
+  }
   if (args.packageKey) {
     url.searchParams.set("metadata_packageKey", args.packageKey);
   }
   if (args.planKey) {
     url.searchParams.set("metadata_planKey", args.planKey);
+  }
+  if (args.discountCode) {
+    url.searchParams.set("metadata_discountCode", args.discountCode);
   }
   if (args.customerEmail) {
     url.searchParams.set("customer_email", args.customerEmail);

@@ -1339,6 +1339,7 @@
     "users": "Users",
     "notifications": "Notifications",
     "projects": "Projects",
+    "webhooks": "Webhooks",
     "discounts": "Discounts",
     "vouchers": "Vouchers",
     "logs": "Logs"

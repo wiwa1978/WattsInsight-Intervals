@@ -1,4 +1,8 @@
 export const queryKeys = {
+  me: {
+    applicationConfig: ["me", "application-config"] as const,
+    subscription: ["me", "subscription"] as const,
+  },
   credits: {
     balance: ["me", "credits", "balance"] as const,
     history: (limit: number) => ["me", "credits", "history", limit] as const,

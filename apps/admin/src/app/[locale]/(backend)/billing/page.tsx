@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getServerSession } from "@/lib/auth-session";
+import { getMyApplicationConfig } from "@/lib/api/me";
 import { getCreditPurchases } from "@/lib/services/credits";
 import { PurchaseHistory } from "@/components/layout/backend/billing/purchase-history";
 import { CreditPricing } from "@/components/layout/backend/billing/credit-pricing";
@@ -19,6 +20,11 @@ export default async function BillingPage() {
   }
 
   const t = await getTranslations("billing");
+  const applicationConfig = await getMyApplicationConfig();
+
+  if (!applicationConfig.billing.creditSurfacesEnabled) {
+    return null;
+  }
 
   return (
     <BillingClientWrapper>

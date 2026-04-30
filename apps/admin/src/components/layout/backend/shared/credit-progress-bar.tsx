@@ -1,59 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { Link } from "@/i18n/navigation";
+import { getMyApplicationConfig } from "@/lib/api/me";
 import { getCreditBalance } from "@/lib/services/credits";
 import { Loader2, Sparkles, Coins } from "lucide-react";
-import { SidebarSeparator, useSidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar";
 import { stripLocaleFromPath } from "@/lib/utils";
-
-interface CreditData {
-  balance: number;
-  totalPurchased: number;
-}
+import { adminQueryKeys } from "@/lib/query/keys";
 
 export function CreditProgressBar() {
   const t = useTranslations("creditProgressBar");
   const pathname = usePathname();
   const { state } = useSidebar();
-  const [creditData, setCreditData] = useState<CreditData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   // Don't show on admin routes
   const normalizedPath = stripLocaleFromPath(pathname);
   const isAdminRoute = normalizedPath.startsWith("/admin");
-  
-  useEffect(() => {
-    if (!isAdminRoute) {
-      fetchCredits();
-    }
-  }, [isAdminRoute]);
-
-  const fetchCredits = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await getCreditBalance();
-      setCreditData({
-        balance: data.balance,
-        totalPurchased: data.totalPurchased,
-      });
-    } catch (err) {
-      console.error("Failed to fetch credits:", err);
-      setError(t("error"));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const applicationConfigQuery = useQuery({
+    queryKey: adminQueryKeys.applicationConfig,
+    queryFn: getMyApplicationConfig,
+    enabled: !isAdminRoute,
+    staleTime: 60_000,
+  });
+  const creditBalanceQuery = useQuery({
+    queryKey: adminQueryKeys.creditBalance,
+    queryFn: getCreditBalance,
+    enabled: applicationConfigQuery.data?.billing.creditSurfacesEnabled === true,
+    staleTime: 30_000,
+  });
 
   if (isAdminRoute) {
     return null;
   }
 
-  if (loading) {
+  if (applicationConfigQuery.isLoading || creditBalanceQuery.isLoading) {
     return (
       <>
         <div className="px-3 py-1">
@@ -66,11 +49,11 @@ export function CreditProgressBar() {
     );
   }
 
-  if (error) {
+  if (applicationConfigQuery.isError || applicationConfigQuery.data?.billing.creditSurfacesEnabled !== true || creditBalanceQuery.isError) {
     return null;
   }
 
-  const currentCredits = creditData?.balance || 0;
+  const currentCredits = creditBalanceQuery.data?.balance || 0;
 
   const isCollapsed = state === "collapsed";
 
