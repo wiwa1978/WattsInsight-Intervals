@@ -85,6 +85,10 @@ export function verifyDodoWebhookSignatureDetailed(
     return { ok: false, reason: "malformed_header" };
   }
 
+  if (!/^\d+$/.test(parsed.timestamp)) {
+    return { ok: false, reason: "malformed_header" };
+  }
+
   const timestampSeconds = Number.parseInt(parsed.timestamp, 10);
   if (!Number.isFinite(timestampSeconds)) {
     return { ok: false, reason: "malformed_header" };

@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import type { WebhookEventStore } from "@platform/payments-core";
 import { paymentWebhookEvents } from "@platform/platform-db";
 
+import { redactString } from "../../observability/redaction";
+
 type PaymentWebhookEventStoreDeps = {
   db: any;
 };
@@ -38,17 +40,17 @@ function safeErrorDetails(error: unknown) {
   if (error instanceof Error) {
     const record = error as Error & Record<string, unknown>;
     return {
-      name: error.name,
-      message: error.message,
+      name: redactString(error.name),
+      message: redactString(error.message),
       ...(stringDetail(record, "code") ? { code: stringDetail(record, "code") } : {}),
       ...(numericDetail(record, "status") ? { status: numericDetail(record, "status") } : {}),
       ...(numericDetail(record, "statusCode") ? { statusCode: numericDetail(record, "statusCode") } : {}),
-      ...(error.stack ? { stack: error.stack } : {}),
+      ...(error.stack ? { stack: redactString(error.stack) } : {}),
     };
   }
 
   return {
-    message: String(error),
+    message: redactString(String(error)),
   };
 }
 

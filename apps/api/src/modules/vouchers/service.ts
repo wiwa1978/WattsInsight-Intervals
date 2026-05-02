@@ -130,22 +130,28 @@ async function getOrInitializeCredits(
   userId: string,
   tx: VouchersServiceDeps["db"] | DbTransaction,
 ) {
-  let credits = await tx.query.userCredits.findFirst({ where: eq(userCredits.userId, userId) });
+  const credits = await tx.query.userCredits.findFirst({ where: eq(userCredits.userId, userId) });
 
-  if (!credits) {
-    const [created] = await tx
-      .insert(userCredits)
-      .values({
-        userId,
-        balance: "0",
-        totalPurchased: "0",
-        totalSpent: "0",
-      })
-      .returning();
-    credits = created;
+  if (credits) {
+    return credits;
   }
 
-  return credits;
+  const [created] = await tx
+    .insert(userCredits)
+    .values({
+      userId,
+      balance: "0",
+      totalPurchased: "0",
+      totalSpent: "0",
+    })
+    .onConflictDoNothing({ target: userCredits.userId })
+    .returning();
+
+  if (created) {
+    return created;
+  }
+
+  return tx.query.userCredits.findFirst({ where: eq(userCredits.userId, userId) });
 }
 
 async function replaceVoucherAssignments(tx: DbTransaction, voucherId: string, userIds: string[]) {
@@ -212,19 +218,30 @@ async function assertVoucherCanBeRedeemed(tx: DbTransaction, voucher: VoucherRec
 
 async function addVoucherCredits(tx: DbTransaction, userId: string, voucher: VoucherRecord) {
   const credits = await getOrInitializeCredits(userId, tx);
-  const newBalance = parseFloat(credits.balance) + voucher.creditAmount;
+  const currentBalance = parseFloat(credits.balance);
+  const newBalance = currentBalance + voucher.creditAmount;
 
   if (newBalance > billingConfig.maxCredits) {
     throw new Error(`Cannot exceed maximum credits limit of ${billingConfig.maxCredits}`);
   }
 
-  await tx
+  const [updated] = await tx
     .update(userCredits)
     .set({
-      balance: newBalance.toString(),
+      balance: sql`${userCredits.balance} + ${voucher.creditAmount}`,
       updatedAt: new Date(),
     })
-    .where(eq(userCredits.userId, userId));
+    .where(and(
+      eq(userCredits.userId, userId),
+      sql`${userCredits.balance} + ${voucher.creditAmount} <= ${billingConfig.maxCredits}`,
+    ))
+    .returning({ balanceAfter: userCredits.balance });
+
+  if (!updated) {
+    throw new Error(`Cannot exceed maximum credits limit of ${billingConfig.maxCredits}`);
+  }
+
+  const balanceAfter = Number(updated.balanceAfter);
 
   await tx.insert(creditTransactions).values({
     userId,
@@ -233,11 +250,11 @@ async function addVoucherCredits(tx: DbTransaction, userId: string, voucher: Vou
     description: `Voucher redeemed: ${voucher.code}`,
     referenceType: "voucher",
     referenceId: voucher.id,
-    balanceAfter: newBalance.toString(),
+    balanceAfter: balanceAfter.toString(),
     metadata: { code: voucher.code },
   });
 
-  return newBalance;
+  return balanceAfter;
 }
 
 async function reserveVoucherRedemption(tx: DbTransaction, userId: string, voucher: VoucherRecord) {

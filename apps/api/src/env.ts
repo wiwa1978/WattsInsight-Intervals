@@ -9,6 +9,12 @@ const emptyToUndefined = <TSchema extends z.ZodTypeAny>(schema: TSchema) =>
     return value;
   }, schema.optional());
 
+const placeholderSecrets = new Set([
+  "replace-with-strong-secret",
+  "changeme",
+  "change-me",
+]);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().int().positive().default(8787),
@@ -24,6 +30,7 @@ const envSchema = z.object({
   ADMIN_ALLOWLIST: z.string().optional(),
   ADMIN_APP_URL: z.string().url().optional(),
   ADMIN_BAN_SECRET: z.string().optional(),
+  TRUST_PROXY: z.coerce.boolean().default(false),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
@@ -38,6 +45,40 @@ const envSchema = z.object({
   JWT_AUDIENCE: z.string().default("mobile-clients"),
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(2592000),
+}).superRefine((value, ctx) => {
+  if (value.NODE_ENV !== "production") return;
+
+  for (const key of ["BETTER_AUTH_SECRET", "JWT_SECRET"] as const) {
+    if (placeholderSecrets.has(value[key]) || value[key].length < 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `${key} must be a non-placeholder production secret with at least 32 characters`,
+      });
+    }
+  }
+
+  for (const key of ["APP_URL", "API_URL"] as const) {
+    if (new URL(value[key]).protocol !== "https:") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `${key} must use https in production`,
+      });
+    }
+  }
+
+  if (value.DODO_PAYMENTS_ENVIRONMENT === "live_mode") {
+    for (const key of ["DODO_PAYMENTS_API_KEY", "DODO_PAYMENTS_WEBHOOK_SECRET"] as const) {
+      if (!value[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required for live payments`,
+        });
+      }
+    }
+  }
 });
 
 const parsed = envSchema.safeParse(process.env);

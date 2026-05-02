@@ -3,11 +3,10 @@ import { cors } from "hono/cors";
 import type { AppEnv } from "../context";
 import { env } from "../env";
 
-const allowedCorsOrigins = new Set(
+const publicCorsOrigins = new Set(
   [
     env.APP_URL,
     env.API_URL,
-    ...(env.ADMIN_APP_URL ? [env.ADMIN_APP_URL] : []),
     ...(env.BETTER_AUTH_ALLOWED_ORIGINS
       ?.split(",")
       .map((item) => item.trim())
@@ -15,11 +14,23 @@ const allowedCorsOrigins = new Set(
   ],
 );
 
+const adminCorsOrigins = new Set(env.ADMIN_APP_URL ? [env.ADMIN_APP_URL] : []);
 const appUrlHostname = new URL(env.APP_URL).hostname;
 
-function isAllowedCorsOrigin(origin: string) {
-  if (allowedCorsOrigins.has(origin)) {
+function isAdminPath(path: string) {
+  return path === "/admin" || path.startsWith("/admin/") || path.startsWith("/auth/admin/");
+}
+
+function isAllowedCorsOrigin(origin: string, path: string) {
+  const adminPath = isAdminPath(path);
+  const allowedOrigins = adminPath ? adminCorsOrigins : publicCorsOrigins;
+
+  if (allowedOrigins.has(origin)) {
     return true;
+  }
+
+  if (adminPath) {
+    return false;
   }
 
   if (env.NODE_ENV !== "production") {
@@ -41,12 +52,12 @@ function isAllowedCorsOrigin(origin: string) {
 }
 
 export const corsMiddleware = cors({
-  origin: (origin) => {
+  origin: (origin, c) => {
     if (!origin) {
-      return env.APP_URL;
+      return isAdminPath(c.req.path) ? (env.ADMIN_APP_URL ?? null) : env.APP_URL;
     }
 
-    return isAllowedCorsOrigin(origin) ? origin : null;
+    return isAllowedCorsOrigin(origin, c.req.path) ? origin : null;
   },
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowHeaders: [

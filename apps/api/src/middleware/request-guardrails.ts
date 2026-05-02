@@ -3,6 +3,7 @@ import type { MiddlewareHandler } from "hono";
 import { errorCode } from "@platform/contracts/wire";
 
 import type { AppEnv } from "../context";
+import { env } from "../env";
 
 type RateLimitRule = {
   windowMs: number;
@@ -19,6 +20,34 @@ type RouteGuardrail = {
 const KIB = 1024;
 const DEFAULT_JSON_BODY_BYTES = 64 * KIB;
 const DEFAULT_WEBHOOK_BODY_BYTES = 256 * KIB;
+const JSON_BODY_METHODS = new Set(["POST", "PUT", "PATCH"]);
+const jsonBodyRoutes = [
+  /^\/auth\/sign-in\/email$/,
+  /^\/auth\/mobile\/token$/,
+  /^\/auth\/mobile\/refresh$/,
+  /^\/auth\/mobile\/revoke$/,
+  /^\/payments\/checkout$/,
+  /^\/me\/credits\/consume$/,
+  /^\/me\/credits\/invoice$/,
+  /^\/me\/subscription\/invoice$/,
+  /^\/me\/vouchers\/redeem$/,
+  /^\/me\/notifications\/[^/]+\/read$/,
+  /^\/logs\/client$/,
+  /^\/admin\/step-up\/complete$/,
+  /^\/admin\/verify-ban-secret$/,
+  /^\/admin\/users\/set-role$/,
+  /^\/admin\/users\/unban$/,
+  /^\/admin\/users\/ban$/,
+  /^\/admin\/users\/impersonate$/,
+  /^\/admin\/users\/revoke-sessions$/,
+  /^\/admin\/users\/set-password$/,
+  /^\/admin\/users\/[^/]+\/credits\/adjust$/,
+  /^\/admin\/discounts(?:\/.*)?$/,
+  /^\/admin\/vouchers(?:\/.*)?$/,
+  /^\/admin\/notifications\/send-all$/,
+  /^\/admin\/notifications\/send-users$/,
+  /^\/auth\/admin\/stop-impersonating$/,
+];
 
 const routeGuardrails: RouteGuardrail[] = [
   { method: "POST", pattern: /^\/auth\/sign-in\/email$/, maxBodyBytes: 8 * KIB, rateLimit: { windowMs: 60_000, max: 20 } },
@@ -29,21 +58,34 @@ const routeGuardrails: RouteGuardrail[] = [
   { method: "POST", pattern: /^\/payments\/webhooks\/dodo$/, maxBodyBytes: DEFAULT_WEBHOOK_BODY_BYTES },
   { method: "POST", pattern: /^\/me\/vouchers\/redeem$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 20 } },
   { method: "POST", pattern: /^\/logs\/client$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 30 } },
+  { method: "POST", pattern: /^\/admin\/step-up\/complete$/, maxBodyBytes: 2 * KIB, rateLimit: { windowMs: 60_000, max: 5 } },
+  { method: "POST", pattern: /^\/admin\/verify-ban-secret$/, maxBodyBytes: 2 * KIB, rateLimit: { windowMs: 60_000, max: 5 } },
+  { method: "POST", pattern: /^\/admin\/users\/ban$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 5 } },
+  { method: "POST", pattern: /^\/admin\/users\/set-password$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 10 } },
+  { method: "POST", pattern: /^\/admin\/users\/impersonate$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 10 } },
 ];
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
 function getClientIp(c: Parameters<MiddlewareHandler<AppEnv>>[0]) {
-  const forwardedFor = c.req.header("x-forwarded-for");
-  if (forwardedFor) {
-    return forwardedFor.split(",")[0]?.trim() || "unknown";
+  if (env.TRUST_PROXY) {
+    const forwardedFor = c.req.header("x-forwarded-for");
+    if (forwardedFor) {
+      return forwardedFor.split(",")[0]?.trim() || "unknown";
+    }
+
+    return c.req.header("x-real-ip") ?? "unknown";
   }
 
-  return c.req.header("x-real-ip") ?? "unknown";
+  return "unknown";
 }
 
 function findGuardrail(method: string, path: string) {
   return routeGuardrails.find((guardrail) => guardrail.method === method && guardrail.pattern.test(path));
+}
+
+function expectsJsonBody(method: string, path: string) {
+  return JSON_BODY_METHODS.has(method) && jsonBodyRoutes.some((pattern) => pattern.test(path));
 }
 
 function checkRateLimit(key: string, rule: RateLimitRule) {
@@ -126,6 +168,15 @@ export const requestGuardrails: MiddlewareHandler<AppEnv> = async (c, next) => {
   const contentType = c.req.header("content-type") ?? "";
   const guardrail = findGuardrail(method, c.req.path);
   const maxBodyBytes = guardrail?.maxBodyBytes ?? (method === "POST" && contentType.includes("application/json") ? DEFAULT_JSON_BODY_BYTES : undefined);
+
+  if (expectsJsonBody(method, c.req.path)) {
+    const isWebhook = c.req.path === "/payments/webhooks/dodo";
+    const hasJsonBody = contentType.includes("application/json");
+
+    if (!isWebhook && !hasJsonBody) {
+      return c.json({ success: false, error: "Unsupported content type" }, 415);
+    }
+  }
 
   if (maxBodyBytes !== undefined && method !== "GET" && method !== "HEAD") {
     const contentLengthHeader = c.req.header("content-length");

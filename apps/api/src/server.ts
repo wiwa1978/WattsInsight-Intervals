@@ -6,7 +6,7 @@ import { app } from "./app";
 import { env } from "./env";
 import { logger } from "./observability/logger";
 
-serve(
+const server = serve(
   {
     fetch: app.fetch,
     port: env.PORT,
@@ -15,3 +15,16 @@ serve(
     logger.info({ port: info.port }, `API server listening on http://localhost:${info.port}`);
   },
 );
+
+function shutdown(signal: string) {
+  logger.info({ signal }, "api.server.shutdown");
+  server.close(() => {
+    logger.info("api.server.closed");
+    process.exit(0);
+  });
+
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

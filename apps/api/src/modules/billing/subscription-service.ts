@@ -4,6 +4,7 @@ import { subscriptionEvents, subscriptionPayments, type SubscriptionStatus, user
 
 import { subscriptionPlans } from "../../config/billing";
 import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
+import { redactLogValue } from "../../observability/redaction";
 
 type SubscriptionServiceDeps = {
   db: any;
@@ -143,25 +144,18 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       currency: input.pricing.currency,
     };
 
-    const [payment] = await deps.db
-      .insert(subscriptionPayments)
-      .values({
-        userId: input.userId,
-        planKey: input.planKey,
-        dodoCustomerId: input.dodoCustomerId ?? null,
-        dodoSubscriptionId: input.dodoSubscriptionId ?? null,
-        paymentId: input.paymentId,
-        paymentStatus: input.paymentStatus,
-        priceExclVat: input.pricing.priceExclVat,
-        priceInclVat: input.pricing.priceInclVat,
-        vatAmount: input.pricing.vatAmount,
-        currency: input.pricing.currency,
-        paymentSnapshot,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [subscriptionPayments.paymentProvider, subscriptionPayments.paymentId],
-        set: {
+    return deps.db.transaction(async (tx: any) => {
+      const existing = await tx.query.subscriptionPayments.findFirst({
+        where: eq(subscriptionPayments.paymentId, input.paymentId),
+      });
+
+      if (existing && existing.userId !== input.userId) {
+        throw new Error(`Payment ${input.paymentId} is already associated with another user`);
+      }
+
+      const [payment] = await tx
+        .insert(subscriptionPayments)
+        .values({
           userId: input.userId,
           planKey: input.planKey,
           dodoCustomerId: input.dodoCustomerId ?? null,
@@ -173,11 +167,25 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
           currency: input.pricing.currency,
           paymentSnapshot,
           updatedAt: now,
-        },
-      })
-      .returning();
+        })
+        .onConflictDoUpdate({
+          target: [subscriptionPayments.paymentProvider, subscriptionPayments.paymentId],
+          set: {
+            paymentStatus: input.paymentStatus,
+            dodoCustomerId: input.dodoCustomerId ?? existing?.dodoCustomerId ?? null,
+            dodoSubscriptionId: input.dodoSubscriptionId ?? existing?.dodoSubscriptionId ?? null,
+            priceExclVat: input.pricing.priceExclVat,
+            priceInclVat: input.pricing.priceInclVat,
+            vatAmount: input.pricing.vatAmount,
+            currency: input.pricing.currency,
+            paymentSnapshot,
+            updatedAt: now,
+          },
+        })
+        .returning();
 
-    return payment;
+      return payment;
+    });
   }
 
   async function listUserSubscriptionPayments(userId: string, limit = 50) {
@@ -320,7 +328,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       dodoSubscriptionId: input.dodoSubscriptionId ?? null,
       eventType: input.eventType,
       status: input.status ? normalizeSubscriptionStatus(input.status) : null,
-      payload: input.payload ?? null,
+      payload: redactLogValue(input.payload) ?? null,
     });
   }
 

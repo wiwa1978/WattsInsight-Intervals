@@ -20,6 +20,9 @@
     "./query-keys": "./src/query-keys.ts",
     "./url": "./src/url.ts"
   },
+  "dependencies": {
+    "@platform/contracts": "*"
+  },
   "peerDependencies": {
     "@tanstack/react-query": "*",
     "next": "*",

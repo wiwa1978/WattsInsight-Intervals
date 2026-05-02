@@ -1,6 +1,8 @@
 node_modules
 .worktrees/
 /logs/
+/runtime-logs/
+runtime-logs/
 reports/
 apps/*/runtime-logs/
 apps/*/tests/.reports/

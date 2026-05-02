@@ -1391,6 +1391,64 @@ describe("API functional routes", () => {
     expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
   });
 
+  it("blocks impersonating administrator accounts", async () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+    mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "admin", banned: false });
+
+    const res = await app.request("/admin/users/impersonate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "FORBIDDEN",
+    });
+    expect(mocks.adminAuthApi.impersonateUser).not.toHaveBeenCalled();
+  });
+
+  it("blocks impersonating self or banned users", async () => {
+    const selfId = "11111111-1111-4111-8111-111111111111";
+    const bannedUserId = "22222222-2222-4222-8222-222222222222";
+    mocks.adminService.getUserById.mockResolvedValueOnce({ id: selfId, role: "user", banned: false });
+    mocks.adminService.getUserById.mockResolvedValueOnce({ id: bannedUserId, role: "user", banned: true });
+
+    const selfRes = await app.request("/admin/users/impersonate", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-auth-user-id": selfId },
+      body: JSON.stringify({ userId: selfId }),
+    });
+    const bannedRes = await app.request("/admin/users/impersonate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId: bannedUserId }),
+    });
+
+    expect(selfRes.status).toBe(403);
+    expect(bannedRes.status).toBe(403);
+    expect(mocks.adminAuthApi.impersonateUser).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when critical admin auth audit recording fails", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminAuthApi.revokeUserSessions.mockResolvedValue({ success: true });
+    mocks.auditService.recordAuditEntry.mockResolvedValueOnce({ success: false, error: "Failed to record audit entry" });
+
+    const res = await app.request("/admin/users/revoke-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    expect(res.status).toBe(503);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: "Audit logging unavailable",
+    });
+  });
+
   it("records audit entries for admin auth mutations", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
     mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
@@ -1509,14 +1567,14 @@ describe("API functional routes", () => {
     const auditPayloads = mocks.auditService.recordAuditEntry.mock.calls.map(([payload]) => payload);
     expect(JSON.stringify(auditPayloads)).not.toContain("raw-admin-token");
 
-    mocks.auditService.recordAuditEntry.mockRejectedValueOnce(new Error("audit unavailable"));
+    mocks.auditService.recordAuditEntry.mockResolvedValueOnce({ success: false, error: "Failed to record audit entry" });
     const auditFailureRes = await app.request("/admin/users/revoke-sessions", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ userId }),
     });
 
-    expect(auditFailureRes.status).toBe(200);
+    expect(auditFailureRes.status).toBe(503);
   });
 
   it("rejects unsupported absolute admin ban expiry without auditing it", async () => {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { auditEntries } from "@platform/platform-db";
 
-import { createAuditService } from "../../../src/modules/audit/service";
+import { createAuditService, getAuditRequestContext } from "../../../src/modules/audit/service";
 
 describe("createAuditService", () => {
   it("records sanitized audit entries", async () => {
@@ -71,5 +71,33 @@ describe("createAuditService", () => {
       { id: "audit-1", action: "notification.send_all" },
     ]);
     expect(limit).toHaveBeenCalledWith(100);
+  });
+
+  it("attributes impersonated requests to the original admin actor", () => {
+    const context = {
+      get: vi.fn((key: string) => {
+        if (key === "authUser") return { id: "impersonated-user" };
+        if (key === "authSession") return { impersonatedBy: "admin-user" };
+        if (key === "requestId") return "req-1";
+        return null;
+      }),
+      req: {
+        header: vi.fn((key: string) => {
+          if (key === "user-agent") return "Vitest";
+          return null;
+        }),
+      },
+    };
+
+    expect(getAuditRequestContext(context as any)).toEqual({
+      actorId: "admin-user",
+      requestId: "req-1",
+      ip: null,
+      userAgent: "Vitest",
+      metadata: {
+        impersonatedBy: "admin-user",
+        subjectId: "impersonated-user",
+      },
+    });
   });
 });

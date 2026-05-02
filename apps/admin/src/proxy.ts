@@ -8,9 +8,9 @@ import { getPathLocale } from "./i18n/path-locale";
 import { getSessionCookie } from "better-auth/cookies";
 
 function getMainAppLoginUrl(locale: string) {
-  const base = process.env.NEXT_PUBLIC_MAIN_APP_URL || process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APP_URL || "";
-  const normalized = base.replace(/\/$/, "");
-  return `${normalized}/${locale}/login?reason=forbidden-admin`;
+  const base = process.env.NEXT_PUBLIC_MAIN_APP_URL;
+  if (!base) return `/${locale}/login?reason=forbidden-admin`;
+  return `${base.replace(/\/$/, "")}/${locale}/login?reason=forbidden-admin`;
 }
 
 const intlMiddleware = createMiddleware(routing);
@@ -38,7 +38,12 @@ export async function proxy(request: NextRequest) {
     const headers = new Headers();
     headers.set("cookie", request.headers.get("cookie") || "");
 
-    const sessionUrl = `${(process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "")}/admin/status`;
+    const apiBaseUrl = process.env.API_URL;
+    if (!apiBaseUrl) {
+      return NextResponse.redirect(getMainAppLoginUrl(activeLocale));
+    }
+
+    const sessionUrl = `${apiBaseUrl.replace(/\/$/, "")}/admin/status`;
     try {
       const res = await fetch(sessionUrl, { headers, cache: "no-store" });
       if (!res.ok) {

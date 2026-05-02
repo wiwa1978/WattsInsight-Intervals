@@ -234,6 +234,53 @@ describe("bearer-token auth lifecycle gate", () => {
   });
 });
 
+describe("cookie-session auth lifecycle gate", () => {
+  beforeEach(() => {
+    mocks.getSession.mockReset();
+    mocks.signInEmail.mockReset();
+  });
+
+  it("uses the persisted user instead of stale session user fields", async () => {
+    mocks.getSession.mockResolvedValue({
+      user: { id: baseUser.id, role: "admin", email: "stale-admin@example.com" },
+      session: { id: "session-1" },
+    });
+    const { app } = buildApp({ findById: () => ({ ...baseUser, role: "user", email: "fresh-user@example.com" }) });
+
+    const res = await app.request("/session/me", {
+      headers: { cookie: "better-auth.session_token=session-token" },
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        id: baseUser.id,
+        role: "user",
+        email: "fresh-user@example.com",
+      },
+    });
+  });
+
+  it("rejects cookie sessions whose user no longer exists", async () => {
+    mocks.getSession.mockResolvedValue({
+      user: { id: baseUser.id, role: "admin", email: "stale-admin@example.com" },
+      session: { id: "session-1" },
+    });
+    const { app } = buildApp({ findById: () => null });
+
+    const res = await app.request("/session/me", {
+      headers: { cookie: "better-auth.session_token=session-token" },
+    });
+
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      errorCode: "UNAUTHORIZED",
+    });
+  });
+});
+
 describe("POST /auth/mobile/refresh lifecycle gate", () => {
   beforeEach(() => {
     mocks.getSession.mockReset();

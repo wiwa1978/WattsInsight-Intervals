@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -91,7 +92,10 @@ export const account = pgTable(
     createdAt,
     updatedAt,
   },
-  (table) => [index("account_userId_idx").on(table.userId)],
+  (table) => [
+    index("account_userId_idx").on(table.userId),
+    uniqueIndex("account_provider_account_unique_idx").on(table.providerId, table.accountId),
+  ],
 );
 
 export const verification = pgTable(
@@ -142,7 +146,7 @@ export const passkey = pgTable(
   },
   (table) => [
     index("passkey_userId_idx").on(table.userId),
-    index("passkey_credentialID_idx").on(table.credentialID),
+    uniqueIndex("passkey_credential_id_unique_idx").on(table.credentialID),
   ],
 );
 

@@ -1,6 +1,6 @@
 import type { NormalizedPaymentEvent, PaymentEventHandler } from "@platform/payments-core";
 
-import type { creditPackages as CreditPackagesList } from "../../config/billing";
+import { subscriptionPlans, type creditPackages as CreditPackagesList } from "../../config/billing";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled } from "../../lib/feature-guards";
 import type { CheckoutIntentRecord, CheckoutIntentsService } from "./checkout-intents";
 import { isDodoSubscriptionWebhookEvent } from "./subscription-webhooks";
@@ -263,6 +263,11 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
 
       if (checkoutIntentValidation.duplicateCompleted) {
         return;
+      }
+
+      const matchedPlan = subscriptionPlans.find((item) => item.key === planKey);
+      if (!matchedPlan || matchedPlan.productId !== event.productId) {
+        throw new Error(`Refusing payment ${event.paymentId}: unknown subscription plan.`);
       }
 
       await deps.subscriptions?.recordSubscriptionPayment?.({

@@ -127,7 +127,19 @@ export function createAuthModule(options: AuthModuleOptions) {
         }
       | null;
 
-    return session;
+    if (!session?.user?.id) {
+      return session;
+    }
+
+    const persistedUser = await options.users.findById(session.user.id);
+    if (!persistedUser) {
+      return null;
+    }
+
+    return {
+      user: persistedUser,
+      session: session.session ?? null,
+    };
   });
   const requireAdminAccess = createRequireAdminAccess({
     allowlist: options.admin.allowlist,
