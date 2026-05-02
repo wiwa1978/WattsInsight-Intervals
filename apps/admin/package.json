@@ -18,6 +18,7 @@
   "dependencies": {
     "@platform/auth-client": "*",
     "@platform/auth-shared": "*",
+    "@platform/contracts": "*",
     "@platform/frontend-shared": "*",
     "@better-auth/passkey": "^1.4.9",
     "@dodopayments/better-auth": "^1.4.2",

@@ -106,6 +106,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function mergeAuditMetadata(base: unknown, extra: unknown) {
+  if (base === undefined) return extra;
+  if (extra === undefined) return base;
+  if (isRecord(base) && isRecord(extra)) {
+    return { ...base, ...extra };
+  }
+  return { requestMetadata: base, routeMetadata: extra };
+}
+
 function stringValue(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
 }
@@ -157,7 +166,9 @@ function resultField(result: unknown, field: string) {
 
 function resultError(result: unknown, fallback: string) {
   const error = resultField(result, "error");
-  return typeof error === "string" ? error : fallback;
+  if (typeof error === "string") return error;
+  if (isRecord(error) && typeof error.message === "string") return error.message;
+  return fallback;
 }
 
 function safeErrorMessage(error: unknown, fallback: string) {
@@ -343,15 +354,22 @@ export function createAdminRouter() {
   }
 
   async function recordAdminAuthAudit<T>(c: AdminContext, body: T, details: AdminAuthAuditDetails<T>) {
-    await bootstrap.auditService.recordAuditEntry({
-      ...getAuditRequestContext(c),
+    const requestContext = getAuditRequestContext(c);
+    const result = await bootstrap.auditService.recordAuditEntry({
+      ...requestContext,
       action: details.action,
       outcome: "success",
       targetType: details.targetType,
       targetId: details.targetId(body),
       after: details.after?.(body),
-      metadata: details.metadata?.(body),
-    }).catch(() => undefined);
+      metadata: mergeAuditMetadata(requestContext.metadata, details.metadata?.(body)),
+    }).catch(() => ({ success: false as const }));
+
+    if (!result.success) {
+      return c.json({ success: false, error: "Audit logging unavailable" }, 503);
+    }
+
+    return null;
   }
 
   async function recordMutationAudit(
@@ -366,10 +384,18 @@ export function createAdminRouter() {
       metadata?: unknown;
     },
   ) {
-    await bootstrap.auditService.recordAuditEntry({
-      ...getAuditRequestContext(c),
+    const requestContext = getAuditRequestContext(c);
+    const result = await bootstrap.auditService.recordAuditEntry({
+      ...requestContext,
       ...input,
-    }).catch(() => undefined);
+      metadata: mergeAuditMetadata(requestContext.metadata, input.metadata),
+    }).catch(() => ({ success: false as const }));
+
+    if (!result.success) {
+      return c.json({ success: false, error: "Audit logging unavailable" }, 503);
+    }
+
+    return null;
   }
 
   function blockIfSelfRoleChange(c: AdminContext, targetUserId: string, targetUser: AdminUserGovernanceRecord, nextRole: string) {
@@ -434,7 +460,8 @@ export function createAdminRouter() {
       return withJsonBody(c, schema, errorMessage, async (body) => {
         const result = await action(body, c.req.raw.headers);
         if (auditDetails && isSuccessfulMutationResult(result)) {
-          await recordAdminAuthAudit(c, body, auditDetails);
+          const auditFailure = await recordAdminAuthAudit(c, body, auditDetails);
+          if (auditFailure) return auditFailure;
         }
         return c.json(result);
       });
@@ -455,7 +482,8 @@ export function createAdminRouter() {
         const jsonResponse = await createJsonResponseFromAuthResponse(response, fallbackError);
         const payload = await jsonResponse.clone().json().catch(() => null);
         if (auditDetails && jsonResponse.ok && isSuccessfulMutationResult(payload)) {
-          await recordAdminAuthAudit(c, body, auditDetails);
+          const auditFailure = await recordAdminAuthAudit(c, body, auditDetails);
+          if (auditFailure) return auditFailure;
         }
         return jsonResponse;
       });
@@ -637,12 +665,13 @@ export function createAdminRouter() {
             logger.warn("Failed to revoke user sessions after admin role change", { userId: body.userId, error });
           });
         }
-        await recordAdminAuthAudit(c, body, {
+        const auditFailure = await recordAdminAuthAudit(c, body, {
           action: "admin.user.set_role",
           targetType: "user",
           targetId: (body) => body.userId,
           after: (body) => ({ role: body.role }),
         });
+        if (auditFailure) return auditFailure;
       }
       return c.json(result);
     });
@@ -671,35 +700,59 @@ export function createAdminRouter() {
       const { secret: _secret, ...banBody } = body;
       const result = await requireAdminAuthApi().banUser({ body: banBody, headers: c.req.raw.headers });
       if (isSuccessfulMutationResult(result)) {
-        await recordAdminAuthAudit(c, banBody, {
+        const auditFailure = await recordAdminAuthAudit(c, banBody, {
           action: "admin.user.ban",
           targetType: "user",
           targetId: (body) => body.userId,
           after: (body) => ({ banned: true, ...body }),
         });
+        if (auditFailure) return auditFailure;
       }
       return c.json(result);
     });
   });
 
-  registerAdminAuthResponseAction(
-    "/users/impersonate",
-    userOnlySchema,
-    "Invalid impersonation payload",
-    "Impersonation failed",
-    async (body, headers) => {
-      return (await requireAdminAuthApi().impersonateUser({
+  router.post("/users/impersonate", (c) => {
+    return withJsonBody(c, userOnlySchema, "Invalid impersonation payload", async (body) => {
+      const actor = getAuthUser(c);
+      const targetUser = await bootstrap.adminService.getUserById(body.userId);
+
+      if (!targetUser) {
+        return c.json({ success: false, error: "User not found" }, 404);
+      }
+
+      if (actor.id === body.userId) {
+        return forbidden(c, "You cannot impersonate yourself.");
+      }
+
+      if (targetUser.banned) {
+        return forbidden(c, "Cannot impersonate a banned user.");
+      }
+
+      if (targetUser.role === "admin") {
+        return forbidden(c, "Administrator accounts cannot be impersonated.");
+      }
+
+      const response = (await requireAdminAuthApi().impersonateUser({
         body,
-        headers,
+        headers: c.req.raw.headers,
         asResponse: true,
       })) as Response;
-    },
-    {
-      action: "admin.impersonation.start",
-      targetType: "user",
-      targetId: (body) => body.userId,
-    },
-  );
+      const jsonResponse = await createJsonResponseFromAuthResponse(response, "Impersonation failed");
+      const payload = await jsonResponse.clone().json().catch(() => null);
+
+      if (jsonResponse.ok && isSuccessfulMutationResult(payload)) {
+        const auditFailure = await recordAdminAuthAudit(c, body, {
+          action: "admin.impersonation.start",
+          targetType: "user",
+          targetId: (body) => body.userId,
+        });
+        if (auditFailure) return auditFailure;
+      }
+
+      return jsonResponse;
+    });
+  });
 
   registerAdminAuthJsonAction("/users/revoke-sessions", userOnlySchema, "Invalid session revoke payload", (body, headers) => {
     return requireAdminAuthApi().revokeUserSessions({ body, headers });
@@ -1127,7 +1180,7 @@ export function createAdminRouter() {
     const discount = resultField(result, "discount");
     const discountSummary = safeDiscountSummary(discount);
 
-    await recordMutationAudit(c, {
+    const auditFailure = await recordMutationAudit(c, {
       action: "discount.create",
       outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
       targetType: "discount",
@@ -1137,6 +1190,7 @@ export function createAdminRouter() {
         ? { code: discountSummary?.code ?? null }
         : { error: resultError(result, "Discount create failed") },
     });
+    if (auditFailure) return auditFailure;
 
     return c.json(result, result.success ? 200 : 400);
   });
@@ -1173,7 +1227,7 @@ export function createAdminRouter() {
         const discountSummary = safeDiscountSummary(discount);
         const previousDiscountSummary = safeDiscountSummary(previousDiscount);
 
-        await recordMutationAudit(c, {
+        const auditFailure = await recordMutationAudit(c, {
           action: "discount.update",
           outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
           targetType: "discount",
@@ -1184,6 +1238,7 @@ export function createAdminRouter() {
             ? { code: discountSummary?.code ?? null }
             : { error: resultError(result, "Discount update failed") },
         });
+        if (auditFailure) return auditFailure;
 
         return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
       });
@@ -1209,7 +1264,7 @@ export function createAdminRouter() {
       const previousDiscount = resultField(result, "previousDiscount");
       const previousDiscountSummary = safeDiscountSummary(previousDiscount);
 
-      await recordMutationAudit(c, {
+      const auditFailure = await recordMutationAudit(c, {
         action: "discount.delete",
         outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
         targetType: "discount",
@@ -1219,6 +1274,7 @@ export function createAdminRouter() {
           ? { code: previousDiscountSummary?.code ?? null }
           : { error: resultError(result, "Discount delete failed") },
       });
+      if (auditFailure) return auditFailure;
 
       return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
     });
@@ -1291,7 +1347,7 @@ export function createAdminRouter() {
     const voucher = resultField(result, "voucher");
     const voucherSummary = safeVoucherSummary(voucher);
 
-    await recordMutationAudit(c, {
+    const auditFailure = await recordMutationAudit(c, {
       action: "voucher.create",
       outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
       targetType: "voucher",
@@ -1301,6 +1357,7 @@ export function createAdminRouter() {
         ? { code: voucherSummary?.code ?? null }
         : { error: resultError(result, "Voucher create failed") },
     });
+    if (auditFailure) return auditFailure;
 
     return c.json(result, result.success ? 200 : 400);
   });
@@ -1331,7 +1388,7 @@ export function createAdminRouter() {
         const voucherSummary = safeVoucherSummary(voucher);
         const previousVoucherSummary = safeVoucherSummary(previousVoucher);
 
-        await recordMutationAudit(c, {
+        const auditFailure = await recordMutationAudit(c, {
           action: "voucher.update",
           outcome: isSuccessfulMutationResult(result) ? "success" : "failure",
           targetType: "voucher",
@@ -1342,6 +1399,7 @@ export function createAdminRouter() {
             ? { code: voucherSummary?.code ?? null }
             : { error: resultError(result, "Voucher update failed") },
         });
+        if (auditFailure) return auditFailure;
 
         return c.json(publicMutationResult(result, ["previousVoucher"]), result.success ? 200 : 400);
       });

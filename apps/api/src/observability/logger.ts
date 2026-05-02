@@ -22,6 +22,15 @@ const MAX_SERIALIZE_DEPTH = 5;
 const MAX_SERIALIZE_ARRAY_LENGTH = 25;
 const MAX_SERIALIZE_KEYS = 50;
 const MAX_SERIALIZE_STRING_LENGTH = 1000;
+const levelPriority = {
+  trace: 10,
+  debug: 20,
+  info: 30,
+  warn: 40,
+  error: 50,
+  fatal: 60,
+  silent: 99,
+} as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -108,7 +117,7 @@ function normalizeArgs(arg1?: unknown, arg2?: unknown) {
 
 function resolveLogDirectory() {
   if (!env.LOG_FILE_PATH) {
-    return path.resolve(process.cwd(), "runtime-logs");
+    return null;
   }
 
   const resolved = path.resolve(env.LOG_FILE_PATH);
@@ -116,6 +125,11 @@ function resolveLogDirectory() {
 }
 
 const logDirectory = resolveLogDirectory();
+let logDirReady = false;
+
+function shouldLog(level: LogLevel) {
+  return levelPriority[level] >= levelPriority[env.LOG_LEVEL];
+}
 
 function getLogFileName(stream: LogStream, date = new Date()) {
   const day = date.toISOString().slice(0, 10);
@@ -123,10 +137,35 @@ function getLogFileName(stream: LogStream, date = new Date()) {
 }
 
 function getLogFilePath(stream: LogStream, date = new Date()) {
+  if (!logDirectory) {
+    throw new Error("File logging is disabled");
+  }
+
   return path.join(logDirectory, getLogFileName(stream, date));
 }
 
+async function writeFileEntry(stream: LogStream, line: string) {
+  if (!logDirectory) return;
+
+  try {
+    if (!logDirReady) {
+      await fs.promises.mkdir(logDirectory, { recursive: true });
+      logDirReady = true;
+    }
+
+    await fs.promises.appendFile(getLogFilePath(stream), line, "utf8");
+  } catch (error) {
+    console.error(JSON.stringify({
+      level: "error",
+      message: "log.write.failed",
+      error: error instanceof Error ? error.message : String(error),
+    }));
+  }
+}
+
 function writeEntry(stream: LogStream, level: LogLevel, arg1?: unknown, arg2?: unknown) {
+  if (!shouldLog(level)) return;
+
   const { message, metadata } = normalizeArgs(arg1, arg2);
   const entry = {
     id: randomUUID(),
@@ -141,8 +180,7 @@ function writeEntry(stream: LogStream, level: LogLevel, arg1?: unknown, arg2?: u
 
   const line = `${JSON.stringify(entry)}\n`;
 
-  fs.mkdirSync(logDirectory, { recursive: true });
-  fs.appendFileSync(getLogFilePath(stream), line, "utf8");
+  void writeFileEntry(stream, line);
 
   if (level === "error") {
     console.error(line.trim());
@@ -160,7 +198,7 @@ function getExpectedPatternForStream(stream: LogStream) {
 }
 
 function listLogFiles(stream: LogStream) {
-  if (!fs.existsSync(logDirectory)) {
+  if (!logDirectory || !fs.existsSync(logDirectory)) {
     return {
       files: [] as string[],
       selectedFile: null,
@@ -201,6 +239,13 @@ function readTail(filePath: string) {
 }
 
 function readLogEntries(input: ReadLogEntriesInput) {
+  if (!logDirectory) {
+    return {
+      file: null,
+      entries: [] as Array<Record<string, unknown>>,
+    };
+  }
+
   const stream = input.stream ?? "app";
   const available = listLogFiles(stream);
   const selectedFile = input.file ?? available.selectedFile;

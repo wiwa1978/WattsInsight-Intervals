@@ -1,19 +1,22 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import * as schema from "@platform/platform-db";
 
 const {
   account,
   auditEntries,
+  checkoutIntents,
   creditPurchases,
   creditTransactions,
   notification,
   session,
+  subscriptionPayments,
   user,
   userCredits,
   userDataExportRequests,
+  userSubscriptions,
   userDiscounts,
   voucherAssignments,
   voucherRedemptions,
@@ -104,6 +107,9 @@ export function buildUserDataExport(input: {
   voucherAssignments: Record<string, unknown>[];
   voucherRedemptions: Record<string, unknown>[];
   discountAssignments: Record<string, unknown>[];
+  subscriptions: Record<string, unknown>[];
+  subscriptionPayments: Record<string, unknown>[];
+  checkoutIntents: Record<string, unknown>[];
   auditReferences: Record<string, unknown>[];
 }) {
   return {
@@ -144,6 +150,11 @@ export function buildUserDataExport(input: {
     },
     discounts: {
       assignments: input.discountAssignments,
+    },
+    subscriptions: {
+      subscriptions: input.subscriptions,
+      payments: input.subscriptionPayments,
+      checkoutIntents: input.checkoutIntents,
     },
     auditReferences: input.auditReferences.map(sanitizeAuditReference),
   };
@@ -203,6 +214,15 @@ export function createPrivacyService(deps: PrivacyServiceDeps) {
   }
 
   async function createExport(userId: string) {
+    await deps.db
+      .update(userDataExportRequests)
+      .set({ status: "expired", downloadTokenHash: null, exportData: null, updatedAt: now() })
+      .where(and(
+        eq(userDataExportRequests.userId, userId),
+        inArray(userDataExportRequests.status, ["pending", "ready"]),
+        lt(userDataExportRequests.expiresAt, now()),
+      ));
+
     const expiresAt = new Date(now().getTime() + EXPORT_EXPIRATION_MS);
     const [request] = await deps.db
       .insert(userDataExportRequests)
@@ -216,7 +236,21 @@ export function createPrivacyService(deps: PrivacyServiceDeps) {
         throw new Error("User not found");
       }
 
-      const [authAccounts, userSessions, userNotifications, creditBalanceRows, creditTxns, purchases, voucherAssigns, voucherRedeems, discountAssigns, auditRefs] = await Promise.all([
+      const [
+        authAccounts,
+        userSessions,
+        userNotifications,
+        creditBalanceRows,
+        creditTxns,
+        purchases,
+        voucherAssigns,
+        voucherRedeems,
+        discountAssigns,
+        subscriptions,
+        subscriptionPaymentRows,
+        checkoutIntentRows,
+        auditRefs,
+      ] = await Promise.all([
         deps.db.select().from(account).where(eq(account.userId, userId)),
         deps.db.select().from(session).where(eq(session.userId, userId)),
         deps.db.select().from(notification).where(eq(notification.userId, userId)),
@@ -226,6 +260,9 @@ export function createPrivacyService(deps: PrivacyServiceDeps) {
         deps.db.select().from(voucherAssignments).where(eq(voucherAssignments.userId, userId)),
         deps.db.select().from(voucherRedemptions).where(eq(voucherRedemptions.userId, userId)),
         deps.db.select().from(userDiscounts).where(eq(userDiscounts.userId, userId)),
+        deps.db.select().from(userSubscriptions).where(eq(userSubscriptions.userId, userId)),
+        deps.db.select().from(subscriptionPayments).where(eq(subscriptionPayments.userId, userId)).orderBy(desc(subscriptionPayments.createdAt)),
+        deps.db.select().from(checkoutIntents).where(eq(checkoutIntents.userId, userId)).orderBy(desc(checkoutIntents.createdAt)),
         deps.db.select().from(auditEntries).where(eq(auditEntries.actorId, userId)).orderBy(desc(auditEntries.createdAt)).limit(100),
       ]);
 
@@ -241,6 +278,9 @@ export function createPrivacyService(deps: PrivacyServiceDeps) {
         voucherAssignments: voucherAssigns,
         voucherRedemptions: voucherRedeems,
         discountAssignments: discountAssigns,
+        subscriptions,
+        subscriptionPayments: subscriptionPaymentRows,
+        checkoutIntents: checkoutIntentRows,
         auditReferences: auditRefs,
       });
       const downloadToken = randomBytes(32).toString("hex");
@@ -274,7 +314,7 @@ export function createPrivacyService(deps: PrivacyServiceDeps) {
   async function cancelExport(userId: string, exportId: string) {
     const rows = await deps.db
       .update(userDataExportRequests)
-      .set({ status: "expired", downloadTokenHash: null, updatedAt: now() })
+      .set({ status: "expired", downloadTokenHash: null, exportData: null, updatedAt: now() })
       .where(
         and(
           eq(userDataExportRequests.id, exportId),
@@ -301,7 +341,7 @@ export function createPrivacyService(deps: PrivacyServiceDeps) {
 
     await deps.db
       .update(userDataExportRequests)
-      .set({ status: "downloaded", downloadedAt: now(), downloadTokenHash: null, updatedAt: now() })
+      .set({ status: "downloaded", downloadedAt: now(), downloadTokenHash: null, exportData: null, updatedAt: now() })
       .where(and(eq(userDataExportRequests.id, result.id), eq(userDataExportRequests.userId, userId)));
 
     return result;

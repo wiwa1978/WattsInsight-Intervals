@@ -4,7 +4,7 @@ import { env } from "../env";
 
 const ADMIN_STEP_UP_COOKIE = "admin_step_up";
 const ADMIN_SESSION_COOKIE = "better-auth.session_token";
-const ADMIN_STEP_UP_TTL_SECONDS = 60 * 60 * 12;
+const ADMIN_STEP_UP_TTL_SECONDS = 60 * 15;
 
 type StepUpPayload = {
   sub: string;

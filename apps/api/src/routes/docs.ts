@@ -3,6 +3,7 @@ import type { Context } from "hono";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
+import { env } from "../env";
 import { resolveAdminAuthApi } from "../lib/auth-admin";
 import { createFallbackOpenApiSpec, mergeOpenApiSpecs } from "../openapi";
 
@@ -35,7 +36,7 @@ function buildSwaggerHtml(specUrl: string) {
     <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script>
       window.ui = SwaggerUIBundle({
-        url: "${specUrl}",
+        url: ${JSON.stringify(specUrl)},
         dom_id: "#swagger-ui",
         deepLinking: true,
         layout: "BaseLayout"
@@ -62,18 +63,18 @@ export function createDocsRouter() {
     return c.json(await buildOpenApiSpec());
   };
 
+  if (env.NODE_ENV === "production") {
+    router.use("/openapi.json", bootstrap.authModule.requireAuth, bootstrap.authModule.requireAdminAccess);
+    router.use("/api/openapi.json", bootstrap.authModule.requireAuth, bootstrap.authModule.requireAdminAccess);
+    router.use("/docs", bootstrap.authModule.requireAuth, bootstrap.authModule.requireAdminAccess);
+    router.use("/api/docs", bootstrap.authModule.requireAuth, bootstrap.authModule.requireAdminAccess);
+  }
+
   router.get("/openapi.json", openApiHandler);
   router.get("/api/openapi.json", openApiHandler);
 
-  router.get("/api/docs", (c) => {
-    const specUrl = `${c.req.url.replace(/\/api\/docs$/, "")}/api/openapi.json`;
-    return c.html(buildSwaggerHtml(specUrl));
-  });
-
-  router.get("/docs", (c) => {
-    const specUrl = `${c.req.url.replace(/\/docs$/, "")}/openapi.json`;
-    return c.html(buildScalarHtml(specUrl));
-  });
+  router.get("/api/docs", (c) => c.html(buildSwaggerHtml("/api/openapi.json")));
+  router.get("/docs", (c) => c.html(buildScalarHtml("/openapi.json")));
 
   return router;
 }

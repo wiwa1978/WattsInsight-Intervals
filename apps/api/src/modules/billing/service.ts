@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 
 import {
   creditPurchases,
@@ -110,22 +110,28 @@ async function getOrInitializeCredits(db: any, userId: string) {
 async function applyCreditDelta(db: any, input: ApplyCreditDeltaInput): Promise<ApplyCreditDeltaResult> {
   const current = await getOrInitializeCredits(db, input.userId);
   const balanceBefore = Number(current.balance);
-  const balanceAfter = balanceBefore + input.amount;
+  const now = input.createdAt ?? new Date();
 
-  if (!input.allowNegativeBalance && balanceAfter < 0) {
+  const [updated] = await db
+    .update(userCredits)
+    .set({
+      balance: sql`${userCredits.balance} + ${input.amount}`,
+      totalSpent: input.type === "usage" ? sql`${userCredits.totalSpent} + ${Math.abs(input.amount)}` : userCredits.totalSpent,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(userCredits.userId, input.userId),
+        input.allowNegativeBalance ? sql`true` : sql`${userCredits.balance} + ${input.amount} >= 0`,
+      ),
+    )
+    .returning({ balanceAfter: userCredits.balance });
+
+  if (!updated) {
     throw new Error("Insufficient credits");
   }
 
-  const now = input.createdAt ?? new Date();
-
-  await db
-    .update(userCredits)
-    .set({
-      balance: balanceAfter.toFixed(2),
-      totalSpent: input.type === "usage" ? (Number(current.totalSpent) + Math.abs(input.amount)).toFixed(2) : current.totalSpent,
-      updatedAt: now,
-    })
-    .where(eq(userCredits.userId, input.userId));
+  const balanceAfter = Number(updated.balanceAfter);
 
   const [transaction] = await db.insert(creditTransactions).values({
     userId: input.userId,
@@ -229,22 +235,25 @@ export function createBillingService(deps: BillingServiceDeps) {
       currency,
     });
 
-    return deps.db.transaction(async (tx: any) => {
+    const result = await deps.db.transaction(async (tx: any) => {
       async function grantCredits(grantedAt: Date) {
         const baseCredits = creditPackage.credits;
         const bonusCredits = "bonus" in creditPackage ? creditPackage.bonus : 0;
         const totalCredits = baseCredits + bonusCredits;
         const current = await getOrInitializeCredits(tx, userId);
-        const newBalance = Number(current.balance) + totalCredits;
 
-        await tx
+        const [updated] = await tx
           .update(userCredits)
           .set({
-            balance: newBalance.toString(),
-            totalPurchased: (Number(current.totalPurchased) + baseCredits).toString(),
+            balance: sql`${userCredits.balance} + ${totalCredits}`,
+            totalPurchased: sql`${userCredits.totalPurchased} + ${baseCredits}`,
             updatedAt: grantedAt,
           })
-          .where(eq(userCredits.userId, userId));
+          .where(eq(userCredits.userId, userId))
+          .returning({ balanceAfter: userCredits.balance });
+
+        const balanceBefore = Number(current.balance);
+        const newBalance = Number(updated.balanceAfter);
 
         await tx.insert(creditTransactions).values({
           userId,
@@ -252,7 +261,7 @@ export function createBillingService(deps: BillingServiceDeps) {
           amount: baseCredits.toString(),
           description: `Package: ${packageKey.charAt(0).toUpperCase() + packageKey.slice(1)}`,
           referenceId: paymentId,
-          balanceAfter: (Number(current.balance) + baseCredits).toString(),
+          balanceAfter: (balanceBefore + baseCredits).toString(),
         });
 
         if (bonusCredits > 0) {
@@ -267,18 +276,7 @@ export function createBillingService(deps: BillingServiceDeps) {
           });
         }
 
-        await deps.notifications.createNotification({
-          userId,
-          title: "creditPurchaseSuccess.title",
-          message: "creditPurchaseSuccess.message",
-          type: "success",
-          category: "billing",
-          data: {
-            credits: totalCredits,
-            amount: priceInclVat / 100,
-            currency,
-          },
-        });
+        return { credits: totalCredits, amount: priceInclVat / 100, currency };
       }
 
       const existingPurchase = await tx.query.creditPurchases.findFirst({
@@ -291,7 +289,7 @@ export function createBillingService(deps: BillingServiceDeps) {
         }
 
         if (existingPurchase.creditsGrantedAt && paymentStatus !== "completed") {
-          return existingPurchase;
+          return { purchase: existingPurchase, notificationData: null };
         }
 
         const shouldGrantCredits = paymentStatus === "completed" && !existingPurchase.creditsGrantedAt;
@@ -316,17 +314,20 @@ export function createBillingService(deps: BillingServiceDeps) {
             .where(eq(creditPurchases.id, existingPurchase.id));
         }
 
+        let notificationData: { credits: number; amount: number; currency: string } | null = null;
         if (shouldGrantCredits) {
-          await grantCredits(creditsGrantedAt);
+          notificationData = await grantCredits(creditsGrantedAt);
         }
 
-        return {
+        const purchase = {
           ...existingPurchase,
           paymentStatus,
           dodoCustomerId: nextDodoCustomerId,
           creditsGrantedAt,
           paymentSnapshot,
         };
+
+        return { purchase, notificationData };
       }
 
       const creditsGrantedAt = paymentStatus === "completed" ? new Date() : null;
@@ -351,12 +352,26 @@ export function createBillingService(deps: BillingServiceDeps) {
         })
         .returning();
 
+      let notificationData: { credits: number; amount: number; currency: string } | null = null;
       if (creditsGrantedAt) {
-        await grantCredits(creditsGrantedAt);
+        notificationData = await grantCredits(creditsGrantedAt);
       }
 
-      return purchase;
+      return { purchase, notificationData };
     });
+
+    if (result.notificationData) {
+      await deps.notifications.createNotification({
+        userId,
+        title: "creditPurchaseSuccess.title",
+        message: "creditPurchaseSuccess.message",
+        type: "success",
+        category: "billing",
+        data: result.notificationData,
+      }).catch(() => undefined);
+    }
+
+    return result.purchase;
   }
 
   async function processCreditReversal(

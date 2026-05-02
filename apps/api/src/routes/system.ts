@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { countriesQuerySchema } from "@platform/contracts/wire";
@@ -13,6 +13,15 @@ export function createSystemRouter() {
 
   router.get("/health", (c) => {
     return ok(c, { status: "ok" });
+  });
+
+  router.get("/ready", async (c) => {
+    try {
+      await bootstrap.db.execute(sql`select 1`);
+      return ok(c, { status: "ready" });
+    } catch {
+      return c.json({ success: false, status: "not_ready" }, 503);
+    }
   });
 
   router.get("/countries", async (c) => {

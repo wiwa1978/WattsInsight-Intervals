@@ -6,7 +6,7 @@ export const env = createEnv({
     NODE_ENV: z.enum(["development", "production", "test"]),
   },
   client: {
-    NEXT_PUBLIC_APP_URL: z.string().nonempty(),
+    NEXT_PUBLIC_APP_URL: z.string().url(),
     NEXT_PUBLIC_APP_NAME: z.string().nonempty(),
     NEXT_PUBLIC_API_URL: z.string().url().optional(),
     NEXT_PUBLIC_ADMIN_APP_URL: z.string().url().optional(),

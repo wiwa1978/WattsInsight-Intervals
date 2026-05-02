@@ -1,9 +1,10 @@
 import { Hono } from "hono";
 import { requestId } from "hono/request-id";
-import { isAdminStepUpVerified } from "./middleware/admin-step-up";
+import { clearAdminStepUpCookieHeader, isAdminStepUpVerified } from "./middleware/admin-step-up";
 
 import type { AppEnv } from "./context";
 import { bootstrap } from "./bootstrap";
+import { env } from "./env";
 import { corsMiddleware } from "./middleware/cors";
 import { errorHandler } from "./middleware/error-handler";
 import { requestGuardrails } from "./middleware/request-guardrails";
@@ -18,6 +19,21 @@ import { createSystemRouter } from "./routes/system";
 
 const app = new Hono<AppEnv>();
 
+function clearSessionCookieHeader() {
+  const parts = [
+    "better-auth.session_token=",
+    "Path=/",
+    "HttpOnly",
+    "Max-Age=0",
+    `SameSite=${env.COOKIE_SAMESITE}`,
+  ];
+
+  if (env.COOKIE_DOMAIN) parts.push(`Domain=${env.COOKIE_DOMAIN}`);
+  if (env.NODE_ENV === "production") parts.push("Secure");
+
+  return parts.join("; ");
+}
+
 app.use("/*", requestId());
 app.use("/*", corsMiddleware);
 app.use("/*", requestGuardrails);
@@ -27,10 +43,26 @@ app.onError(errorHandler);
 app.use("/auth/admin/*", bootstrap.authModule.requireAuth);
 app.use("/auth/admin/*", bootstrap.authModule.requireAdminAccess);
 app.use("/auth/admin/*", async (c, next) => {
+  if (c.req.path === "/auth/admin/stop-impersonating") {
+    return next();
+  }
+
+  const authUser = c.get("authUser");
+  if (!authUser?.id) {
+    return c.json({ success: false, error: "Unauthorized" }, 401);
+  }
+
+  const verified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
+  c.set("adminStepUpVerified", verified);
+
+  return bootstrap.authModule.requireAdminStepUp(c, next);
+});
+app.use("/auth/admin/*", async (c, next) => {
   await next();
 
   if (c.res.status === 403) {
-    c.res.headers.set("Set-Cookie", "better-auth.session_token=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
+    c.res.headers.append("Set-Cookie", clearSessionCookieHeader());
+    c.res.headers.append("Set-Cookie", clearAdminStepUpCookieHeader());
   }
 });
 

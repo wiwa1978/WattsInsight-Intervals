@@ -44,11 +44,22 @@ function sanitizeJson(value: unknown) {
 
 export function getAuditRequestContext(c: Context<AppEnv>) {
   const forwardedFor = c.req.header("x-forwarded-for");
+  const authUser = c.get("authUser");
+  const authSession = c.get("authSession") as { impersonatedBy?: string | null } | null;
+  const impersonatedBy = authSession?.impersonatedBy ?? null;
+  const subjectId = authUser?.id ?? null;
+
   return {
-    actorId: c.get("authUser")?.id ?? null,
+    actorId: impersonatedBy ?? subjectId,
     requestId: c.get("requestId") ?? null,
     ip: forwardedFor?.split(",")[0]?.trim() || c.req.header("x-real-ip") || null,
     userAgent: c.req.header("user-agent") ?? null,
+    metadata: impersonatedBy
+      ? {
+          impersonatedBy,
+          subjectId,
+        }
+      : undefined,
   };
 }
 

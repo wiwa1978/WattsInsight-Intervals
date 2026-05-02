@@ -34,7 +34,7 @@ const paymentSucceededSchema = z.object({
     metadata: z.record(z.string(), z.string()).optional(),
     customer: z
       .object({
-        email: z.string().email(),
+        email: z.string().email().optional(),
         customer_id: z.string().min(1).optional(),
       })
       .optional(),
@@ -127,7 +127,8 @@ const disputeSchema = z.object({
 const baseSchema = z.object({
   id: z.string().min(1).optional(),
   event_id: z.string().min(1).optional(),
-  type: z.string(),
+  type: z.string().optional(),
+  event_type: z.string().optional(),
   data: z.unknown().optional(),
 });
 
@@ -137,7 +138,10 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     return null;
   }
 
-  if (parsed.data.type === "payment.succeeded") {
+  const eventType = parsed.data.type ?? parsed.data.event_type;
+  if (!eventType) return null;
+
+  if (eventType === "payment.succeeded") {
     const succeeded = paymentSucceededSchema.safeParse(payload);
     if (!succeeded.success) {
       return null;
@@ -160,7 +164,7 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     };
   }
 
-  if (parsed.data.type === "payment.failed") {
+  if (eventType === "payment.failed") {
     const failed = paymentFailedSchema.safeParse(payload);
     if (!failed.success) {
       return null;
@@ -183,7 +187,7 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     };
   }
 
-  if (parsed.data.type === "payment.processing") {
+  if (eventType === "payment.processing") {
     const processing = paymentProcessingSchema.safeParse(payload);
     if (!processing.success) {
       return null;
@@ -206,7 +210,7 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     };
   }
 
-  if (parsed.data.type === "refund.succeeded") {
+  if (eventType === "refund.succeeded") {
     const refund = refundSucceededSchema.safeParse(payload);
     if (!refund.success) {
       return null;
@@ -229,7 +233,7 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     };
   }
 
-  if (disputeEventTypes.includes(parsed.data.type as (typeof disputeEventTypes)[number])) {
+  if (disputeEventTypes.includes(eventType as (typeof disputeEventTypes)[number])) {
     const dispute = disputeSchema.safeParse(payload);
     if (!dispute.success) {
       return null;
@@ -240,7 +244,7 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     return {
       provider: "dodo",
       providerEventId: dispute.data.id ?? dispute.data.event_id,
-      eventType: dispute.data.type,
+      eventType: eventType as (typeof disputeEventTypes)[number],
       paymentId: data.payment_id,
       disputeId: data.dispute_id,
       disputeStatus: data.dispute_status,
@@ -252,14 +256,14 @@ export function mapDodoEvent(payload: unknown): NormalizedPaymentEvent | null {
     };
   }
 
-  if (subscriptionEventTypes.includes(parsed.data.type as (typeof subscriptionEventTypes)[number])) {
+  if (subscriptionEventTypes.includes(eventType as (typeof subscriptionEventTypes)[number])) {
     const data = parsed.data.data as { subscription_id?: unknown } | undefined;
     const subscriptionId = typeof data?.subscription_id === "string" ? data.subscription_id : "subscription";
 
     return {
       provider: "dodo",
       providerEventId: parsed.data.id ?? parsed.data.event_id,
-      eventType: parsed.data.type as (typeof subscriptionEventTypes)[number],
+      eventType: eventType as (typeof subscriptionEventTypes)[number],
       paymentId: subscriptionId,
       raw: payload,
     };

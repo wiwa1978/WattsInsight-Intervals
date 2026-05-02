@@ -16,6 +16,7 @@ import { env } from "../env";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { ok, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 import { isCreditBillingMode, isSubscriptionBillingMode } from "../lib/billing-mode";
+import { logger } from "../observability/logger";
 
 function getAuthUser(c: Context<AppEnv>) {
   const authUser = c.get("authUser");
@@ -99,7 +100,14 @@ export function createMeRouter() {
 
       return c.json({ success: true, data: { portalUrl: session.link } });
     } catch (error) {
-      console.error("Customer portal error:", error);
+      logger.error(
+        {
+          requestId: c.get("requestId"),
+          userId: authUser.id,
+          error,
+        },
+        "customer_portal.create.failed",
+      );
       return c.json({ success: false, error: "Failed to create customer portal session" }, 502);
     }
   });

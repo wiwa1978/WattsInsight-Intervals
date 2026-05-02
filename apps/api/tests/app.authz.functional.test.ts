@@ -72,45 +72,50 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("../src/env", () => ({ env: mocks.env }));
 
-vi.mock("@platform/auth-core", () => ({
-  authAdditionalUserFields: {},
-  createAuthModule: () => ({
-    router: new Hono(),
-    sessionRouter: new Hono(),
-    mobileRouter: new Hono(),
-    requireAuth: async (c: any, next: any) => {
-      if (!mocks.authState.allowAuth) {
-        return c.json({ success: false, error: "Unauthorized" }, 401);
-      }
-      c.set("authUser", { id: "u1", role: "admin", email: "admin@example.com" });
-      await next();
-    },
-    requireAdmin: async (c: any, next: any) => {
-      if (!mocks.authState.allowAdmin) {
-        return c.json({ success: false, error: "Forbidden" }, 403);
-      }
-      await next();
-    },
-    requireAdminAccess: async (c: any, next: any) => {
-      if (!mocks.authState.allowAdminAccess) {
-        return c.json({ success: false, error: "Forbidden" }, 403);
-      }
-      await next();
-    },
-    requireAdminStepUp: async (c: any, next: any) => {
-      if (!mocks.authState.allowAdminStepUp) {
-        return c.json({ success: false, error: "Admin step-up required" }, 403);
-      }
-      await next();
-    },
-    auth: {
-      api: {
-        getSession: async () => ({ user: { twoFactorEnabled: mocks.authState.twoFactorEnabled } }),
-        verifyTotp: async () => null,
+vi.mock("@platform/auth-core", () => {
+  const rawAdminRouter = new Hono();
+  rawAdminRouter.post("/admin/set-role", (c) => c.json({ success: true }));
+
+  return {
+    authAdditionalUserFields: {},
+    createAuthModule: () => ({
+      router: rawAdminRouter,
+      sessionRouter: new Hono(),
+      mobileRouter: new Hono(),
+      requireAuth: async (c: any, next: any) => {
+        if (!mocks.authState.allowAuth) {
+          return c.json({ success: false, error: "Unauthorized" }, 401);
+        }
+        c.set("authUser", { id: "u1", role: "admin", email: "admin@example.com" });
+        await next();
       },
-    },
-  }),
-}));
+      requireAdmin: async (c: any, next: any) => {
+        if (!mocks.authState.allowAdmin) {
+          return c.json({ success: false, error: "Forbidden" }, 403);
+        }
+        await next();
+      },
+      requireAdminAccess: async (c: any, next: any) => {
+        if (!mocks.authState.allowAdminAccess) {
+          return c.json({ success: false, error: "Forbidden" }, 403);
+        }
+        await next();
+      },
+      requireAdminStepUp: async (c: any, next: any) => {
+        if (!mocks.authState.allowAdminStepUp) {
+          return c.json({ success: false, error: "Admin step-up required" }, 403);
+        }
+        await next();
+      },
+      auth: {
+        api: {
+          getSession: async () => ({ user: { twoFactorEnabled: mocks.authState.twoFactorEnabled } }),
+          verifyTotp: async () => null,
+        },
+      },
+    }),
+  };
+});
 
 vi.mock("@platform/payments-core", () => ({ createPaymentsModule: () => ({ router: new Hono() }) }));
 vi.mock("@platform/platform-db", () => ({
@@ -227,5 +232,40 @@ describe("authz contract", () => {
     const res = await app.request("/admin/dashboard/stats");
 
     expect(res.status).toBe(403);
+  });
+
+  // Ensures raw Better Auth admin plugin endpoints cannot bypass custom admin step-up.
+  it("rejects /auth/admin routes when step-up is missing", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.allowAdminStepUp = false;
+
+    const res = await app.request("/auth/admin/set-role", { method: "POST" });
+
+    expect(res.status).toBe(403);
+  });
+
+  // Ensures raw Better Auth admin plugin endpoints remain available after step-up.
+  it("allows /auth/admin routes after admin step-up", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.allowAdminStepUp = true;
+
+    const res = await app.request("/auth/admin/set-role", { method: "POST" });
+
+    expect(res.status).toBe(200);
+  });
+
+  // Ensures credentialed admin APIs are not CORS-callable from the public app origin.
+  it("does not allow public app origin CORS on admin APIs", async () => {
+    const res = await app.request("/admin/status", {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:3100",
+        "access-control-request-method": "GET",
+      },
+    });
+
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
 });
