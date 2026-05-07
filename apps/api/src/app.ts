@@ -7,6 +7,7 @@ import { bootstrap } from "./bootstrap";
 import { env } from "./env";
 import { corsMiddleware } from "./middleware/cors";
 import { errorHandler } from "./middleware/error-handler";
+import { originGuard } from "./middleware/origin-guard";
 import { requestGuardrails } from "./middleware/request-guardrails";
 import { requestLogger } from "./middleware/request-logger";
 import { createAdminRouter } from "./routes/admin";
@@ -36,6 +37,7 @@ function clearSessionCookieHeader() {
 
 app.use("/*", requestId());
 app.use("/*", corsMiddleware);
+app.use("/*", originGuard);
 app.use("/*", requestGuardrails);
 app.use("/*", requestLogger);
 app.onError(errorHandler);
