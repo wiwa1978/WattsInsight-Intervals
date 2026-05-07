@@ -36,6 +36,22 @@ export type CustomerPortalResult = {
   portalUrl: string;
 };
 
+export type CreateRefundInput = {
+  paymentId: string;
+  reason?: string | null;
+  metadata?: Record<string, string>;
+  idempotencyKey?: string | null;
+};
+
+export type RefundResult = {
+  refundId: string;
+  paymentId: string;
+  status: string;
+  amount?: number | null;
+  currency?: string | null;
+  raw?: unknown;
+};
+
 export type ProviderPaymentListItem = {
   paymentId: string;
   status?: ProviderPaymentStatus | null;
@@ -72,6 +88,7 @@ export type PaymentProvider = {
   createCheckoutUrl(input: CreateCheckoutInput): Promise<string> | string;
   createCustomerPortal?(input: CustomerPortalInput): Promise<CustomerPortalResult>;
   getInvoice?(paymentId: string): Promise<InvoiceResult>;
+  createRefund?(input: CreateRefundInput): Promise<RefundResult>;
   finance?: PaymentProviderFinance;
 };
 

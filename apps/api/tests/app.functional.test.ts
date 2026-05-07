@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
     getSubscriptionStats: vi.fn(),
     getPlanDistribution: vi.fn(),
     listSubscriptionEvents: vi.fn(),
+    createSubscriptionRefund: vi.fn(),
     listUserSubscriptionPayments: vi.fn(),
     downloadSubscriptionInvoice: vi.fn(),
     getLatestDodoCustomerId: vi.fn(),
@@ -1041,6 +1042,73 @@ describe("API functional routes", () => {
         },
       ],
     });
+  });
+
+  it("creates subscription refunds through the admin billing endpoint", async () => {
+    setBillingModeForTest("subscriptions");
+    mocks.subscriptionService.createSubscriptionRefund.mockResolvedValueOnce({
+      payment: {
+        id: "sp_1",
+        userId: "user_1",
+        paymentId: "pay_1",
+        paymentStatus: "refunded",
+      },
+      refund: {
+        refundId: "ref_1",
+        paymentId: "pay_1",
+        status: "pending",
+        amount: 1900,
+        currency: "EUR",
+      },
+    });
+
+    const res = await app.request("/admin/billing/subscription-refunds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ paymentId: " pay_1 ", reason: "Customer request" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.subscriptionService.createSubscriptionRefund).toHaveBeenCalledWith({
+      paymentId: "pay_1",
+      reason: "Customer request",
+      actorUserId: "auth-user",
+    });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "billing.subscription_refund.create",
+      targetType: "subscription_payment",
+      targetId: "sp_1",
+    }));
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        payment: {
+          id: "sp_1",
+          userId: "user_1",
+          paymentId: "pay_1",
+          paymentStatus: "refunded",
+        },
+        refund: {
+          refundId: "ref_1",
+          paymentId: "pay_1",
+          status: "pending",
+          amount: 1900,
+          currency: "EUR",
+        },
+      },
+    });
+  });
+
+  it("validates subscription refund payloads", async () => {
+    const res = await app.request("/admin/billing/subscription-refunds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ paymentId: " " }),
+    });
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid subscription refund payload");
+    expect(mocks.subscriptionService.createSubscriptionRefund).not.toHaveBeenCalled();
   });
 
   // Verifies the admin webhook monitor can list stored webhook events.

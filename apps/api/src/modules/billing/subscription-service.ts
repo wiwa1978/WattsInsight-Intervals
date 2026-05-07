@@ -28,6 +28,12 @@ type RecordSubscriptionPaymentInput = {
   };
 };
 
+type CreateSubscriptionRefundInput = {
+  paymentId: string;
+  reason?: string | null;
+  actorUserId?: string | null;
+};
+
 const supportedStatuses = new Set<SubscriptionStatus>([
   "active",
   "trialing",
@@ -242,6 +248,83 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     };
   }
 
+  async function createSubscriptionRefund(input: CreateSubscriptionRefundInput) {
+    if (!deps.paymentProvider?.createRefund) {
+      throw new Error("Payment provider refund support is not configured");
+    }
+
+    const payment = await deps.db.transaction(async (tx: any) => {
+      const lockedPayment = await tx.query.subscriptionPayments.findFirst({
+        where: eq(subscriptionPayments.paymentId, input.paymentId),
+      });
+
+      if (!lockedPayment) {
+        return null;
+      }
+
+      if (lockedPayment.paymentStatus !== "completed") {
+        return lockedPayment;
+      }
+
+      const [processingPayment] = await tx
+        .update(subscriptionPayments)
+        .set({ paymentStatus: "pending", updatedAt: new Date() })
+        .where(eq(subscriptionPayments.id, lockedPayment.id))
+        .returning();
+
+      return processingPayment ?? lockedPayment;
+    });
+
+    if (!payment) {
+      throw new Error("Subscription payment not found");
+    }
+
+    if (payment.paymentStatus !== "pending") {
+      throw new Error("Only completed payments can be refunded");
+    }
+
+    try {
+      const refund = await deps.paymentProvider.createRefund({
+        paymentId: payment.paymentId,
+        reason: input.reason || null,
+        metadata: {
+          initiated_by: "admin_api",
+          ...(input.actorUserId ? { actor_user_id: input.actorUserId } : {}),
+          user_id: payment.userId,
+          local_subscription_payment_id: payment.id,
+        },
+        idempotencyKey: `subscription-refund:${payment.paymentProvider}:${payment.paymentId}`,
+      });
+
+      const paymentSnapshot = {
+        ...(payment.paymentSnapshot && typeof payment.paymentSnapshot === "object" ? payment.paymentSnapshot : {}),
+        adminRefund: refund,
+      };
+
+      const [updatedPayment] = await deps.db
+        .update(subscriptionPayments)
+        .set({
+          paymentStatus: "refunded",
+          paymentSnapshot,
+          updatedAt: new Date(),
+        })
+        .where(eq(subscriptionPayments.id, payment.id))
+        .returning();
+
+      return {
+        payment: updatedPayment ?? { ...payment, paymentStatus: "refunded", paymentSnapshot },
+        refund,
+      };
+    } catch (error) {
+      await deps.db
+        .update(subscriptionPayments)
+        .set({ paymentStatus: "completed", updatedAt: new Date() })
+        .where(eq(subscriptionPayments.id, payment.id));
+
+      throw error;
+    }
+  }
+
   async function getLatestDodoCustomerId(userId: string) {
     const [subscription] = await deps.db
       .select({ dodoCustomerId: userSubscriptions.dodoCustomerId })
@@ -400,6 +483,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     recordSubscriptionPayment,
     listUserSubscriptionPayments,
     downloadSubscriptionInvoice,
+    createSubscriptionRefund,
     getLatestDodoCustomerId,
     upsertUserSubscription,
     recordSubscriptionEvent,

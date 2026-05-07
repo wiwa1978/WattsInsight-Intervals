@@ -23,6 +23,14 @@ type DodoInvoiceResponse = {
   url?: string;
 };
 
+type DodoRefundResponse = {
+  refund_id: string;
+  payment_id: string;
+  status: string;
+  amount?: number | null;
+  currency?: string | null;
+};
+
 type DodoListResponse<T> = {
   items?: T[];
   next_cursor?: string | null;
@@ -70,7 +78,12 @@ function dodoListParams(params?: ProviderListParams) {
   });
 }
 
-async function dodoApiRequest<T>(options: DodoPaymentProviderOptions, path: string, timeoutMessage: string): Promise<T> {
+async function dodoApiRequest<T>(
+  options: DodoPaymentProviderOptions,
+  path: string,
+  timeoutMessage: string,
+  init?: RequestInit,
+): Promise<T> {
   if (!options.apiKey) {
     throw new Error("Payment provider API key not configured");
   }
@@ -80,11 +93,13 @@ async function dodoApiRequest<T>(options: DodoPaymentProviderOptions, path: stri
     response = await fetch(
       `${dodoApiBaseUrl(options.environment)}${path}`,
       withProviderTimeout({
-        method: "GET",
+        method: init?.method ?? "GET",
         headers: {
           Authorization: `Bearer ${options.apiKey}`,
           "Content-Type": "application/json",
+          ...(init?.headers ?? {}),
         },
+        body: init?.body,
       }),
     );
   } catch (error) {
@@ -147,6 +162,31 @@ export function createDodoPaymentProvider(options: DodoPaymentProviderOptions): 
       }
 
       return { invoiceUrl, invoiceData };
+    },
+    async createRefund(input) {
+      const refund = await dodoApiRequest<DodoRefundResponse>(
+        options,
+        "/refunds",
+        "Refund provider request timed out",
+        {
+          method: "POST",
+          headers: input.idempotencyKey ? { "Idempotency-Key": input.idempotencyKey } : undefined,
+          body: JSON.stringify({
+            payment_id: input.paymentId,
+            reason: input.reason ?? undefined,
+            metadata: input.metadata,
+          }),
+        },
+      );
+
+      return {
+        refundId: refund.refund_id,
+        paymentId: refund.payment_id,
+        status: refund.status,
+        amount: refund.amount ?? null,
+        currency: refund.currency ?? null,
+        raw: refund,
+      };
     },
     finance: options.apiKey
       ? {

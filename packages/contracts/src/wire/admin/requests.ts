@@ -38,6 +38,11 @@ export const billingListQuerySchema = paginationQuerySchema.extend({
   searchEmail: z.string().trim().email().max(255).optional(),
 });
 
+export const createSubscriptionRefundSchema = z.object({
+  paymentId: z.string().trim().min(1, "Payment ID is required").max(255),
+  reason: z.string().trim().max(3000, "Reason must be 3000 characters or fewer").optional(),
+});
+
 export const webhookEventStatusSchema = z.enum(["processing", "processed", "failed"]);
 
 export const webhookEventsQuerySchema = paginationQuerySchema.extend({

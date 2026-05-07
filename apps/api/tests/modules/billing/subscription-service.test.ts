@@ -100,4 +100,99 @@ describe("subscription service helpers", () => {
     await expect(service.listSubscriptionEvents(10)).resolves.toEqual(events);
     expect(limit).toHaveBeenCalledWith(10);
   });
+
+  it("creates provider refunds and marks subscription payments refunded", async () => {
+    const payment = {
+      id: "sp_1",
+      userId: "user_1",
+      paymentProvider: "dodo",
+      paymentId: "pay_1",
+      paymentStatus: "completed",
+      paymentSnapshot: { existing: true },
+    };
+    const updateReturning = vi.fn()
+      .mockResolvedValueOnce([{ ...payment, paymentStatus: "pending" }])
+      .mockResolvedValueOnce([{ ...payment, paymentStatus: "refunded" }]);
+    const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const update = vi.fn().mockReturnValue({ set: updateSet });
+    const db = {
+      transaction: vi.fn(async (callback) => callback({
+        query: { subscriptionPayments: { findFirst: vi.fn().mockResolvedValue(payment) } },
+        update,
+      })),
+      update,
+    };
+    const createRefund = vi.fn().mockResolvedValue({
+      refundId: "ref_1",
+      paymentId: "pay_1",
+      status: "pending",
+      amount: 1900,
+      currency: "EUR",
+    });
+    const service = createSubscriptionService({
+      db: db as any,
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: false, refunds: true, finance: false },
+        createCheckoutUrl: vi.fn(),
+        createRefund,
+      },
+    });
+
+    await expect(service.createSubscriptionRefund({
+      paymentId: "pay_1",
+      reason: "Customer request",
+      actorUserId: "admin_1",
+    })).resolves.toEqual(expect.objectContaining({
+      refund: expect.objectContaining({ refundId: "ref_1" }),
+      payment: expect.objectContaining({ paymentStatus: "refunded" }),
+    }));
+    expect(createRefund).toHaveBeenCalledWith({
+      paymentId: "pay_1",
+      reason: "Customer request",
+      metadata: {
+        initiated_by: "admin_api",
+        actor_user_id: "admin_1",
+        user_id: "user_1",
+        local_subscription_payment_id: "sp_1",
+      },
+      idempotencyKey: "subscription-refund:dodo:pay_1",
+    });
+    expect(updateSet).toHaveBeenLastCalledWith(expect.objectContaining({ paymentStatus: "refunded" }));
+  });
+
+  it("rolls subscription payment status back when provider refund creation fails", async () => {
+    const payment = {
+      id: "sp_1",
+      userId: "user_1",
+      paymentProvider: "dodo",
+      paymentId: "pay_1",
+      paymentStatus: "completed",
+      paymentSnapshot: null,
+    };
+    const updateReturning = vi.fn().mockResolvedValueOnce([{ ...payment, paymentStatus: "pending" }]);
+    const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const update = vi.fn().mockReturnValue({ set: updateSet });
+    const db = {
+      transaction: vi.fn(async (callback) => callback({
+        query: { subscriptionPayments: { findFirst: vi.fn().mockResolvedValue(payment) } },
+        update,
+      })),
+      update,
+    };
+    const service = createSubscriptionService({
+      db: db as any,
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: false, refunds: true, finance: false },
+        createCheckoutUrl: vi.fn(),
+        createRefund: vi.fn().mockRejectedValue(new Error("provider failed")),
+      },
+    });
+
+    await expect(service.createSubscriptionRefund({ paymentId: "pay_1" })).rejects.toThrow("provider failed");
+    expect(updateSet).toHaveBeenLastCalledWith(expect.objectContaining({ paymentStatus: "completed" }));
+  });
 });
