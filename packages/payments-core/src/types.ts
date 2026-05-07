@@ -1,7 +1,7 @@
 import type { WebhookVerifyResult } from "./providers/dodo/webhook-verify";
 
 export type NormalizedPaymentEvent = {
-  provider: "dodo";
+  provider: string;
   providerEventId?: string;
   eventType:
     | "payment.succeeded"
@@ -44,7 +44,7 @@ export type WebhookEventProcessingStatus = "processing" | "processed" | "failed"
 
 export type WebhookEventStore = {
   claim: (event: {
-    provider: "dodo";
+    provider: string;
     providerEventId: string;
     eventType: string;
     paymentId?: string;
@@ -53,12 +53,12 @@ export type WebhookEventStore = {
     requestId?: string | null;
     correlationId?: string | null;
   }) => Promise<{ claimed: true } | { claimed: false; status: WebhookEventProcessingStatus }>;
-  markProcessed: (event: { provider: "dodo"; providerEventId: string; durationMs?: number | null }) => Promise<void>;
-  markFailed: (event: { provider: "dodo"; providerEventId: string; error: unknown; durationMs?: number | null }) => Promise<void>;
+  markProcessed: (event: { provider: string; providerEventId: string; durationMs?: number | null }) => Promise<void>;
+  markFailed: (event: { provider: string; providerEventId: string; error: unknown; durationMs?: number | null }) => Promise<void>;
 };
 
 export type WebhookFailureAuditEvent = {
-  provider: "dodo";
+  provider: string;
   providerEventId?: string | null;
   eventType?: string | null;
   paymentId?: string | null;

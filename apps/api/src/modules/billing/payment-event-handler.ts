@@ -377,7 +377,7 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         currency: event.currency,
       },
       {
-        provider: event.provider,
+        provider: "dodo",
         customerId: event.customerId,
       },
     );

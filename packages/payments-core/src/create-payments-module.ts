@@ -9,9 +9,19 @@ import {
 } from "./providers/dodo/webhook-verify";
 import type { CreatePaymentsModuleOptions, WebhookFailureAuditEvent } from "./types";
 
-type SafeDodoMetadata = Pick<WebhookFailureAuditEvent, "providerEventId" | "eventType" | "paymentId">;
+type SafeWebhookMetadata = Pick<WebhookFailureAuditEvent, "providerEventId" | "eventType" | "paymentId">;
+type PaymentWebhookProvider = "dodo";
 
-const UNAUTHENTICATED_DODO_METADATA: SafeDodoMetadata = {
+type PaymentWebhookDispatcher = {
+  provider: PaymentWebhookProvider;
+  signatureHeaderName: string;
+  secret?: string;
+  toleranceSeconds?: number;
+  verify?: CreatePaymentsModuleOptions["verifyDodoWebhook"];
+  mapEvent(payload: unknown): ReturnType<typeof mapDodoEvent>;
+};
+
+const UNAUTHENTICATED_WEBHOOK_METADATA: SafeWebhookMetadata = {
   providerEventId: null,
   eventType: null,
   paymentId: null,
@@ -88,9 +98,9 @@ function signatureTimestamp(signatureHeader: string | null) {
   return new Date(timestampSeconds * 1000);
 }
 
-function extractSafeDodoMetadata(payload: unknown): SafeDodoMetadata {
+function extractSafeWebhookMetadata(payload: unknown): SafeWebhookMetadata {
   if (!payload || typeof payload !== "object") {
-    return UNAUTHENTICATED_DODO_METADATA;
+    return UNAUTHENTICATED_WEBHOOK_METADATA;
   }
 
   const record = payload as Record<string, unknown>;
@@ -107,14 +117,30 @@ function contextRequestId(c: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
+function paymentWebhookDispatcherForProvider(provider: string, options: CreatePaymentsModuleOptions): PaymentWebhookDispatcher | null {
+  if (provider !== "dodo") {
+    return null;
+  }
+
+  return {
+    provider: "dodo",
+    signatureHeaderName: "x-dodo-signature",
+    secret: options.dodoWebhookSecret,
+    toleranceSeconds: options.dodoWebhookToleranceSeconds,
+    verify: options.verifyDodoWebhook,
+    mapEvent: mapDodoEvent,
+  };
+}
+
 async function recordWebhookFailure(
   options: CreatePaymentsModuleOptions,
-  metadata: SafeDodoMetadata,
+  provider: string,
+  metadata: SafeWebhookMetadata,
   error: SafeWebhookFailureError,
 ) {
   try {
     await options.onWebhookFailure?.({
-      provider: "dodo",
+      provider,
       providerEventId: metadata.providerEventId ?? null,
       eventType: metadata.eventType ?? null,
       paymentId: metadata.paymentId ?? null,
@@ -129,16 +155,22 @@ async function recordWebhookFailure(
 export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
   const router = new Hono();
 
-  router.post("/webhooks/dodo", async (c) => {
+  router.post("/webhooks/:provider", async (c) => {
     const startedAt = Date.now();
-    const signatureHeader = c.req.header("x-dodo-signature") ?? null;
+    const provider = c.req.param("provider");
+    const dispatcher = paymentWebhookDispatcherForProvider(provider, options);
+    if (!dispatcher) {
+      return c.json({ success: false, error: "Unsupported payment provider" }, 404);
+    }
+
+    const signatureHeader = c.req.header(dispatcher.signatureHeaderName) ?? null;
     const requestId = contextRequestId(c) ?? c.req.header("x-request-id") ?? null;
     const correlationId = c.req.header("x-correlation-id") ?? requestId;
     const rawBody = await c.req.text();
 
-    const verification: WebhookVerifyResult = options.verifyDodoWebhook
+    const verification: WebhookVerifyResult = dispatcher.verify
       ? await (async () => {
-          const result = await options.verifyDodoWebhook!(rawBody, signatureHeader);
+          const result = await dispatcher.verify!(rawBody, signatureHeader);
           // Allow boolean returns from custom verifiers for backward compat.
           if (typeof result === "boolean") {
             return result
@@ -150,12 +182,12 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
       : verifyDodoWebhookSignatureDetailed(
           rawBody,
           signatureHeader,
-          options.dodoWebhookSecret,
-          { toleranceSeconds: options.dodoWebhookToleranceSeconds },
+          dispatcher.secret,
+          { toleranceSeconds: dispatcher.toleranceSeconds },
         );
 
     if (!verification.ok) {
-      await recordWebhookFailure(options, UNAUTHENTICATED_DODO_METADATA, verification.reason);
+      await recordWebhookFailure(options, dispatcher.provider, UNAUTHENTICATED_WEBHOOK_METADATA, verification.reason);
       const { status, body } = failureToResponse(verification.reason);
       return c.json(body, status);
     }
@@ -164,20 +196,20 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     try {
       payload = JSON.parse(rawBody);
     } catch {
-      await recordWebhookFailure(options, UNAUTHENTICATED_DODO_METADATA, "invalid_json");
+      await recordWebhookFailure(options, dispatcher.provider, UNAUTHENTICATED_WEBHOOK_METADATA, "invalid_json");
       return c.json({ success: false, error: "Invalid JSON payload" }, 400);
     }
 
-    const event = mapDodoEvent(payload);
+    const event = dispatcher.mapEvent(payload);
     if (!event) {
-      await recordWebhookFailure(options, extractSafeDodoMetadata(payload), "unsupported_event");
+      await recordWebhookFailure(options, dispatcher.provider, extractSafeWebhookMetadata(payload), "unsupported_event");
       return c.json({ success: false, error: "Unsupported webhook payload" }, 400);
     }
 
     if (options.webhookEventStore) {
       const providerEventId = event.providerEventId;
       if (!providerEventId) {
-        await recordWebhookFailure(options, event, "missing_event_id");
+        await recordWebhookFailure(options, event.provider, event, "missing_event_id");
         return c.json({ success: false, error: "Missing webhook event id" }, 400);
       }
 
@@ -202,7 +234,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
         return c.json({ success: true, data: { processed: true } }, 200);
       } catch (error) {
         await options.webhookEventStore.markFailed({ provider: event.provider, providerEventId, error, durationMs: Date.now() - startedAt });
-        await recordWebhookFailure(options, event, "handler_failed");
+        await recordWebhookFailure(options, event.provider, event, "handler_failed");
         throw error;
       }
     }
@@ -210,7 +242,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     try {
       await options.onPaymentEvent(event);
     } catch (error) {
-      await recordWebhookFailure(options, event, "handler_failed");
+      await recordWebhookFailure(options, event.provider, event, "handler_failed");
       throw error;
     }
     return c.json({ success: true, data: { processed: true } }, 200);
