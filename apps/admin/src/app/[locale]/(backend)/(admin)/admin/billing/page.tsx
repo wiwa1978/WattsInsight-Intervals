@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/container";
 import { StatCard } from "@/components/layout/backend/shared/stat-card";
 import { CreditCard, Wallet, TrendingDown, DollarSign } from "lucide-react";
 import { RevenueChart } from "@/components/layout/backend/admin/billing/revenue-chart";
+import { SubscriptionFinanceSummary } from "@/components/layout/backend/admin/billing/subscription-finance-summary";
 import { SubscriptionPlanDistribution } from "@/components/layout/backend/admin/billing/subscription-plan-distribution";
 import { SubscriptionStatsGrid } from "@/components/layout/backend/admin/billing/subscription-stats-grid";
 import { SubscriptionEventsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
@@ -16,6 +17,7 @@ import {
   getAdminAllTransactions,
   getAdminBillingStats,
   getAdminBillingSubscriptionEvents,
+  getAdminBillingSubscriptionFinanceSummary,
   getAdminBillingSubscriptionPlanDistribution,
   getAdminBillingSubscriptionStats,
   getAdminBillingSubscriptions,
@@ -145,8 +147,9 @@ export default async function AdminBillingPage() {
 
 async function AdminSubscriptionBillingPage() {
   const t = await getTranslations("admin.billing.subscription");
-  const [stats, distribution, subscriptions, events] = await Promise.all([
+  const [stats, financeSummary, distribution, subscriptions, events] = await Promise.all([
     getAdminBillingSubscriptionStats(),
+    getAdminBillingSubscriptionFinanceSummary(),
     getAdminBillingSubscriptionPlanDistribution(),
     getAdminBillingSubscriptions(50, 0),
     getAdminBillingSubscriptionEvents(50),
@@ -161,6 +164,10 @@ async function AdminSubscriptionBillingPage() {
 
       <div className="mb-8">
         <SubscriptionStatsGrid stats={stats} />
+      </div>
+
+      <div className="mb-8">
+        <SubscriptionFinanceSummary summary={financeSummary} />
       </div>
 
       <div className="mb-8">

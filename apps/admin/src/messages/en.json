@@ -991,6 +991,17 @@
           "annualRecurringRevenue": "ARR",
           "annualRecurringRevenueDescription": "Annualized recurring revenue"
         },
+        "finance": {
+          "grossRevenue": "Gross revenue",
+          "grossRevenueDescription": "From {count} completed payments",
+          "netRevenue": "Net revenue",
+          "netRevenueDescription": "After {refunded} refunded",
+          "refunds": "Refunds",
+          "refundsDescription": "Total refunded amount: {amount}",
+          "providerDrift": "Provider drift",
+          "providerDriftDescription": "{payments} payments · {subscriptions} subscriptions unmatched",
+          "providerUnavailable": "Provider finance data unavailable"
+        },
         "planDistribution": {
           "title": "Plan distribution",
           "empty": "No subscriptions found.",

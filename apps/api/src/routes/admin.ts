@@ -1016,6 +1016,17 @@ export function createAdminRouter() {
     return c.json({ success: true, data });
   });
 
+  router.get("/billing/subscription-finance-summary", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const data = await bootstrap.subscriptionService.getSubscriptionFinanceSummary();
+    return c.json({ success: true, data });
+  });
+
   router.get("/billing/subscription-plan-distribution", async (c) => {
     try {
       ensureSubscriptionBillingEnabled();

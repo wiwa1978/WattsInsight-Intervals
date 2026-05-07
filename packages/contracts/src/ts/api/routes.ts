@@ -76,6 +76,7 @@ export const apiRoutes = {
     billingSubscriptions: (limit = 20, offset = 0, searchEmail?: string) =>
       withQuery("/admin/billing/subscriptions", { limit, offset, searchEmail }),
     billingSubscriptionStats: "/admin/billing/subscription-stats",
+    billingSubscriptionFinanceSummary: "/admin/billing/subscription-finance-summary",
     billingSubscriptionPlanDistribution: "/admin/billing/subscription-plan-distribution",
     billingSubscriptionEvents: (limit = 50) => withQuery("/admin/billing/subscription-events", { limit }),
     discounts: (limit = 20, offset = 0, search?: string, status?: DiscountStatus) =>

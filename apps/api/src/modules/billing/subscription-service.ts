@@ -446,6 +446,82 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     };
   }
 
+  async function getSubscriptionFinanceSummary() {
+    const [localPayments, providerPayments, providerSubscriptions] = await Promise.all([
+      deps.db
+        .select({
+          paymentId: subscriptionPayments.paymentId,
+          dodoSubscriptionId: subscriptionPayments.dodoSubscriptionId,
+          paymentStatus: subscriptionPayments.paymentStatus,
+          priceInclVat: subscriptionPayments.priceInclVat,
+          currency: subscriptionPayments.currency,
+        })
+        .from(subscriptionPayments),
+      deps.paymentProvider?.finance?.listPayments({ pageSize: 100 }).catch(() => null) ?? Promise.resolve(null),
+      deps.paymentProvider?.finance?.listSubscriptions({ pageSize: 100 }).catch(() => null) ?? Promise.resolve(null),
+    ]);
+
+    const localPaymentIds = new Set(localPayments.map((payment: { paymentId: string }) => payment.paymentId));
+    const localSubscriptionIds = new Set(
+      localPayments
+        .map((payment: { dodoSubscriptionId?: string | null }) => payment.dodoSubscriptionId)
+        .filter((id: string | null | undefined): id is string => typeof id === "string" && id.length > 0),
+    );
+    const primaryCurrency = localPayments.find((payment: { currency?: string | null }) => payment.currency)?.currency ?? "EUR";
+
+    const totals = localPayments.reduce((summary: {
+      grossRevenue: number;
+      refundedRevenue: number;
+      completedPayments: number;
+      refundedPayments: number;
+      failedPayments: number;
+      pendingPayments: number;
+    }, payment: { paymentStatus: SubscriptionPaymentStatus; priceInclVat: number }) => {
+      if (payment.paymentStatus === "completed") {
+        summary.completedPayments += 1;
+        summary.grossRevenue += Number(payment.priceInclVat ?? 0);
+      } else if (payment.paymentStatus === "refunded") {
+        summary.refundedPayments += 1;
+        summary.refundedRevenue += Number(payment.priceInclVat ?? 0);
+      } else if (payment.paymentStatus === "failed") {
+        summary.failedPayments += 1;
+      } else if (payment.paymentStatus === "pending") {
+        summary.pendingPayments += 1;
+      }
+
+      return summary;
+    }, {
+      grossRevenue: 0,
+      refundedRevenue: 0,
+      completedPayments: 0,
+      refundedPayments: 0,
+      failedPayments: 0,
+      pendingPayments: 0,
+    });
+
+    const providerPaymentItems = providerPayments?.items ?? [];
+    const providerSubscriptionItems = providerSubscriptions?.items ?? [];
+    const unmatchedProviderPayments = providerPaymentItems.filter((payment) => !localPaymentIds.has(payment.paymentId)).length;
+    const unmatchedProviderSubscriptions = providerSubscriptionItems.filter((subscription) => !localSubscriptionIds.has(subscription.subscriptionId)).length;
+
+    return {
+      currency: primaryCurrency,
+      grossRevenue: totals.grossRevenue / 100,
+      refundedRevenue: totals.refundedRevenue / 100,
+      netRevenue: (totals.grossRevenue - totals.refundedRevenue) / 100,
+      totalPayments: localPayments.length,
+      completedPayments: totals.completedPayments,
+      refundedPayments: totals.refundedPayments,
+      failedPayments: totals.failedPayments,
+      pendingPayments: totals.pendingPayments,
+      providerFinanceAvailable: Boolean(providerPayments && providerSubscriptions),
+      providerPaymentsChecked: providerPaymentItems.length,
+      providerSubscriptionsChecked: providerSubscriptionItems.length,
+      unmatchedProviderPayments,
+      unmatchedProviderSubscriptions,
+    };
+  }
+
   async function getPlanDistribution() {
     const rows = await deps.db
       .select({
@@ -489,6 +565,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     recordSubscriptionEvent,
     listSubscriptions,
     getSubscriptionStats,
+    getSubscriptionFinanceSummary,
     getPlanDistribution,
     listSubscriptionEvents,
   };
