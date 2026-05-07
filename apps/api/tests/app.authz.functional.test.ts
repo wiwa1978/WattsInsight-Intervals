@@ -59,6 +59,7 @@ const mocks = vi.hoisted(() => {
       APP_URL: "http://localhost:3100",
       API_URL: "http://localhost:8787",
       ADMIN_ALLOWLIST: "admin@example.com",
+      ADMIN_APP_URL: "http://localhost:3101",
       DODO_PAYMENTS_ENVIRONMENT: "test_mode" as const,
       BETTER_AUTH_SECRET: "this-is-a-long-enough-secret",
       JWT_SECRET: "this-is-a-long-enough-jwt-secret",
@@ -121,16 +122,19 @@ vi.mock("@platform/payments-core", () => ({ createPaymentsModule: () => ({ route
 vi.mock("@platform/platform-db", () => ({
   account: {},
   auditEntries: {},
+  checkoutIntents: {},
   creditPurchases: {},
   creditTransactions: {},
   createPlatformDb: () => ({ db: {} }),
   mobileRefreshToken: {},
   notification: {},
   session: {},
+  subscriptionPayments: {},
   user: {},
   userCredits: {},
   userDataExportRequests: {},
   userDiscounts: {},
+  userSubscriptions: {},
   voucherAssignments: {},
   voucherRedemptions: {},
 }));
@@ -267,5 +271,43 @@ describe("authz contract", () => {
     });
 
     expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("blocks cross-site cookie-authenticated unsafe requests", async () => {
+    const res = await app.request("/admin/verify-ban-secret", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: "better-auth.session_token=session-token",
+        origin: "https://evil.example.com",
+      },
+      body: JSON.stringify({ secret: "secret" }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: "Forbidden origin",
+      errorCode: "FORBIDDEN",
+    });
+  });
+
+  it("allows same-admin-origin cookie-authenticated unsafe requests", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.allowAdminStepUp = true;
+    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+
+    const res = await app.request("/admin/verify-ban-secret", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: "better-auth.session_token=session-token",
+        origin: "http://localhost:3101",
+      },
+      body: JSON.stringify({ secret: "secret" }),
+    });
+
+    expect(res.status).toBe(200);
   });
 });
