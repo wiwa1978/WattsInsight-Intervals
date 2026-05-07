@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NormalizedPaymentEvent } from "@platform/payments-core";
 
 import { buildDodoCheckoutUrl } from "../../src/lib/dodo-checkout";
 import { createPaymentEventHandler } from "../../src/modules/billing/payment-event-handler";
 import { creditPackages } from "../../src/config/billing";
+import { createDodoPaymentProvider } from "../../src/modules/payments/providers/dodo";
 
 describe("buildDodoCheckoutUrl", () => {
   const baseUrl = "https://test.checkout.dodopayments.com";
@@ -68,6 +69,63 @@ describe("buildDodoCheckoutUrl", () => {
     expect(url.searchParams.getAll("metadata_userId")).toEqual([
       "victim&metadata_userId=attacker",
     ]);
+  });
+});
+
+describe("createDodoPaymentProvider", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("creates checkout URLs through the provider seam", async () => {
+    const provider = createDodoPaymentProvider({
+      environment: "test_mode",
+      appUrl: "https://app.example.com",
+      apiKey: "api-key",
+    });
+
+    const checkoutUrl = await provider.createCheckoutUrl({
+      productId: "pdt_TEST",
+      userId: "user-123",
+      billingMode: "subscriptions",
+      planKey: "starter",
+      referenceId: "checkout-ref-123",
+      customerEmail: "buyer@example.com",
+    });
+    const url = new URL(checkoutUrl);
+
+    expect(provider.name).toBe("dodo");
+    expect(provider.capabilities.checkout).toBe(true);
+    expect(provider.capabilities.invoices).toBe(true);
+    expect(url.origin + url.pathname).toBe("https://test.checkout.dodopayments.com/buy/pdt_TEST");
+    expect(url.searchParams.get("metadata_billingMode")).toBe("subscriptions");
+    expect(url.searchParams.get("metadata_planKey")).toBe("starter");
+    expect(url.searchParams.get("metadata_checkoutReferenceId")).toBe("checkout-ref-123");
+    expect(url.searchParams.get("redirect_url")).toBe("https://app.example.com/billing?success=true");
+    expect(url.searchParams.get("cancel_url")).toBe("https://app.example.com/billing?cancel=true");
+  });
+
+  it("fetches invoices through the provider seam with timeout signal", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ invoice_pdf: "https://invoices.test/file.pdf" }),
+      }),
+    );
+    const provider = createDodoPaymentProvider({
+      environment: "test_mode",
+      appUrl: "https://app.example.com",
+      apiKey: "api-key",
+    });
+
+    await expect(provider.getInvoice?.("pay_123")).resolves.toEqual({
+      invoiceUrl: "https://invoices.test/file.pdf",
+      invoiceData: { invoice_pdf: "https://invoices.test/file.pdf" },
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect((fetch as any).mock.calls[0]?.[0]).toBe("https://test.dodopayments.com/invoices/payments/pay_123");
+    expect((fetch as any).mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
   });
 });
 

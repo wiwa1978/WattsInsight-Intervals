@@ -643,9 +643,11 @@ describe("createBillingService", () => {
           }),
         }),
       } as any,
-      env: {
-        DODO_PAYMENTS_API_KEY: "api-key",
-        DODO_PAYMENTS_ENVIRONMENT: "test_mode",
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: true, refunds: false, finance: false },
+        createCheckoutUrl: vi.fn(),
+        getInvoice: vi.fn(async () => ({ invoiceUrl: "https://invoices.test/file.pdf" })),
       },
       notifications: { createNotification: vi.fn() },
     });
@@ -654,8 +656,6 @@ describe("createBillingService", () => {
     expect(result.success).toBe(true);
     expect(result.invoiceUrl).toBe("https://invoices.test/file.pdf");
     expect(result).not.toHaveProperty("invoiceData");
-    expect(fetch).toHaveBeenCalledOnce();
-    expect((fetch as any).mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
   });
 
   // Verifies provider failures are sanitized before surfacing to callers.
@@ -685,9 +685,13 @@ describe("createBillingService", () => {
           }),
         }),
       } as any,
-      env: {
-        DODO_PAYMENTS_API_KEY: "api-key",
-        DODO_PAYMENTS_ENVIRONMENT: "test_mode",
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: true, refunds: false, finance: false },
+        createCheckoutUrl: vi.fn(),
+        getInvoice: vi.fn(async () => {
+          throw new Error("Invoice provider request failed");
+        }),
       },
       notifications: { createNotification: vi.fn() },
     });
@@ -718,9 +722,13 @@ describe("createBillingService", () => {
           }),
         }),
       } as any,
-      env: {
-        DODO_PAYMENTS_API_KEY: "api-key",
-        DODO_PAYMENTS_ENVIRONMENT: "test_mode",
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: true, refunds: false, finance: false },
+        createCheckoutUrl: vi.fn(),
+        getInvoice: vi.fn(async () => {
+          throw new Error("Invoice provider request timed out");
+        }),
       },
       notifications: { createNotification: vi.fn() },
     });
@@ -746,9 +754,11 @@ describe("createBillingService", () => {
           }),
         }),
       } as any,
-      env: {
-        DODO_PAYMENTS_API_KEY: "api-key",
-        DODO_PAYMENTS_ENVIRONMENT: "test_mode",
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: true, refunds: false, finance: false },
+        createCheckoutUrl: vi.fn(),
+        getInvoice: vi.fn(),
       },
       notifications: { createNotification: vi.fn() },
     });

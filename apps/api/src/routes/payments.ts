@@ -5,14 +5,6 @@ import { createCheckoutRequestSchema } from "@platform/contracts";
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { creditPackages, subscriptionPlans } from "../config/billing";
-import { env } from "../env";
-import {
-  CHECKOUT_CANCEL_RETURN_PATH,
-  CHECKOUT_SUCCESS_RETURN_PATH,
-  DODO_CHECKOUT_BASE_URL,
-  buildCheckoutReturnUrl,
-  buildDodoCheckoutUrl,
-} from "../lib/dodo-checkout";
 import { parseJsonBody, validationError } from "../lib/http";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 
@@ -64,19 +56,6 @@ export function createPaymentsRouter() {
       return c.json({ success: false, error: "Unauthenticated" }, 401);
     }
 
-    const baseUrl =
-      env.DODO_PAYMENTS_ENVIRONMENT === "live_mode"
-        ? DODO_CHECKOUT_BASE_URL.live_mode
-        : DODO_CHECKOUT_BASE_URL.test_mode;
-    const successUrl = buildCheckoutReturnUrl({
-      appUrl: env.APP_URL,
-      path: CHECKOUT_SUCCESS_RETURN_PATH,
-    });
-    const cancelUrl = buildCheckoutReturnUrl({
-      appUrl: env.APP_URL,
-      path: CHECKOUT_CANCEL_RETURN_PATH,
-    });
-
     const checkoutIntent = await bootstrap.checkoutIntentsService.create({
       userId: authUser.id,
       billingMode: requestMode,
@@ -89,8 +68,7 @@ export function createPaymentsRouter() {
       },
     });
 
-    const checkoutUrl = buildDodoCheckoutUrl({
-      baseUrl,
+    const checkoutUrl = await bootstrap.paymentProviders.activeProvider.createCheckoutUrl({
       productId: selectedProduct.productId,
       userId: authUser.id,
       billingMode: requestMode,
@@ -98,8 +76,6 @@ export function createPaymentsRouter() {
       ...(requestMode === "subscriptions" && discountCode ? { discountCode } : {}),
       referenceId: checkoutIntent.referenceId,
       customerEmail: authUser.email ?? null,
-      successUrl,
-      cancelUrl,
     });
 
     return c.json({ success: true, data: { checkoutUrl } });

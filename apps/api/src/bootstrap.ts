@@ -19,12 +19,14 @@ import { getBillingMode } from "./lib/billing-mode";
 import { getDodoCheckoutProductsForBillingMode } from "./lib/dodo-billing-products";
 import { createAdminService } from "./modules/admin/service";
 import { createAuditService } from "./modules/audit/service";
-import { createBillingService } from "./modules/billing/service";
 import { createCheckoutIntentsService } from "./modules/billing/checkout-intents";
+import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
 import { createSubscriptionService } from "./modules/billing/subscription-service";
 import { createSubscriptionWebhookHandler } from "./modules/billing/subscription-webhooks";
+import { createPaymentProviderRegistry } from "./modules/payments/provider";
+import { createDodoPaymentProvider } from "./modules/payments/providers/dodo";
 import { createPaymentWebhookEventStore } from "./modules/payments/webhook-event-store";
 import { createNotificationsService } from "./modules/notifications/service";
 import { createPrivacyService } from "./modules/privacy/service";
@@ -60,12 +62,28 @@ const emailModule = createEmailModule({
 
 const notificationsService = createNotificationsService({ db });
 const privacyService = createPrivacyService({ db });
+
+const dodoPaymentsClient = env.DODO_PAYMENTS_API_KEY
+  ? new DodoPayments({
+      bearerToken: env.DODO_PAYMENTS_API_KEY,
+      environment: env.DODO_PAYMENTS_ENVIRONMENT,
+    })
+  : null;
+const paymentProviders = createPaymentProviderRegistry(
+  createDodoPaymentProvider({
+    apiKey: env.DODO_PAYMENTS_API_KEY,
+    environment: env.DODO_PAYMENTS_ENVIRONMENT,
+    appUrl: env.APP_URL,
+    client: dodoPaymentsClient,
+  }),
+);
+
 const billingService = createBillingService({
   db,
-  env,
+  paymentProvider: paymentProviders.activeProvider,
   notifications: notificationsService,
 });
-const subscriptionService = createSubscriptionService({ db, env });
+const subscriptionService = createSubscriptionService({ db, paymentProvider: paymentProviders.activeProvider });
 const checkoutIntentsService = createCheckoutIntentsService({ db });
 const adminService = createAdminService({
   db,
@@ -80,13 +98,6 @@ const vouchersService = createVouchersService({
   notifications: notificationsService,
 });
 const paymentWebhookEventStore = createPaymentWebhookEventStore({ db });
-
-const dodoPaymentsClient = env.DODO_PAYMENTS_API_KEY
-  ? new DodoPayments({
-      bearerToken: env.DODO_PAYMENTS_API_KEY,
-      environment: env.DODO_PAYMENTS_ENVIRONMENT,
-    })
-  : null;
 
 const authModule = createAuthModule({
   betterAuthOptions: {
@@ -370,5 +381,6 @@ export const bootstrap = {
   privacyService,
   vouchersService,
   paymentsModule,
+  paymentProviders,
   dodoPaymentsClient,
 };
