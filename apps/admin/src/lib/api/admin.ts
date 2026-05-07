@@ -80,10 +80,14 @@ export async function getAdminUsersApi(limit = 20, offset = 0, search?: string, 
   return result.data;
 }
 
-export async function setAdminUserRoleApi(userId: string, role: "user" | "admin") {
+export async function setAdminUserRoleApi(
+  userId: string,
+  role: "user" | "admin",
+  options: { reason?: string; confirmed?: boolean } = {},
+) {
   return apiRequest<{ user?: unknown; error?: { message?: string } | string }>("/admin/users/set-role", {
     method: "POST",
-    body: JSON.stringify({ userId, role }),
+    body: JSON.stringify({ userId, role, ...options }),
   });
 }
 

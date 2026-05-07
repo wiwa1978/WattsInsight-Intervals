@@ -23,24 +23,13 @@ const mocks = vi.hoisted(() => {
 
   const subscriptionService = {
     getUserSubscription: vi.fn(),
-    listUserSubscriptionPayments: vi.fn(),
-    downloadSubscriptionInvoice: vi.fn(),
-    getLatestDodoCustomerId: vi.fn(),
-    upsertUserSubscription: vi.fn(),
-    recordSubscriptionPayment: vi.fn(),
-    recordSubscriptionEvent: vi.fn(),
-    listSubscriptions: vi.fn(),
-    getSubscriptionStats: vi.fn(),
-  };
-
-  const subscriptionService = {
-    getUserSubscription: vi.fn(),
     listSubscriptions: vi.fn(),
     getSubscriptionStats: vi.fn(),
     getPlanDistribution: vi.fn(),
     listSubscriptionEvents: vi.fn(),
     listUserSubscriptionPayments: vi.fn(),
     downloadSubscriptionInvoice: vi.fn(),
+    getLatestDodoCustomerId: vi.fn(),
     recordSubscriptionPayment: vi.fn(),
     upsertUserSubscription: vi.fn(),
     recordSubscriptionEvent: vi.fn(),
@@ -304,6 +293,8 @@ vi.mock("@platform/auth-core", () => ({
         role: "admin",
         email: c.req.header("x-test-auth-user-email") ?? "admin@example.com",
       });
+      const impersonatedBy = c.req.header("x-test-impersonated-by");
+      c.set("authSession", impersonatedBy ? { impersonatedBy } : null);
       await next();
     };
 
@@ -345,15 +336,18 @@ vi.mock("@platform/platform-db", () => ({
   createPlatformDb: () => ({ db: mocks.db }),
   account: {},
   auditEntries: {},
+  checkoutIntents: {},
   creditPurchases: {},
   creditTransactions: {},
   mobileRefreshToken: {},
   notification: {},
   session: {},
+  subscriptionPayments: {},
   user: {},
   userCredits: {},
   userDataExportRequests: {},
   userDiscounts: {},
+  userSubscriptions: {},
   voucherAssignments: {},
   voucherRedemptions: {},
   country: {
@@ -1306,7 +1300,7 @@ describe("API functional routes", () => {
     const demoteRes = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json", "x-test-auth-user-id": authUserId },
-      body: JSON.stringify({ userId: authUserId, role: "user" }),
+      body: JSON.stringify({ userId: authUserId, role: "user", reason: "self demotion", confirmed: true }),
     });
     const unchangedRes = await app.request("/admin/users/set-role", {
       method: "POST",
@@ -1334,7 +1328,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "user" }),
+      body: JSON.stringify({ userId, role: "user", reason: "offboarding", confirmed: true }),
     });
 
     expect(res.status).toBe(403);
@@ -1346,6 +1340,37 @@ describe("API functional routes", () => {
     expect(mocks.adminAuthApi.revokeUserSessions).not.toHaveBeenCalled();
   });
 
+  it("requires a reason for role changes and confirmation for admin demotions", async () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+    mocks.adminService.getUserById.mockResolvedValueOnce({ id: userId, role: "user", banned: false });
+    mocks.adminService.getUserById.mockResolvedValueOnce({ id: userId, role: "admin", banned: false });
+
+    const missingReasonRes = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, role: "admin" }),
+    });
+    const missingConfirmationRes = await app.request("/admin/users/set-role", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ userId, role: "user", reason: "offboarding" }),
+    });
+
+    expect(missingReasonRes.status).toBe(403);
+    await expect(missingReasonRes.json()).resolves.toMatchObject({
+      success: false,
+      error: "A reason is required for role changes.",
+      errorCode: "FORBIDDEN",
+    });
+    expect(missingConfirmationRes.status).toBe(403);
+    await expect(missingConfirmationRes.json()).resolves.toMatchObject({
+      success: false,
+      error: "Explicit confirmation is required to remove admin access.",
+      errorCode: "FORBIDDEN",
+    });
+    expect(mocks.adminAuthApi.setRole).not.toHaveBeenCalled();
+  });
+
   it("revokes target sessions after a successful role change", async () => {
     const userId = "22222222-2222-4222-8222-222222222222";
     mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "user", banned: false });
@@ -1355,7 +1380,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "admin" }),
+      body: JSON.stringify({ userId, role: "admin", reason: "support coverage" }),
     });
 
     expect(res.status).toBe(200);
@@ -1449,6 +1474,24 @@ describe("API functional routes", () => {
     });
   });
 
+  it("blocks admin mutations while impersonating another user", async () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+
+    const res = await app.request("/admin/users/revoke-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-test-impersonated-by": "admin-origin" },
+      body: JSON.stringify({ userId }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      error: "Admin actions are blocked while impersonating another user.",
+      errorCode: "FORBIDDEN",
+    });
+    expect(mocks.adminAuthApi.revokeUserSessions).not.toHaveBeenCalled();
+  });
+
   it("records audit entries for admin auth mutations", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
     mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
@@ -1463,7 +1506,7 @@ describe("API functional routes", () => {
     const setRoleRes = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "admin" }),
+      body: JSON.stringify({ userId, role: "admin", reason: "security coverage" }),
     });
     const banRes = await app.request("/admin/users/ban", {
       method: "POST",
@@ -1503,6 +1546,11 @@ describe("API functional routes", () => {
       targetType: "user",
       targetId: userId,
       after: { role: "admin" },
+      metadata: expect.objectContaining({
+        previousRole: "user",
+        nextRole: "admin",
+        reason: "security coverage",
+      }),
     }));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "admin.user.ban",

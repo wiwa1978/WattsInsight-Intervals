@@ -43,6 +43,7 @@ import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 import { getAdminSessionTokenFromHeaders, issueAdminStepUpCookie, isAdminStepUpVerified } from "../middleware/admin-step-up";
+import { buildRoleChangeAuditMetadata, checkSetRoleGovernance, isImpersonatedSession } from "../modules/admin/governance";
 import { getAuditRequestContext } from "../modules/audit/service";
 import { logger } from "../observability/logger";
 
@@ -411,19 +412,6 @@ export function createAdminRouter() {
     return forbidden(c, "You cannot change your own role.");
   }
 
-  async function blockIfLastActiveAdminRoleChange(c: AdminContext, targetUser: AdminUserGovernanceRecord, nextRole: string) {
-    if (!targetUser || !isActiveAdmin(targetUser) || nextRole === "admin") {
-      return null;
-    }
-
-    const activeAdminCount = await bootstrap.adminService.countActiveAdmins();
-    if (activeAdminCount <= 1) {
-      return forbidden(c, "Cannot demote the last active admin.");
-    }
-
-    return null;
-  }
-
   async function blockIfLastActiveAdminBan(c: AdminContext, targetUser: AdminUserGovernanceRecord) {
     if (!targetUser || !isActiveAdmin(targetUser)) {
       return null;
@@ -435,6 +423,14 @@ export function createAdminRouter() {
     }
 
     return null;
+  }
+
+  function blockIfImpersonatedAdminSession(c: AdminContext) {
+    if (!isImpersonatedSession(c.get("authSession"))) {
+      return null;
+    }
+
+    return forbidden(c, "Admin actions are blocked while impersonating another user.");
   }
 
   function withUserIdParam(c: AdminContext, handler: (userId: string) => Response | Promise<Response>) {
@@ -492,6 +488,16 @@ export function createAdminRouter() {
 
   router.use("/*", bootstrap.authModule.requireAuth);
   router.use("/*", bootstrap.authModule.requireAdminAccess);
+  router.use("/*", async (c, next) => {
+    if (c.req.path === "/admin/session" || c.req.path === "/admin/status" || c.req.path.startsWith("/admin/step-up")) {
+      return next();
+    }
+
+    const block = blockIfImpersonatedAdminSession(c);
+    if (block) return block;
+
+    return next();
+  });
 
   router.get("/session", (c) => {
     return c.json({
@@ -653,11 +659,23 @@ export function createAdminRouter() {
       const selfRoleChangeBlock = blockIfSelfRoleChange(c, body.userId, targetUser, body.role);
       if (selfRoleChangeBlock) return selfRoleChangeBlock;
 
-      const lastAdminBlock = await blockIfLastActiveAdminRoleChange(c, targetUser, body.role);
-      if (lastAdminBlock) return lastAdminBlock;
+      const activeAdminCount = targetUser && isActiveAdmin(targetUser) && body.role !== "admin"
+        ? await bootstrap.adminService.countActiveAdmins()
+        : undefined;
+      const governance = checkSetRoleGovernance({
+        previousRole: targetUser?.role,
+        nextRole: body.role,
+        reason: body.reason,
+        confirmed: body.confirmed,
+        activeAdminCount,
+      });
+      if (!governance.allowed) {
+        return forbidden(c, governance.error);
+      }
 
       const adminAuthApi = requireAdminAuthApi();
-      const result = await adminAuthApi.setRole({ body, headers: c.req.raw.headers });
+      const roleBody = { userId: body.userId, role: body.role };
+      const result = await adminAuthApi.setRole({ body: roleBody, headers: c.req.raw.headers });
       if (isSuccessfulMutationResult(result)) {
         const roleChanged = !targetUser || targetUser.role !== body.role;
         if (roleChanged && typeof adminAuthApi.revokeUserSessions === "function") {
@@ -670,6 +688,11 @@ export function createAdminRouter() {
           targetType: "user",
           targetId: (body) => body.userId,
           after: (body) => ({ role: body.role }),
+          metadata: (body) => buildRoleChangeAuditMetadata({
+            previousRole: targetUser?.role,
+            nextRole: body.role,
+            reason: body.reason,
+          }),
         });
         if (auditFailure) return auditFailure;
       }

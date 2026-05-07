@@ -57,7 +57,7 @@ interface UsersTableProps {
   displayTotal: number;
   from: number;
   to: number;
-  onSetRole: (userId: string, role: "user" | "admin") => Promise<void>;
+  onSetRole: (userId: string, role: "user" | "admin", options?: { reason?: string; confirmed?: boolean }) => Promise<void>;
   onUnban: (userId: string) => Promise<void>;
   onImpersonate: (userId: string) => Promise<void>;
   onRevokeSessions: (userId: string) => Promise<void>;
@@ -91,6 +91,27 @@ export function UsersTable({
   const handleUserClick = (userId: string) => {
     router.push(`/admin/users/${userId}`);
   };
+
+  const requestRoleChange = React.useCallback(async (user: User, role: "user" | "admin") => {
+    if (user.role === role) {
+      await onSetRole(user.id, role);
+      return;
+    }
+
+    const reason = window.prompt(t("roleChange.reasonPrompt"));
+    if (!reason?.trim()) {
+      return;
+    }
+
+    const confirmed = user.role === "admin" && role === "user"
+      ? window.confirm(t("roleChange.demoteConfirm"))
+      : undefined;
+    if (confirmed === false) {
+      return;
+    }
+
+    await onSetRole(user.id, role, { reason: reason.trim(), ...(confirmed !== undefined ? { confirmed } : {}) });
+  }, [onSetRole, t]);
 
   const getStatusBadge = (user: User) => {
     if (user.banned) {
@@ -200,7 +221,7 @@ export function UsersTable({
             <DropdownMenuContent align="end">
               {user.role === "admin" ? (
                 <DropdownMenuItem
-                  onClick={() => onSetRole(user.id, "user")}
+                  onClick={() => void requestRoleChange(user, "user")}
                   disabled={user.id === session?.user?.id}
                 >
                   <ShieldOff className="mr-2 h-4 w-4" />
@@ -209,7 +230,7 @@ export function UsersTable({
               ) : (
                 <>
                   <DropdownMenuItem
-                    onClick={() => onSetRole(user.id, "admin")}
+                    onClick={() => void requestRoleChange(user, "admin")}
                   >
                     <Shield className="mr-2 h-4 w-4" />
                     {t("actions.makeAdmin")}

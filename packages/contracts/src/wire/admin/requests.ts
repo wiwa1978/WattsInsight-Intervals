@@ -10,6 +10,8 @@ export const verifyBanSecretSchema = z.object({
 export const setRoleSchema = z.object({
   userId: z.string().uuid(),
   role: z.enum(["user", "admin"]),
+  reason: z.string().trim().max(1000).optional(),
+  confirmed: z.boolean().optional(),
 });
 
 export const userOnlySchema = z.object({

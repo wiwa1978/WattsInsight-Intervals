@@ -708,6 +708,10 @@
         "impersonate": "Nabootsen",
         "revokeSessions": "Alle sessies intrekken"
       },
+      "roleChange": {
+        "reasonPrompt": "Voer een reden in voor deze rolwijziging. Dit wordt opgeslagen in het auditlogboek.",
+        "demoteConfirm": "Admin-toegang voor deze gebruiker verwijderen? Er moet minstens een actieve admin overblijven."
+      },
       "banDialog": {
         "trigger": "Gebruiker blokkeren",
         "title": "Gebruiker blokkeren",
