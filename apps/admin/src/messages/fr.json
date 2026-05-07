@@ -708,6 +708,10 @@
         "impersonate": "Usurper l'identité",
         "revokeSessions": "Révoquer toutes les sessions"
       },
+      "roleChange": {
+        "reasonPrompt": "Indiquez une raison pour ce changement de rôle. Elle sera enregistrée dans le journal d'audit.",
+        "demoteConfirm": "Retirer l'accès admin à cet utilisateur ? Il doit rester au moins un admin actif."
+      },
       "banDialog": {
         "trigger": "Bannir l'utilisateur",
         "title": "Bannir l'utilisateur",

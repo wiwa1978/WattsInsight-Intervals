@@ -50,8 +50,8 @@ export default function AdminAdminsPage() {
   }, [queryClient]);
 
   const setRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: "user" | "admin" }) => {
-      const result = await setAdminUserRole(userId, role);
+    mutationFn: async ({ userId, role, reason, confirmed }: { userId: string; role: "user" | "admin"; reason?: string; confirmed?: boolean }) => {
+      const result = await setAdminUserRole(userId, role, { reason, confirmed });
       if ((result as { error?: unknown }).error) {
         throw new Error(tErrors("roleUpdateFailed"));
       }
@@ -167,7 +167,7 @@ export default function AdminAdminsPage() {
         displayTotal={totalAdmins}
         from={from}
         to={to}
-        onSetRole={(userId, role) => setRoleMutation.mutateAsync({ userId, role }).then(() => undefined)}
+        onSetRole={(userId, role, options) => setRoleMutation.mutateAsync({ userId, role, ...options }).then(() => undefined)}
         onUnban={(userId) => unbanMutation.mutateAsync(userId).then(() => undefined)}
         onImpersonate={(userId) => impersonateMutation.mutateAsync(userId).then(() => undefined)}
         onRevokeSessions={(userId) => revokeSessionsMutation.mutateAsync(userId).then(() => undefined)}

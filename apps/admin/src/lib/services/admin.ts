@@ -331,8 +331,12 @@ export async function getUsers(
   }
 }
 
-export async function setAdminUserRole(userId: string, role: "user" | "admin") {
-  return setAdminUserRoleApi(userId, role);
+export async function setAdminUserRole(
+  userId: string,
+  role: "user" | "admin",
+  options: { reason?: string; confirmed?: boolean } = {},
+) {
+  return setAdminUserRoleApi(userId, role, options);
 }
 
 export async function unbanAdminUser(userId: string) {

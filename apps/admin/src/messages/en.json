@@ -740,6 +740,10 @@
         "impersonate": "Impersonate",
         "revokeSessions": "Revoke All Sessions"
       },
+      "roleChange": {
+        "reasonPrompt": "Enter a reason for this role change. This will be stored in the audit log.",
+        "demoteConfirm": "Remove admin access for this user? At least one active admin must remain."
+      },
       "banDialog": {
         "trigger": "Ban User",
         "title": "Ban User",
