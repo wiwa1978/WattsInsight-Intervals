@@ -25,6 +25,7 @@ import {
   userOnlySchema,
   validateDiscountCodeSchema,
   createDiscountSchema,
+  createSubscriptionRefundSchema,
   createVoucherSchema,
   updateVoucherSchema,
   verifyBanSecretSchema,
@@ -1041,6 +1042,47 @@ export function createAdminRouter() {
 
     const data = await bootstrap.subscriptionService.listSubscriptionEvents(parsedQuery.data.limit);
     return c.json({ success: true, data });
+  });
+
+  router.post("/billing/subscription-refunds", async (c) => {
+    return withJsonBody(c, createSubscriptionRefundSchema, "Invalid subscription refund payload", async (body) => {
+      const actor = getAuthUser(c);
+      let result: Awaited<ReturnType<typeof bootstrap.subscriptionService.createSubscriptionRefund>>;
+
+      try {
+        result = await bootstrap.subscriptionService.createSubscriptionRefund({
+          paymentId: body.paymentId,
+          reason: body.reason,
+          actorUserId: actor.id,
+        });
+      } catch (error) {
+        const message = safeErrorMessage(error, "Failed to create subscription refund");
+        const status = message === "Subscription payment not found" ? 404 : message === "Only completed payments can be refunded" ? 400 : 502;
+        return c.json({ success: false, error: message }, status);
+      }
+
+      const auditFailure = await recordMutationAudit(c, {
+        action: "billing.subscription_refund.create",
+        outcome: "success",
+        targetType: "subscription_payment",
+        targetId: result.payment.id,
+        after: {
+          paymentId: result.payment.paymentId,
+          paymentStatus: result.payment.paymentStatus,
+          refundId: result.refund.refundId,
+          refundStatus: result.refund.status,
+        },
+        metadata: {
+          reason: body.reason ?? null,
+          userId: result.payment.userId,
+          amount: result.refund.amount ?? null,
+          currency: result.refund.currency ?? null,
+        },
+      });
+      if (auditFailure) return auditFailure;
+
+      return c.json({ success: true, data: { refund: result.refund, payment: result.payment } });
+    });
   });
 
   router.post("/billing/reconcile", async (c) => {
