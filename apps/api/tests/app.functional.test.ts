@@ -315,7 +315,11 @@ vi.mock("@platform/auth-core", () => ({
 vi.mock("@platform/payments-core", () => ({
   createPaymentsModule: () => {
     const router = new Hono();
-    router.post("/webhooks/dodo", async (c) => {
+    router.post("/webhooks/:provider", async (c) => {
+      if (c.req.param("provider") !== "dodo") {
+        return c.json({ success: false, error: "Unsupported payment provider" }, 404);
+      }
+
       if (c.req.header("x-dodo-signature") !== "valid") {
         return c.json({ success: false, error: "Invalid signature" }, 401);
       }
@@ -453,7 +457,7 @@ function getSourceDefinedAppRoutes() {
     ...extractRouterRoutes("auth.ts", "/auth"),
     ...extractRouterRoutes("me.ts", "/me"),
     ...extractRouterRoutes("admin.ts", "/admin"),
-    routeSignature("post", "/payments/webhooks/dodo"),
+    routeSignature("post", "/payments/webhooks/{provider}"),
     routeSignature("post", "/auth/mobile/token"),
     routeSignature("post", "/auth/mobile/refresh"),
     routeSignature("post", "/auth/mobile/revoke"),
@@ -634,6 +638,17 @@ describe("API functional routes", () => {
       headers: { "x-dodo-signature": "valid" },
     });
     expect(res.status).toBe(200);
+  });
+
+  it("rejects unsupported payment webhook providers", async () => {
+    const res = await app.request("/payments/webhooks/stripe", {
+      method: "POST",
+      headers: { "x-dodo-signature": "valid" },
+      body: "{}",
+    });
+
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Unsupported payment provider" });
   });
 
   // Verifies checkout endpoint rejects requests without packageKey.

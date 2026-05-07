@@ -267,8 +267,8 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     requestBody: requestBody(createCheckoutRequestSchema),
     responses: defaultResponses("Checkout session created", ["400", "401", "413", "429"]),
   }),
-  route("post", "/payments/webhooks/dodo", ["Payments"], "Receive Dodo webhook events", {
-    parameters: [headerParameter("x-dodo-signature", z.string(), true)],
+  route("post", "/payments/webhooks/{provider}", ["Payments"], "Receive payment provider webhook events", {
+    parameters: [pathParameter("provider", z.enum(["dodo"])), headerParameter("x-dodo-signature", z.string(), true)],
     requestBody: requestBody(genericObjectSchema),
     responses: defaultResponses("Webhook processed", ["400", "401", "413"]),
   }),

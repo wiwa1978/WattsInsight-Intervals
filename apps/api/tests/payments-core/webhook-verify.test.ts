@@ -141,6 +141,18 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
 
+  it("404 rejects unsupported webhook providers before verification", async () => {
+    const { app, onPaymentEvent } = build();
+    const res = await app.request("/webhooks/stripe", {
+      method: "POST",
+      body: samplePayload,
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ success: false, error: "Unsupported payment provider" });
+    expect(onPaymentEvent).not.toHaveBeenCalled();
+  });
+
   it("401 reports only unauthenticated-safe webhook failure metadata when signature header is missing", async () => {
     const onWebhookFailure = vi.fn(async () => {});
     const { app, onPaymentEvent } = build({ onWebhookFailure });

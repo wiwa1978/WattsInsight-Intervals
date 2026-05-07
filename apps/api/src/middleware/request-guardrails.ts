@@ -57,7 +57,7 @@ const routeGuardrails: RouteGuardrail[] = [
   { method: "POST", pattern: /^\/auth\/mobile\/refresh$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 60 } },
   { method: "POST", pattern: /^\/auth\/mobile\/revoke$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 60 } },
   { method: "POST", pattern: /^\/payments\/checkout$/, maxBodyBytes: 8 * KIB, rateLimit: { windowMs: 60_000, max: 30 } },
-  { method: "POST", pattern: /^\/payments\/webhooks\/dodo$/, maxBodyBytes: DEFAULT_WEBHOOK_BODY_BYTES },
+  { method: "POST", pattern: /^\/payments\/webhooks\/[^/]+$/, maxBodyBytes: DEFAULT_WEBHOOK_BODY_BYTES },
   { method: "POST", pattern: /^\/me\/vouchers\/redeem$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 20 } },
   { method: "POST", pattern: /^\/logs\/client$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 30 } },
   { method: "POST", pattern: /^\/admin\/step-up\/complete$/, maxBodyBytes: 2 * KIB, rateLimit: { windowMs: 60_000, max: 5 } },
@@ -173,7 +173,7 @@ export const requestGuardrails: MiddlewareHandler<AppEnv> = async (c, next) => {
   const maxBodyBytes = guardrail?.maxBodyBytes ?? (method === "POST" && contentType.includes("application/json") ? DEFAULT_JSON_BODY_BYTES : undefined);
 
   if (expectsJsonBody(method, c.req.path)) {
-    const isWebhook = c.req.path === "/payments/webhooks/dodo";
+    const isWebhook = /^\/payments\/webhooks\/[^/]+$/.test(c.req.path);
     const hasJsonBody = contentType.includes("application/json");
 
     if (!isWebhook && !hasJsonBody) {
