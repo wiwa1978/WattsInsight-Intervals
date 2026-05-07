@@ -1017,7 +1017,7 @@
             "plan": "Plan",
             "status": "Status",
             "periodEnd": "Period end",
-            "subscriptionId": "Dodo subscription"
+            "subscriptionId": "Provider subscription"
           },
           "status": {
             "active": "Active",
@@ -1034,7 +1034,7 @@
           "table": {
             "event": "Event",
             "status": "Status",
-            "dodoSubscription": "Dodo subscription",
+            "providerSubscription": "Provider subscription",
             "received": "Received"
           }
         }

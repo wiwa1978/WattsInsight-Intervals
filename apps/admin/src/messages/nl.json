@@ -1017,7 +1017,7 @@
             "plan": "Plan",
             "status": "Status",
             "periodEnd": "Periode-einde",
-            "subscriptionId": "Dodo-abonnement"
+            "subscriptionId": "Providerabonnement"
           },
           "status": {
             "active": "Actief",
@@ -1034,7 +1034,7 @@
           "table": {
             "event": "Gebeurtenis",
             "status": "Status",
-            "dodoSubscription": "Dodo-abonnement",
+            "providerSubscription": "Providerabonnement",
             "received": "Ontvangen"
           }
         }
