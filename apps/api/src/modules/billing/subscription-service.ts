@@ -128,10 +128,18 @@ function normalizeSearchEmail(searchEmail?: string) {
 
 export function createSubscriptionService(deps: SubscriptionServiceDeps) {
   async function getUserSubscription(userId: string) {
-    return deps.db.query.userSubscriptions.findFirst({
+    const subscription = await deps.db.query.userSubscriptions.findFirst({
       where: eq(userSubscriptions.userId, userId),
       orderBy: desc(userSubscriptions.createdAt),
     });
+
+    return subscription
+      ? {
+          ...subscription,
+          providerCustomerId: subscription.dodoCustomerId,
+          providerSubscriptionId: subscription.dodoSubscriptionId,
+        }
+      : null;
   }
 
   async function recordSubscriptionPayment(input: RecordSubscriptionPaymentInput) {
@@ -198,6 +206,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       .select({
         id: subscriptionPayments.id,
         planKey: subscriptionPayments.planKey,
+        providerSubscriptionId: subscriptionPayments.dodoSubscriptionId,
         dodoSubscriptionId: subscriptionPayments.dodoSubscriptionId,
         paymentStatus: subscriptionPayments.paymentStatus,
         paymentId: subscriptionPayments.paymentId,
@@ -395,6 +404,8 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
           id: userSubscriptions.id,
           userId: userSubscriptions.userId,
           planKey: userSubscriptions.planKey,
+          providerCustomerId: userSubscriptions.dodoCustomerId,
+          providerSubscriptionId: userSubscriptions.dodoSubscriptionId,
           dodoCustomerId: userSubscriptions.dodoCustomerId,
           dodoSubscriptionId: userSubscriptions.dodoSubscriptionId,
           status: userSubscriptions.status,
@@ -544,6 +555,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       .select({
         id: subscriptionEvents.id,
         userId: subscriptionEvents.userId,
+        providerSubscriptionId: subscriptionEvents.dodoSubscriptionId,
         dodoSubscriptionId: subscriptionEvents.dodoSubscriptionId,
         eventType: subscriptionEvents.eventType,
         status: subscriptionEvents.status,

@@ -1037,7 +1037,7 @@ describe("API functional routes", () => {
   it("passes pagination and search to subscription billing endpoint", async () => {
     setBillingModeForTest("subscriptions");
     mocks.subscriptionService.listSubscriptions.mockResolvedValueOnce({
-      subscriptions: [{ id: "sub-row-1" }],
+      subscriptions: [{ id: "sub-row-1", providerSubscriptionId: "sub_1" }],
       total: 1,
       hasMore: false,
     });
@@ -1048,7 +1048,7 @@ describe("API functional routes", () => {
     expect(mocks.subscriptionService.listSubscriptions).toHaveBeenCalledWith(5, 10, "alice@example.com");
     await expect(res.json()).resolves.toEqual({
       success: true,
-      data: { subscriptions: [{ id: "sub-row-1" }], total: 1, hasMore: false },
+      data: { subscriptions: [{ id: "sub-row-1", providerSubscriptionId: "sub_1" }], total: 1, hasMore: false },
     });
   });
 
@@ -1077,6 +1077,7 @@ describe("API functional routes", () => {
       {
         id: "evt_1",
         userId: "user_1",
+        providerSubscriptionId: "sub_1",
         dodoSubscriptionId: "sub_1",
         eventType: "subscription.active",
         status: "active",
@@ -1094,6 +1095,7 @@ describe("API functional routes", () => {
         {
           id: "evt_1",
           userId: "user_1",
+          providerSubscriptionId: "sub_1",
           dodoSubscriptionId: "sub_1",
           eventType: "subscription.active",
           status: "active",

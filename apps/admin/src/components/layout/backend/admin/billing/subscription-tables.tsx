@@ -67,7 +67,7 @@ export async function SubscriptionTable({ subscriptions }: { subscriptions: Subs
                   <TableCell>
                     {subscription.currentPeriodEnd ? formatDateTime(subscription.currentPeriodEnd) : "-"}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{subscription.dodoSubscriptionId}</TableCell>
+                  <TableCell className="font-mono text-xs">{subscription.providerSubscriptionId}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -104,7 +104,7 @@ export async function SubscriptionEventsTable({ events }: { events: Subscription
                 <TableRow key={event.id}>
                   <TableCell>{event.eventType}</TableCell>
                   <TableCell>{event.status ? <Badge variant={statusVariant(event.status)}>{event.status}</Badge> : "-"}</TableCell>
-                  <TableCell className="font-mono text-xs">{event.dodoSubscriptionId ?? "-"}</TableCell>
+                  <TableCell className="font-mono text-xs">{event.providerSubscriptionId ?? "-"}</TableCell>
                   <TableCell>{formatDateTime(event.createdAt)}</TableCell>
                 </TableRow>
               ))}

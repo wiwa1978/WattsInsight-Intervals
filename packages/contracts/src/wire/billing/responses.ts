@@ -79,6 +79,8 @@ export const userSubscriptionSchema = z.object({
   id: z.string(),
   userId: z.string(),
   planKey: z.string(),
+  providerCustomerId: z.string().nullable().optional(),
+  providerSubscriptionId: z.string(),
   dodoCustomerId: z.string().nullable().optional(),
   dodoSubscriptionId: z.string(),
   status: subscriptionStatusSchema,
@@ -94,6 +96,7 @@ export const userSubscriptionSchema = z.object({
 export const subscriptionPaymentSchema = z.object({
   id: z.string(),
   planKey: z.string(),
+  providerSubscriptionId: z.string().nullable().optional(),
   dodoSubscriptionId: z.string().nullable().optional(),
   paymentStatus: z.enum(["pending", "completed", "failed", "refunded"]),
   paymentId: z.string(),
@@ -139,6 +142,7 @@ export const subscriptionPlanDistributionPointSchema = z.object({
 export const subscriptionEventSchema = z.object({
   id: z.string(),
   userId: z.string().nullable().optional(),
+  providerSubscriptionId: z.string().nullable().optional(),
   dodoSubscriptionId: z.string().nullable().optional(),
   eventType: z.string(),
   status: subscriptionStatusSchema.nullable().optional(),

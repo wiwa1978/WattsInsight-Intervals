@@ -85,6 +85,7 @@ describe("subscription service helpers", () => {
       {
         id: "evt_1",
         userId: "user_1",
+        providerSubscriptionId: "sub_1",
         dodoSubscriptionId: "sub_1",
         eventType: "subscription.active",
         status: "active",
@@ -99,6 +100,32 @@ describe("subscription service helpers", () => {
 
     await expect(service.listSubscriptionEvents(10)).resolves.toEqual(events);
     expect(limit).toHaveBeenCalledWith(10);
+  });
+
+  it("returns provider-neutral identifiers for subscription responses", async () => {
+    const subscription = {
+      id: "us_1",
+      userId: "user_1",
+      planKey: "starter",
+      dodoCustomerId: "cus_1",
+      dodoSubscriptionId: "sub_1",
+      status: "active",
+    };
+    const service = createSubscriptionService({
+      db: {
+        query: {
+          userSubscriptions: {
+            findFirst: vi.fn().mockResolvedValue(subscription),
+          },
+        },
+      } as any,
+    });
+
+    await expect(service.getUserSubscription("user_1")).resolves.toEqual({
+      ...subscription,
+      providerCustomerId: "cus_1",
+      providerSubscriptionId: "sub_1",
+    });
   });
 
   it("creates provider refunds and marks subscription payments refunded", async () => {
