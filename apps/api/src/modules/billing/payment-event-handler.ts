@@ -3,7 +3,7 @@ import type { NormalizedPaymentEvent, PaymentEventHandler } from "@platform/paym
 import { subscriptionPlans, type creditPackages as CreditPackagesList } from "../../config/billing";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled } from "../../lib/feature-guards";
 import type { CheckoutIntentRecord, CheckoutIntentsService } from "./checkout-intents";
-import { isDodoSubscriptionWebhookEvent } from "./subscription-webhooks";
+import { isProviderSubscriptionWebhookEvent } from "./subscription-webhooks";
 
 type CreditPackage = (typeof CreditPackagesList)[number];
 
@@ -26,7 +26,7 @@ export type PaymentEventHandlerDeps = {
         currency: string;
       },
       snapshot: {
-        provider: "dodo";
+        provider: string;
         customerId?: string;
       },
     ) => Promise<unknown>;
@@ -35,12 +35,14 @@ export type PaymentEventHandlerDeps = {
   };
   checkoutIntents?: CheckoutIntentsService;
   subscriptions?: {
-    handleDodoSubscriptionWebhook: (payload: unknown) => Promise<void>;
+    handleSubscriptionWebhook: (payload: unknown) => Promise<void>;
     recordSubscriptionPayment?: (input: {
       userId: string;
       planKey: string;
       paymentId: string;
       paymentStatus: "completed" | "pending" | "failed";
+      providerCustomerId?: string | null;
+      providerSubscriptionId?: string | null;
       dodoCustomerId?: string | null;
       dodoSubscriptionId?: string | null;
       pricing: {
@@ -148,8 +150,8 @@ async function markCheckoutIntentForPaymentStatus(args: {
 }
 
 /**
- * Build the payment event handler that turns a verified Dodo
- * `payment.succeeded` webhook into a credit-purchase mutation.
+ * Build the payment event handler that turns a verified provider payment
+ * webhook into a local billing mutation.
  *
  * SECURITY: this handler refuses any event that does not carry an authoritative
  * `metadata.userId` (bound at checkout-URL construction time). Without that
@@ -160,9 +162,9 @@ async function markCheckoutIntentForPaymentStatus(args: {
  */
 export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): PaymentEventHandler {
   return async (event: NormalizedPaymentEvent) => {
-    if (isDodoSubscriptionWebhookEvent(event.eventType)) {
+    if (isProviderSubscriptionWebhookEvent(event.eventType)) {
       ensureSubscriptionBillingEnabled();
-      await deps.subscriptions?.handleDodoSubscriptionWebhook({
+      await deps.subscriptions?.handleSubscriptionWebhook({
         event_type: event.eventType,
         data: getWebhookDataPayload(event.raw),
       });
@@ -275,6 +277,8 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         planKey,
         paymentId: event.paymentId,
         paymentStatus,
+        providerCustomerId: event.customerId ?? null,
+        providerSubscriptionId: event.metadata.subscriptionId,
         dodoCustomerId: event.customerId ?? null,
         dodoSubscriptionId: event.metadata.subscriptionId,
         pricing: {
@@ -377,7 +381,7 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         currency: event.currency,
       },
       {
-        provider: "dodo",
+        provider: event.provider,
         customerId: event.customerId,
       },
     );

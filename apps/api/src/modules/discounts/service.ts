@@ -83,10 +83,10 @@ function getDodoApiBaseUrl(environment: "test_mode" | "live_mode") {
   return environment === "live_mode" ? "https://live.dodopayments.com" : "https://test.dodopayments.com";
 }
 
-function withProviderDiscountId<T extends { dodoDiscountId?: string | null }>(discount: T) {
+function withProviderDiscountId<T extends { providerDiscountId?: string | null; dodoDiscountId?: string | null }>(discount: T) {
   return {
     ...discount,
-    providerDiscountId: discount.dodoDiscountId ?? null,
+    providerDiscountId: discount.providerDiscountId ?? discount.dodoDiscountId ?? null,
   };
 }
 
@@ -351,6 +351,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
             endDate: input.endDate,
             maxUses: input.maxUses,
             currentUses: 0,
+            providerDiscountId: providerDiscount.discount_id,
             dodoDiscountId: providerDiscount.discount_id,
             status,
           })
@@ -415,14 +416,15 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     if (input.maxUses !== undefined) updateData.maxUses = input.maxUses;
     if (input.status !== undefined) updateData.status = input.status;
 
-    if (existing.dodoDiscountId) {
+    const existingProviderDiscountId = existing.providerDiscountId ?? existing.dodoDiscountId;
+    if (existingProviderDiscountId) {
       const providerUpdateData: ProviderUpdateDiscountRequest = {};
       if (input.code !== undefined) providerUpdateData.code = input.code;
       if (input.value !== undefined) providerUpdateData.amount = Math.round(input.value * 100);
       if (input.endDate !== undefined) providerUpdateData.expires_at = input.endDate.toISOString();
       if (input.maxUses !== undefined) providerUpdateData.usage_limit = input.maxUses ?? null;
       if (Object.keys(providerUpdateData).length > 0) {
-        await updateProviderDiscount(existing.dodoDiscountId, providerUpdateData);
+        await updateProviderDiscount(existingProviderDiscountId, providerUpdateData);
       }
     }
 
@@ -444,8 +446,9 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       return discountFailure("Discount not found");
     }
 
-    if (existing.dodoDiscountId) {
-      await deleteProviderDiscount(existing.dodoDiscountId);
+    const existingProviderDiscountId = existing.providerDiscountId ?? existing.dodoDiscountId;
+    if (existingProviderDiscountId) {
+      await deleteProviderDiscount(existingProviderDiscountId);
     }
 
     await deps.db.delete(discounts).where(eq(discounts.id, id));

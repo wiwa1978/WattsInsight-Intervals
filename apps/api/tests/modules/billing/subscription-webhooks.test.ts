@@ -3,16 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createSubscriptionWebhookHandler,
   getSubscriptionWebhookStatus,
-  isDodoSubscriptionWebhookEvent,
+  isProviderSubscriptionWebhookEvent,
 } from "../../../src/modules/billing/subscription-webhooks";
 
 describe("subscription webhooks", () => {
-  it("detects Dodo subscription events", () => {
-    expect(isDodoSubscriptionWebhookEvent("subscription.active")).toBe(true);
-    expect(isDodoSubscriptionWebhookEvent("payment.succeeded")).toBe(false);
+  it("detects provider subscription events", () => {
+    expect(isProviderSubscriptionWebhookEvent("subscription.active")).toBe(true);
+    expect(isProviderSubscriptionWebhookEvent("payment.succeeded")).toBe(false);
   });
 
-  it("maps Dodo subscription events to local statuses", () => {
+  it("maps provider subscription events to local statuses", () => {
     expect(getSubscriptionWebhookStatus("subscription.active", "active")).toBe("active");
     expect(getSubscriptionWebhookStatus("subscription.renewed", "active")).toBe("active");
     expect(getSubscriptionWebhookStatus("subscription.cancelled", "cancelled")).toBe("canceled");
@@ -44,7 +44,7 @@ describe("subscription webhooks", () => {
 
     expect(recordSubscriptionEvent).toHaveBeenCalledWith({
       userId: "user-1",
-      dodoSubscriptionId: "sub_123",
+      providerSubscriptionId: "sub_123",
       eventType: "subscription.active",
       status: "active",
       payload: expect.any(Object),
@@ -52,7 +52,8 @@ describe("subscription webhooks", () => {
     expect(upsertUserSubscription).toHaveBeenCalledWith({
       userId: "user-1",
       planKey: "starter",
-      dodoCustomerId: "cus_123",
+      providerCustomerId: "cus_123",
+      providerSubscriptionId: "sub_123",
       dodoSubscriptionId: "sub_123",
       status: "active",
       currentPeriodStart: new Date("2026-04-01T00:00:00.000Z"),

@@ -18,6 +18,8 @@ type RecordSubscriptionPaymentInput = {
   planKey: string;
   paymentId: string;
   paymentStatus: SubscriptionPaymentStatus;
+  providerCustomerId?: string | null;
+  providerSubscriptionId?: string | null;
   dodoCustomerId?: string | null;
   dodoSubscriptionId?: string | null;
   pricing: {
@@ -46,6 +48,8 @@ const supportedStatuses = new Set<SubscriptionStatus>([
 export type UpsertUserSubscriptionInput = {
   userId: string;
   planKey: string;
+  providerCustomerId?: string | null;
+  providerSubscriptionId?: string | null;
   dodoCustomerId?: string | null;
   dodoSubscriptionId: string;
   status: SubscriptionStatus | "cancelled";
@@ -56,6 +60,7 @@ export type UpsertUserSubscriptionInput = {
 
 export type RecordSubscriptionEventInput = {
   userId?: string | null;
+  providerSubscriptionId?: string | null;
   dodoSubscriptionId?: string | null;
   eventType: string;
   status?: SubscriptionStatus | "cancelled" | null;
@@ -136,19 +141,21 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     return subscription
       ? {
           ...subscription,
-          providerCustomerId: subscription.dodoCustomerId,
-          providerSubscriptionId: subscription.dodoSubscriptionId,
+          providerCustomerId: subscription.providerCustomerId ?? subscription.dodoCustomerId,
+          providerSubscriptionId: subscription.providerSubscriptionId ?? subscription.dodoSubscriptionId,
         }
       : null;
   }
 
   async function recordSubscriptionPayment(input: RecordSubscriptionPaymentInput) {
     const now = new Date();
+    const providerCustomerId = input.providerCustomerId ?? input.dodoCustomerId ?? null;
+    const providerSubscriptionId = input.providerSubscriptionId ?? input.dodoSubscriptionId ?? null;
     const paymentSnapshot = {
-      provider: "dodo" as const,
+      provider: deps.paymentProvider?.name ?? "dodo",
       planKey: input.planKey,
-      customerId: input.dodoCustomerId ?? undefined,
-      subscriptionId: input.dodoSubscriptionId ?? undefined,
+      customerId: providerCustomerId ?? undefined,
+      subscriptionId: providerSubscriptionId ?? undefined,
       priceExclVat: input.pricing.priceExclVat,
       priceInclVat: input.pricing.priceInclVat,
       vatAmount: input.pricing.vatAmount,
@@ -169,8 +176,10 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
         .values({
           userId: input.userId,
           planKey: input.planKey,
-          dodoCustomerId: input.dodoCustomerId ?? null,
-          dodoSubscriptionId: input.dodoSubscriptionId ?? null,
+          providerCustomerId,
+          providerSubscriptionId,
+          dodoCustomerId: providerCustomerId,
+          dodoSubscriptionId: providerSubscriptionId,
           paymentStatus: input.paymentStatus,
           priceExclVat: input.pricing.priceExclVat,
           priceInclVat: input.pricing.priceInclVat,
@@ -183,8 +192,10 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
           target: [subscriptionPayments.paymentProvider, subscriptionPayments.paymentId],
           set: {
             paymentStatus: input.paymentStatus,
-            dodoCustomerId: input.dodoCustomerId ?? existing?.dodoCustomerId ?? null,
-            dodoSubscriptionId: input.dodoSubscriptionId ?? existing?.dodoSubscriptionId ?? null,
+            providerCustomerId: providerCustomerId ?? existing?.providerCustomerId ?? existing?.dodoCustomerId ?? null,
+            providerSubscriptionId: providerSubscriptionId ?? existing?.providerSubscriptionId ?? existing?.dodoSubscriptionId ?? null,
+            dodoCustomerId: providerCustomerId ?? existing?.dodoCustomerId ?? null,
+            dodoSubscriptionId: providerSubscriptionId ?? existing?.dodoSubscriptionId ?? null,
             priceExclVat: input.pricing.priceExclVat,
             priceInclVat: input.pricing.priceInclVat,
             vatAmount: input.pricing.vatAmount,
@@ -206,7 +217,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       .select({
         id: subscriptionPayments.id,
         planKey: subscriptionPayments.planKey,
-        providerSubscriptionId: subscriptionPayments.dodoSubscriptionId,
+        providerSubscriptionId: subscriptionPayments.providerSubscriptionId,
         dodoSubscriptionId: subscriptionPayments.dodoSubscriptionId,
         paymentStatus: subscriptionPayments.paymentStatus,
         paymentId: subscriptionPayments.paymentId,
@@ -334,35 +345,67 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     }
   }
 
-  async function getLatestDodoCustomerId(userId: string) {
+  async function getLatestProviderCustomerId(userId: string) {
     const [subscription] = await deps.db
+      .select({
+        providerCustomerId: userSubscriptions.providerCustomerId,
+        dodoCustomerId: userSubscriptions.dodoCustomerId,
+      })
+      .from(userSubscriptions)
+      .where(and(eq(userSubscriptions.userId, userId), isNotNull(userSubscriptions.providerCustomerId)))
+      .orderBy(desc(userSubscriptions.createdAt))
+      .limit(1);
+
+    if (subscription?.providerCustomerId) {
+      return subscription.providerCustomerId;
+    }
+
+    const [legacySubscription] = await deps.db
       .select({ dodoCustomerId: userSubscriptions.dodoCustomerId })
       .from(userSubscriptions)
       .where(and(eq(userSubscriptions.userId, userId), isNotNull(userSubscriptions.dodoCustomerId)))
       .orderBy(desc(userSubscriptions.createdAt))
       .limit(1);
 
-    if (subscription?.dodoCustomerId) {
-      return subscription.dodoCustomerId;
+    if (legacySubscription?.dodoCustomerId) {
+      return legacySubscription.dodoCustomerId;
     }
 
     const [payment] = await deps.db
+      .select({
+        providerCustomerId: subscriptionPayments.providerCustomerId,
+        dodoCustomerId: subscriptionPayments.dodoCustomerId,
+      })
+      .from(subscriptionPayments)
+      .where(and(eq(subscriptionPayments.userId, userId), isNotNull(subscriptionPayments.providerCustomerId)))
+      .orderBy(desc(subscriptionPayments.createdAt))
+      .limit(1);
+
+    if (payment?.providerCustomerId) {
+      return payment.providerCustomerId;
+    }
+
+    const [legacyPayment] = await deps.db
       .select({ dodoCustomerId: subscriptionPayments.dodoCustomerId })
       .from(subscriptionPayments)
       .where(and(eq(subscriptionPayments.userId, userId), isNotNull(subscriptionPayments.dodoCustomerId)))
       .orderBy(desc(subscriptionPayments.createdAt))
       .limit(1);
 
-    return payment?.dodoCustomerId ?? null;
+    return legacyPayment?.dodoCustomerId ?? null;
   }
 
   async function upsertUserSubscription(input: UpsertUserSubscriptionInput) {
     const status = normalizeSubscriptionStatus(input.status);
+    const providerCustomerId = input.providerCustomerId ?? input.dodoCustomerId ?? null;
+    const providerSubscriptionId = input.providerSubscriptionId ?? input.dodoSubscriptionId;
     const values = {
       userId: input.userId,
       planKey: input.planKey,
-      dodoCustomerId: input.dodoCustomerId ?? null,
-      dodoSubscriptionId: input.dodoSubscriptionId,
+      providerCustomerId,
+      providerSubscriptionId,
+      dodoCustomerId: providerCustomerId,
+      dodoSubscriptionId: providerSubscriptionId,
       status,
       currentPeriodStart: input.currentPeriodStart ?? null,
       currentPeriodEnd: input.currentPeriodEnd ?? null,
@@ -374,7 +417,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       .insert(userSubscriptions)
       .values(values)
       .onConflictDoUpdate({
-        target: userSubscriptions.dodoSubscriptionId,
+        target: userSubscriptions.providerSubscriptionId,
         set: values,
       })
       .returning();
@@ -385,7 +428,8 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
   async function recordSubscriptionEvent(input: RecordSubscriptionEventInput) {
     await deps.db.insert(subscriptionEvents).values({
       userId: input.userId ?? null,
-      dodoSubscriptionId: input.dodoSubscriptionId ?? null,
+      providerSubscriptionId: input.providerSubscriptionId ?? input.dodoSubscriptionId ?? null,
+      dodoSubscriptionId: input.providerSubscriptionId ?? input.dodoSubscriptionId ?? null,
       eventType: input.eventType,
       status: input.status ? normalizeSubscriptionStatus(input.status) : null,
       payload: redactLogValue(input.payload) ?? null,
@@ -404,8 +448,8 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
           id: userSubscriptions.id,
           userId: userSubscriptions.userId,
           planKey: userSubscriptions.planKey,
-          providerCustomerId: userSubscriptions.dodoCustomerId,
-          providerSubscriptionId: userSubscriptions.dodoSubscriptionId,
+          providerCustomerId: userSubscriptions.providerCustomerId,
+          providerSubscriptionId: userSubscriptions.providerSubscriptionId,
           dodoCustomerId: userSubscriptions.dodoCustomerId,
           dodoSubscriptionId: userSubscriptions.dodoSubscriptionId,
           status: userSubscriptions.status,
@@ -462,6 +506,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       deps.db
         .select({
           paymentId: subscriptionPayments.paymentId,
+          providerSubscriptionId: subscriptionPayments.providerSubscriptionId,
           dodoSubscriptionId: subscriptionPayments.dodoSubscriptionId,
           paymentStatus: subscriptionPayments.paymentStatus,
           priceInclVat: subscriptionPayments.priceInclVat,
@@ -475,7 +520,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     const localPaymentIds = new Set(localPayments.map((payment: { paymentId: string }) => payment.paymentId));
     const localSubscriptionIds = new Set(
       localPayments
-        .map((payment: { dodoSubscriptionId?: string | null }) => payment.dodoSubscriptionId)
+        .map((payment: { providerSubscriptionId?: string | null; dodoSubscriptionId?: string | null }) => payment.providerSubscriptionId ?? payment.dodoSubscriptionId)
         .filter((id: string | null | undefined): id is string => typeof id === "string" && id.length > 0),
     );
     const primaryCurrency = localPayments.find((payment: { currency?: string | null }) => payment.currency)?.currency ?? "EUR";
@@ -555,7 +600,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       .select({
         id: subscriptionEvents.id,
         userId: subscriptionEvents.userId,
-        providerSubscriptionId: subscriptionEvents.dodoSubscriptionId,
+        providerSubscriptionId: subscriptionEvents.providerSubscriptionId,
         dodoSubscriptionId: subscriptionEvents.dodoSubscriptionId,
         eventType: subscriptionEvents.eventType,
         status: subscriptionEvents.status,
@@ -572,7 +617,8 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     listUserSubscriptionPayments,
     downloadSubscriptionInvoice,
     createSubscriptionRefund,
-    getLatestDodoCustomerId,
+    getLatestProviderCustomerId,
+    getLatestDodoCustomerId: getLatestProviderCustomerId,
     upsertUserSubscription,
     recordSubscriptionEvent,
     listSubscriptions,

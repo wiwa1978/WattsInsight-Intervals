@@ -70,6 +70,33 @@ const dodoPaymentsClient = env.DODO_PAYMENTS_API_KEY
       environment: env.DODO_PAYMENTS_ENVIRONMENT,
     })
   : null;
+
+function createPaymentProviderAuthPlugins(client: DodoPayments | null) {
+  if (!client) {
+    return [];
+  }
+
+  return [
+    dodopayments({
+      client,
+      createCustomerOnSignUp: true,
+      getCustomerParams: (authUser) => ({
+        metadata: {
+          userId: authUser.id,
+        },
+      }),
+      use: [
+        checkout({
+          products: getDodoCheckoutProductsForBillingMode(getBillingMode()),
+          successUrl: `${env.APP_URL}/billing?success=true`,
+          authenticatedUsersOnly: true,
+        }),
+        portal(),
+      ],
+    }),
+  ];
+}
+
 const paymentProviders = createPaymentProviderRegistry(
   createDodoPaymentProvider({
     apiKey: env.DODO_PAYMENTS_API_KEY,
@@ -232,27 +259,7 @@ const authModule = createAuthModule({
       openAPI({
         disableDefaultReference: true,
       }),
-      ...(dodoPaymentsClient
-        ? [
-            dodopayments({
-              client: dodoPaymentsClient,
-              createCustomerOnSignUp: true,
-              getCustomerParams: (authUser) => ({
-                metadata: {
-                  userId: authUser.id,
-                },
-              }),
-              use: [
-                checkout({
-                  products: getDodoCheckoutProductsForBillingMode(getBillingMode()),
-                  successUrl: `${env.APP_URL}/billing?success=true`,
-                  authenticatedUsersOnly: true,
-                }),
-                portal(),
-              ],
-            }),
-          ]
-        : []),
+      ...createPaymentProviderAuthPlugins(dodoPaymentsClient),
     ],
   },
   users: {
@@ -362,7 +369,7 @@ const paymentsModule = createPaymentsModule({
     billing: billingService,
     checkoutIntents: checkoutIntentsService,
     subscriptions: {
-      handleDodoSubscriptionWebhook: createSubscriptionWebhookHandler({
+      handleSubscriptionWebhook: createSubscriptionWebhookHandler({
         subscriptions: subscriptionService,
       }),
       recordSubscriptionPayment: subscriptionService.recordSubscriptionPayment,

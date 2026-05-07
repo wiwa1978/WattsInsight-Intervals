@@ -74,11 +74,11 @@ describe("payment event handler billing modes", () => {
   it("routes subscription events to the subscription webhook handler", async () => {
     (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "subscriptions";
     const billing = createBillingDeps();
-    const handleDodoSubscriptionWebhook = vi.fn().mockResolvedValue(undefined);
+    const handleSubscriptionWebhook = vi.fn().mockResolvedValue(undefined);
     const handler = createPaymentEventHandler({
       creditPackages: [],
       billing,
-      subscriptions: { handleDodoSubscriptionWebhook },
+      subscriptions: { handleSubscriptionWebhook },
     });
 
     await handler({
@@ -95,7 +95,7 @@ describe("payment event handler billing modes", () => {
       },
     });
 
-    expect(handleDodoSubscriptionWebhook).toHaveBeenCalledWith({
+    expect(handleSubscriptionWebhook).toHaveBeenCalledWith({
       event_type: "subscription.active",
       data: {
         subscription_id: "sub_1",
@@ -121,7 +121,7 @@ describe("payment event handler billing modes", () => {
       billing,
       checkoutIntents,
       subscriptions: {
-        handleDodoSubscriptionWebhook: vi.fn(),
+        handleSubscriptionWebhook: vi.fn(),
         recordSubscriptionPayment,
       },
     });
@@ -151,6 +151,8 @@ describe("payment event handler billing modes", () => {
       planKey: "starter",
       paymentId: "pay_sub_1",
       paymentStatus: "completed",
+      providerCustomerId: "cus_1",
+      providerSubscriptionId: "sub_1",
       dodoCustomerId: "cus_1",
       dodoSubscriptionId: "sub_1",
       pricing: {
@@ -293,7 +295,7 @@ describe("payment event handler billing modes", () => {
       billing,
       checkoutIntents,
       subscriptions: {
-        handleDodoSubscriptionWebhook: vi.fn(),
+        handleSubscriptionWebhook: vi.fn(),
         recordSubscriptionPayment,
       },
     });

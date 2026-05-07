@@ -3,7 +3,7 @@ import { z } from "zod";
 import { subscriptionPlans } from "../../config/billing";
 import { normalizeSubscriptionStatus, type UpsertUserSubscriptionInput } from "./subscription-service";
 
-const dodoSubscriptionEventTypes = [
+const subscriptionWebhookEventTypes = [
   "subscription.active",
   "subscription.renewed",
   "subscription.cancelled",
@@ -14,10 +14,10 @@ const dodoSubscriptionEventTypes = [
   "subscription.updated",
 ] as const;
 
-type DodoSubscriptionEventType = typeof dodoSubscriptionEventTypes[number];
+type SubscriptionWebhookEventType = typeof subscriptionWebhookEventTypes[number];
 
-const dodoSubscriptionWebhookSchema = z.object({
-  event_type: z.enum(dodoSubscriptionEventTypes),
+const subscriptionWebhookSchema = z.object({
+  event_type: z.enum(subscriptionWebhookEventTypes),
   data: z.object({
     subscription_id: z.string().min(1),
     product_id: z.string().min(1),
@@ -36,6 +36,7 @@ export type SubscriptionWebhookDeps = {
   subscriptions: {
     recordSubscriptionEvent: (input: {
       userId?: string | null;
+      providerSubscriptionId?: string | null;
       dodoSubscriptionId?: string | null;
       eventType: string;
       status?: UpsertUserSubscriptionInput["status"] | null;
@@ -45,11 +46,13 @@ export type SubscriptionWebhookDeps = {
   };
 };
 
-export function isDodoSubscriptionWebhookEvent(eventType: string): eventType is DodoSubscriptionEventType {
-  return dodoSubscriptionEventTypes.includes(eventType as DodoSubscriptionEventType);
+export function isProviderSubscriptionWebhookEvent(eventType: string): eventType is SubscriptionWebhookEventType {
+  return subscriptionWebhookEventTypes.includes(eventType as SubscriptionWebhookEventType);
 }
 
-export function getSubscriptionWebhookStatus(eventType: DodoSubscriptionEventType, payloadStatus: string) {
+export const isDodoSubscriptionWebhookEvent = isProviderSubscriptionWebhookEvent;
+
+export function getSubscriptionWebhookStatus(eventType: SubscriptionWebhookEventType, payloadStatus: string) {
   if (eventType === "subscription.failed") {
     return "past_due" as const;
   }
@@ -79,8 +82,8 @@ function getPlanKey(productId: string, metadata: Record<string, string> | null |
 }
 
 export function createSubscriptionWebhookHandler(deps: SubscriptionWebhookDeps) {
-  return async function handleDodoSubscriptionWebhook(payload: unknown) {
-    const parsed = dodoSubscriptionWebhookSchema.parse(payload);
+  return async function handleSubscriptionWebhook(payload: unknown) {
+    const parsed = subscriptionWebhookSchema.parse(payload);
     const data = parsed.data;
     const status = getSubscriptionWebhookStatus(parsed.event_type, data.status);
     const userId = data.metadata?.userId ?? null;
@@ -88,7 +91,7 @@ export function createSubscriptionWebhookHandler(deps: SubscriptionWebhookDeps) 
 
     await deps.subscriptions.recordSubscriptionEvent({
       userId,
-      dodoSubscriptionId: data.subscription_id,
+      providerSubscriptionId: data.subscription_id,
       eventType: parsed.event_type,
       status,
       payload,
@@ -101,7 +104,8 @@ export function createSubscriptionWebhookHandler(deps: SubscriptionWebhookDeps) 
     await deps.subscriptions.upsertUserSubscription({
       userId,
       planKey,
-      dodoCustomerId: data.customer?.customer_id ?? null,
+      providerCustomerId: data.customer?.customer_id ?? null,
+      providerSubscriptionId: data.subscription_id,
       dodoSubscriptionId: data.subscription_id,
       status,
       currentPeriodStart: parseDate(data.previous_billing_date),

@@ -88,6 +88,7 @@ export const creditPurchases = pgTable(
     currency: text("currency").default("EUR").notNull(),
     paymentProvider: text("payment_provider").default("dodo").notNull(),
     paymentId: text("payment_id").notNull(),
+    providerCustomerId: text("provider_customer_id"),
     dodoCustomerId: text("dodo_customer_id"),
     paymentStatus: text("payment_status")
       .$type<"pending" | "completed" | "failed" | "refunded">()
@@ -102,6 +103,7 @@ export const creditPurchases = pgTable(
     index("credit_purchases_user_id_idx").on(table.userId),
     uniqueIndex("credit_purchases_provider_payment_id_idx").on(table.paymentProvider, table.paymentId),
     index("credit_purchases_payment_id_idx").on(table.paymentId),
+    index("credit_purchases_provider_customer_id_idx").on(table.providerCustomerId),
     index("credit_purchases_dodo_customer_id_idx").on(table.dodoCustomerId),
     index("credit_purchases_payment_status_created_at_idx").on(table.paymentStatus, table.createdAt),
   ],
@@ -172,6 +174,8 @@ export const userSubscriptions = pgTable(
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
     planKey: text("plan_key").notNull(),
+    providerCustomerId: text("provider_customer_id"),
+    providerSubscriptionId: text("provider_subscription_id").notNull(),
     dodoCustomerId: text("dodo_customer_id"),
     dodoSubscriptionId: text("dodo_subscription_id").notNull(),
     status: text("status").$type<SubscriptionStatus>().notNull(),
@@ -183,6 +187,8 @@ export const userSubscriptions = pgTable(
   },
   (table) => [
     index("user_subscriptions_user_id_idx").on(table.userId),
+    uniqueIndex("user_subscriptions_provider_subscription_id_idx").on(table.providerSubscriptionId),
+    index("user_subscriptions_provider_customer_id_idx").on(table.providerCustomerId),
     uniqueIndex("user_subscriptions_dodo_subscription_id_idx").on(table.dodoSubscriptionId),
     index("user_subscriptions_status_idx").on(table.status),
     index("user_subscriptions_plan_key_idx").on(table.planKey),
@@ -194,6 +200,7 @@ export const subscriptionEvents = pgTable(
   {
     id,
     userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }),
+    providerSubscriptionId: text("provider_subscription_id"),
     dodoSubscriptionId: text("dodo_subscription_id"),
     eventType: text("event_type").notNull(),
     status: text("status").$type<SubscriptionStatus>(),
@@ -203,6 +210,7 @@ export const subscriptionEvents = pgTable(
   },
   (table) => [
     index("subscription_events_user_id_idx").on(table.userId),
+    index("subscription_events_provider_subscription_id_idx").on(table.providerSubscriptionId),
     index("subscription_events_dodo_subscription_id_idx").on(table.dodoSubscriptionId),
     index("subscription_events_event_type_idx").on(table.eventType),
     index("subscription_events_created_at_idx").on(table.createdAt),
@@ -217,6 +225,8 @@ export const subscriptionPayments = pgTable(
       .references(() => user.id, { onDelete: "cascade" })
       .notNull(),
     planKey: text("plan_key").notNull(),
+    providerCustomerId: text("provider_customer_id"),
+    providerSubscriptionId: text("provider_subscription_id"),
     dodoCustomerId: text("dodo_customer_id"),
     dodoSubscriptionId: text("dodo_subscription_id"),
     paymentProvider: text("payment_provider").default("dodo").notNull(),
@@ -237,6 +247,8 @@ export const subscriptionPayments = pgTable(
     index("subscription_payments_user_id_idx").on(table.userId),
     uniqueIndex("subscription_payments_provider_payment_id_idx").on(table.paymentProvider, table.paymentId),
     index("subscription_payments_payment_id_idx").on(table.paymentId),
+    index("subscription_payments_provider_customer_id_idx").on(table.providerCustomerId),
+    index("subscription_payments_provider_subscription_id_idx").on(table.providerSubscriptionId),
     index("subscription_payments_subscription_id_idx").on(table.dodoSubscriptionId),
     index("subscription_payments_status_created_at_idx").on(table.paymentStatus, table.createdAt),
   ],
@@ -253,6 +265,7 @@ export const discounts = pgTable(
     endDate: timestamp("end_date", { withTimezone: true }).notNull(),
     maxUses: integer("max_uses"),
     currentUses: integer("current_uses").default(0).notNull(),
+    providerDiscountId: text("provider_discount_id").unique(),
     dodoDiscountId: text("dodo_discount_id").unique(),
     status: text("status")
       .$type<"active" | "inactive" | "expired">()
@@ -263,6 +276,7 @@ export const discounts = pgTable(
   },
   (table) => [
     index("discounts_code_idx").on(table.code),
+    index("discounts_provider_discount_id_idx").on(table.providerDiscountId),
     index("discounts_dodo_discount_id_idx").on(table.dodoDiscountId),
     index("discounts_status_idx").on(table.status),
     index("discounts_start_date_idx").on(table.startDate),
@@ -429,8 +443,8 @@ export const subscriptionEventsRelations = relations(subscriptionEvents, ({ one 
     references: [user.id],
   }),
   subscription: one(userSubscriptions, {
-    fields: [subscriptionEvents.dodoSubscriptionId],
-    references: [userSubscriptions.dodoSubscriptionId],
+    fields: [subscriptionEvents.providerSubscriptionId],
+    references: [userSubscriptions.providerSubscriptionId],
   }),
 }));
 
@@ -440,8 +454,8 @@ export const subscriptionPaymentsRelations = relations(subscriptionPayments, ({ 
     references: [user.id],
   }),
   subscription: one(userSubscriptions, {
-    fields: [subscriptionPayments.dodoSubscriptionId],
-    references: [userSubscriptions.dodoSubscriptionId],
+    fields: [subscriptionPayments.providerSubscriptionId],
+    references: [userSubscriptions.providerSubscriptionId],
   }),
 }));
 
