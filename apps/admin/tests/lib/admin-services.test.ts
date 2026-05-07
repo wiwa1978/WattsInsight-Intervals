@@ -5,12 +5,12 @@ import {
   getAdminAllTransactions,
   getAdminBillingStats,
   getAdminBillingSubscriptionEvents,
+  getAdminBillingSubscriptionFinanceSummary,
   getAdminBillingSubscriptionPlanDistribution,
   getAdminBillingSubscriptionStats,
   getAdminBillingSubscriptions,
   getAdminCreditsConsumedData,
   getAdminRevenueData,
-  getAdminSubscriptionStats,
   getAdminSystemHealth,
   getAdminTransactionData,
   getUsers,
@@ -21,12 +21,12 @@ import {
   getAdminAllTransactionsApi,
   getAdminBillingStatsApi,
   getAdminBillingSubscriptionEventsApi,
+  getAdminBillingSubscriptionFinanceSummaryApi,
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
   getAdminCreditsConsumedDataApi,
   getAdminRevenueDataApi,
-  getAdminSubscriptionStatsApi,
   getAdminTransactionDataApi,
   getAdminUsersApi,
   getSystemHealthApi,
@@ -39,12 +39,12 @@ vi.mock("../../src/lib/api/admin", () => ({
   getAdminAllTransactionsApi: vi.fn(),
   getAdminBillingStatsApi: vi.fn(),
   getAdminBillingSubscriptionEventsApi: vi.fn(),
+  getAdminBillingSubscriptionFinanceSummaryApi: vi.fn(),
   getAdminBillingSubscriptionPlanDistributionApi: vi.fn(),
   getAdminBillingSubscriptionStatsApi: vi.fn(),
   getAdminBillingSubscriptionsApi: vi.fn(),
   getAdminCreditsConsumedDataApi: vi.fn(),
   getAdminRevenueDataApi: vi.fn(),
-  getAdminSubscriptionStatsApi: vi.fn(),
   getAdminTransactionDataApi: vi.fn(),
   getAdminUsersApi: vi.fn(),
   getSystemHealthApi: vi.fn(),
@@ -55,12 +55,12 @@ const getAdminAllPurchasesApiMock = vi.mocked(getAdminAllPurchasesApi);
 const getAdminAllTransactionsApiMock = vi.mocked(getAdminAllTransactionsApi);
 const getAdminBillingStatsApiMock = vi.mocked(getAdminBillingStatsApi);
 const getAdminBillingSubscriptionEventsApiMock = vi.mocked(getAdminBillingSubscriptionEventsApi);
+const getAdminBillingSubscriptionFinanceSummaryApiMock = vi.mocked(getAdminBillingSubscriptionFinanceSummaryApi);
 const getAdminBillingSubscriptionPlanDistributionApiMock = vi.mocked(getAdminBillingSubscriptionPlanDistributionApi);
 const getAdminBillingSubscriptionStatsApiMock = vi.mocked(getAdminBillingSubscriptionStatsApi);
 const getAdminBillingSubscriptionsApiMock = vi.mocked(getAdminBillingSubscriptionsApi);
 const getAdminCreditsConsumedDataApiMock = vi.mocked(getAdminCreditsConsumedDataApi);
 const getAdminRevenueDataApiMock = vi.mocked(getAdminRevenueDataApi);
-const getAdminSubscriptionStatsApiMock = vi.mocked(getAdminSubscriptionStatsApi);
 const getAdminTransactionDataApiMock = vi.mocked(getAdminTransactionDataApi);
 const getAdminUsersApiMock = vi.mocked(getAdminUsersApi);
 const getSystemHealthApiMock = vi.mocked(getSystemHealthApi);
@@ -105,18 +105,41 @@ describe("admin services", () => {
       monthlyRecurringRevenue: 49,
       annualRecurringRevenue: 588,
     };
-    getAdminSubscriptionStatsApiMock.mockResolvedValue(stats);
+    getAdminBillingSubscriptionStatsApiMock.mockResolvedValue(stats);
 
-    await expect(getAdminSubscriptionStats()).resolves.toBe(stats);
-    expect(getAdminSubscriptionStatsApiMock).toHaveBeenCalledOnce();
+    await expect(getAdminBillingSubscriptionStats()).resolves.toBe(stats);
+    expect(getAdminBillingSubscriptionStatsApiMock).toHaveBeenCalledOnce();
   });
 
   it("delegates subscription list queries to the admin API", async () => {
     const subscriptions = { subscriptions: [], total: 0, hasMore: false };
-    getAdminAllSubscriptionsApiMock.mockResolvedValue(subscriptions);
+    getAdminBillingSubscriptionsApiMock.mockResolvedValue(subscriptions);
 
-    await expect(getAdminAllSubscriptions(25, 50, "alice@example.com")).resolves.toBe(subscriptions);
-    expect(getAdminAllSubscriptionsApiMock).toHaveBeenCalledWith(25, 50, "alice@example.com");
+    await expect(getAdminBillingSubscriptions(25, 50, "alice@example.com")).resolves.toBe(subscriptions);
+    expect(getAdminBillingSubscriptionsApiMock).toHaveBeenCalledWith(25, 50, "alice@example.com");
+  });
+
+  it("delegates subscription finance summary to the admin API", async () => {
+    const summary = {
+      currency: "EUR",
+      grossRevenue: 19,
+      refundedRevenue: 9,
+      netRevenue: 10,
+      totalPayments: 4,
+      completedPayments: 1,
+      refundedPayments: 1,
+      failedPayments: 1,
+      pendingPayments: 1,
+      providerFinanceAvailable: true,
+      providerPaymentsChecked: 2,
+      providerSubscriptionsChecked: 2,
+      unmatchedProviderPayments: 1,
+      unmatchedProviderSubscriptions: 1,
+    };
+    getAdminBillingSubscriptionFinanceSummaryApiMock.mockResolvedValue(summary);
+
+    await expect(getAdminBillingSubscriptionFinanceSummary()).resolves.toBe(summary);
+    expect(getAdminBillingSubscriptionFinanceSummaryApiMock).toHaveBeenCalledOnce();
   });
 
   it("delegates admin account list queries with admin role filtering", async () => {

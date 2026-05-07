@@ -995,6 +995,16 @@
             "expired": "Expiré",
             "paused": "En pause"
           }
+        },
+        "events": {
+          "title": "Événements d'abonnement",
+          "empty": "Aucun événement d'abonnement trouvé.",
+          "table": {
+            "event": "Événement",
+            "status": "Statut",
+            "dodoSubscription": "Abonnement Dodo",
+            "received": "Reçu"
+          }
         }
       },
       "errors": {

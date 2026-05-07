@@ -7,7 +7,7 @@ type SubscriptionPlanDistributionProps = {
 };
 
 export async function SubscriptionPlanDistribution({ distribution }: SubscriptionPlanDistributionProps) {
-  const t = await getTranslations("admin.billing.subscription.planDistribution");
+  const t = await getTranslations("admin.billing.subscriptionsMode");
 
   return (
     <Card>

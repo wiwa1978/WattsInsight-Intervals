@@ -146,7 +146,7 @@ export default async function AdminBillingPage() {
 }
 
 async function AdminSubscriptionBillingPage() {
-  const t = await getTranslations("admin.billing.subscription");
+  const t = await getTranslations("admin.billing.subscriptionsMode");
   const [stats, financeSummary, distribution, subscriptions, events] = await Promise.all([
     getAdminBillingSubscriptionStats(),
     getAdminBillingSubscriptionFinanceSummary(),

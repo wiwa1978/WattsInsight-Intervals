@@ -1027,6 +1027,16 @@
             "expired": "Verlopen",
             "paused": "Gepauzeerd"
           }
+        },
+        "events": {
+          "title": "Abonnementsgebeurtenissen",
+          "empty": "Geen abonnementsgebeurtenissen gevonden.",
+          "table": {
+            "event": "Gebeurtenis",
+            "status": "Status",
+            "dodoSubscription": "Dodo-abonnement",
+            "received": "Ontvangen"
+          }
         }
       },
       "errors": {
