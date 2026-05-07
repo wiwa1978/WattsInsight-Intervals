@@ -991,6 +991,17 @@
           "annualRecurringRevenue": "ARR",
           "annualRecurringRevenueDescription": "Geannualiseerde terugkerende omzet"
         },
+        "finance": {
+          "grossRevenue": "Bruto omzet",
+          "grossRevenueDescription": "Uit {count} voltooide betalingen",
+          "netRevenue": "Netto omzet",
+          "netRevenueDescription": "Na {refunded} terugbetaald",
+          "refunds": "Terugbetalingen",
+          "refundsDescription": "Totaal terugbetaald: {amount}",
+          "providerDrift": "Provider-afwijking",
+          "providerDriftDescription": "{payments} betalingen · {subscriptions} abonnementen niet gekoppeld",
+          "providerUnavailable": "Provider-financegegevens niet beschikbaar"
+        },
         "planDistribution": {
           "title": "Planverdeling",
           "empty": "Geen abonnementen gevonden.",

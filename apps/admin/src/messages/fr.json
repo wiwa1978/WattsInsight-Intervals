@@ -959,6 +959,17 @@
           "annualRecurringRevenue": "ARR",
           "annualRecurringRevenueDescription": "Revenu récurrent annualisé"
         },
+        "finance": {
+          "grossRevenue": "Revenu brut",
+          "grossRevenueDescription": "Depuis {count} paiements terminés",
+          "netRevenue": "Revenu net",
+          "netRevenueDescription": "Après {refunded} remboursé",
+          "refunds": "Remboursements",
+          "refundsDescription": "Montant remboursé total : {amount}",
+          "providerDrift": "Écart fournisseur",
+          "providerDriftDescription": "{payments} paiements · {subscriptions} abonnements non rapprochés",
+          "providerUnavailable": "Données financières fournisseur indisponibles"
+        },
         "planDistribution": {
           "title": "Répartition des offres",
           "empty": "Aucun abonnement trouvé.",

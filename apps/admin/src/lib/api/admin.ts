@@ -21,6 +21,7 @@ import type {
   PurchasesList,
   RevenuePoint,
   SubscriptionEvent,
+  SubscriptionFinanceSummary,
   SubscriptionPlanDistributionPoint,
   SubscriptionStats,
   SubscriptionsList,
@@ -229,6 +230,13 @@ export async function getAdminBillingSubscriptionsApi(limit = 20, offset = 0, se
 export async function getAdminBillingSubscriptionStatsApi() {
   const result = await apiRequest<{ success: boolean; data: SubscriptionStats }>(
     apiRoutes.admin.billingSubscriptionStats,
+  );
+  return result.data;
+}
+
+export async function getAdminBillingSubscriptionFinanceSummaryApi() {
+  const result = await apiRequest<{ success: boolean; data: SubscriptionFinanceSummary }>(
+    apiRoutes.admin.billingSubscriptionFinanceSummary,
   );
   return result.data;
 }

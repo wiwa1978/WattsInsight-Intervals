@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => {
     getPlanDistribution: vi.fn(),
     listSubscriptionEvents: vi.fn(),
     createSubscriptionRefund: vi.fn(),
+    getSubscriptionFinanceSummary: vi.fn(),
     listUserSubscriptionPayments: vi.fn(),
     downloadSubscriptionInvoice: vi.fn(),
     getLatestDodoCustomerId: vi.fn(),
@@ -986,6 +987,49 @@ describe("API functional routes", () => {
         canceledSubscriptions: 0,
         monthlyRecurringRevenue: 68,
         annualRecurringRevenue: 816,
+      },
+    });
+  });
+
+  it("returns subscription finance summary", async () => {
+    setBillingModeForTest("subscriptions");
+    mocks.subscriptionService.getSubscriptionFinanceSummary.mockResolvedValueOnce({
+      currency: "EUR",
+      grossRevenue: 19,
+      refundedRevenue: 9,
+      netRevenue: 10,
+      totalPayments: 4,
+      completedPayments: 1,
+      refundedPayments: 1,
+      failedPayments: 1,
+      pendingPayments: 1,
+      providerFinanceAvailable: true,
+      providerPaymentsChecked: 2,
+      providerSubscriptionsChecked: 2,
+      unmatchedProviderPayments: 1,
+      unmatchedProviderSubscriptions: 1,
+    });
+
+    const res = await app.request("/admin/billing/subscription-finance-summary");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        currency: "EUR",
+        grossRevenue: 19,
+        refundedRevenue: 9,
+        netRevenue: 10,
+        totalPayments: 4,
+        completedPayments: 1,
+        refundedPayments: 1,
+        failedPayments: 1,
+        pendingPayments: 1,
+        providerFinanceAvailable: true,
+        providerPaymentsChecked: 2,
+        providerSubscriptionsChecked: 2,
+        unmatchedProviderPayments: 1,
+        unmatchedProviderSubscriptions: 1,
       },
     });
   });

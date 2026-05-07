@@ -195,4 +195,43 @@ describe("subscription service helpers", () => {
     await expect(service.createSubscriptionRefund({ paymentId: "pay_1" })).rejects.toThrow("provider failed");
     expect(updateSet).toHaveBeenLastCalledWith(expect.objectContaining({ paymentStatus: "completed" }));
   });
+
+  it("summarizes subscription finance from local and provider rows", async () => {
+    const from = vi.fn().mockResolvedValue([
+      { paymentId: "pay_1", dodoSubscriptionId: "sub_1", paymentStatus: "completed", priceInclVat: 1900, currency: "EUR" },
+      { paymentId: "pay_2", dodoSubscriptionId: "sub_2", paymentStatus: "refunded", priceInclVat: 900, currency: "EUR" },
+      { paymentId: "pay_3", dodoSubscriptionId: "sub_3", paymentStatus: "failed", priceInclVat: 2900, currency: "EUR" },
+      { paymentId: "pay_4", dodoSubscriptionId: "sub_4", paymentStatus: "pending", priceInclVat: 3900, currency: "EUR" },
+    ]);
+    const select = vi.fn().mockReturnValue({ from });
+    const service = createSubscriptionService({
+      db: { select } as any,
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: false, refunds: false, finance: true },
+        createCheckoutUrl: vi.fn(),
+        finance: {
+          listPayments: vi.fn().mockResolvedValue({ items: [{ paymentId: "pay_1" }, { paymentId: "pay_provider_only" }] }),
+          listSubscriptions: vi.fn().mockResolvedValue({ items: [{ subscriptionId: "sub_1" }, { subscriptionId: "sub_provider_only" }] }),
+        },
+      },
+    });
+
+    await expect(service.getSubscriptionFinanceSummary()).resolves.toEqual({
+      currency: "EUR",
+      grossRevenue: 19,
+      refundedRevenue: 9,
+      netRevenue: 10,
+      totalPayments: 4,
+      completedPayments: 1,
+      refundedPayments: 1,
+      failedPayments: 1,
+      pendingPayments: 1,
+      providerFinanceAvailable: true,
+      providerPaymentsChecked: 2,
+      providerSubscriptionsChecked: 2,
+      unmatchedProviderPayments: 1,
+      unmatchedProviderSubscriptions: 1,
+    });
+  });
 });

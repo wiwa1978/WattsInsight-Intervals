@@ -6,10 +6,10 @@ import type { SubscriptionStats } from "@platform/contracts";
 
 type SubscriptionStatsGridProps = {
   stats: SubscriptionStats;
-  t: ReturnType<typeof useTranslations>;
 };
 
-export function SubscriptionStatsGrid({ stats, t }: SubscriptionStatsGridProps) {
+export async function SubscriptionStatsGrid({ stats }: SubscriptionStatsGridProps) {
+  const t = await getTranslations("admin.billing.subscriptionsMode");
   const cards = [
     {
       title: t("stats.activeSubscriptions"),

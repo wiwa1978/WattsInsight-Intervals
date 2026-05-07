@@ -5,6 +5,7 @@ import {
   getAdminAllTransactionsApi,
   getAdminBillingStatsApi,
   getAdminBillingSubscriptionEventsApi,
+  getAdminBillingSubscriptionFinanceSummaryApi,
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
@@ -50,6 +51,7 @@ import type {
   PurchasesList,
   RevenuePoint,
   SubscriptionEvent,
+  SubscriptionFinanceSummary,
   SubscriptionPlanDistributionPoint,
   SubscriptionStats,
   SubscriptionsList,
@@ -97,6 +99,22 @@ const emptySubscriptionStats: SubscriptionStats = {
   annualRecurringRevenue: 0,
 };
 const emptySubscriptionsList: SubscriptionsList = { subscriptions: [], total: 0, hasMore: false };
+const emptySubscriptionFinanceSummary: SubscriptionFinanceSummary = {
+  currency: "EUR",
+  grossRevenue: 0,
+  refundedRevenue: 0,
+  netRevenue: 0,
+  totalPayments: 0,
+  completedPayments: 0,
+  refundedPayments: 0,
+  failedPayments: 0,
+  pendingPayments: 0,
+  providerFinanceAvailable: false,
+  providerPaymentsChecked: 0,
+  providerSubscriptionsChecked: 0,
+  unmatchedProviderPayments: 0,
+  unmatchedProviderSubscriptions: 0,
+};
 
 async function getCreditBillingChartData<T>(loadData: () => Promise<T[]>): Promise<T[]> {
   try {
@@ -250,6 +268,18 @@ export async function getAdminBillingSubscriptionStats(): Promise<SubscriptionSt
   } catch (error) {
     if (isSubscriptionBillingDisabledError(error)) {
       return emptySubscriptionStats;
+    }
+
+    throw error;
+  }
+}
+
+export async function getAdminBillingSubscriptionFinanceSummary(): Promise<SubscriptionFinanceSummary> {
+  try {
+    return await getAdminBillingSubscriptionFinanceSummaryApi();
+  } catch (error) {
+    if (isSubscriptionBillingDisabledError(error)) {
+      return emptySubscriptionFinanceSummary;
     }
 
     throw error;
