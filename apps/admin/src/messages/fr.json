@@ -985,7 +985,7 @@
             "plan": "Offre",
             "status": "Statut",
             "periodEnd": "Fin de période",
-            "subscriptionId": "Abonnement Dodo"
+            "subscriptionId": "Abonnement fournisseur"
           },
           "status": {
             "active": "Actif",
@@ -1002,7 +1002,7 @@
           "table": {
             "event": "Événement",
             "status": "Statut",
-            "dodoSubscription": "Abonnement Dodo",
+            "providerSubscription": "Abonnement fournisseur",
             "received": "Reçu"
           }
         }

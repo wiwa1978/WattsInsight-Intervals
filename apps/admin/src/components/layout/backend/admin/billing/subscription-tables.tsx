@@ -95,7 +95,7 @@ export async function SubscriptionEventsTable({ events }: { events: Subscription
               <TableRow>
                 <TableHead>{t("table.event")}</TableHead>
                 <TableHead>{t("table.status")}</TableHead>
-                <TableHead>{t("table.dodoSubscription")}</TableHead>
+                <TableHead>{t("table.providerSubscription")}</TableHead>
                 <TableHead>{t("table.received")}</TableHead>
               </TableRow>
             </TableHeader>
