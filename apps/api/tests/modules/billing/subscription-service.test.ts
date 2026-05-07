@@ -51,9 +51,11 @@ describe("subscription service helpers", () => {
           }),
         }),
       } as any,
-      env: {
-        DODO_PAYMENTS_API_KEY: "api-key",
-        DODO_PAYMENTS_ENVIRONMENT: "test_mode",
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: true, refunds: false, finance: false },
+        createCheckoutUrl: vi.fn(),
+        getInvoice: vi.fn(async () => ({ invoiceUrl: "https://invoices.test/subscription.pdf" })),
       },
     });
 

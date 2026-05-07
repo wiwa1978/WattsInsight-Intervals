@@ -11,7 +11,7 @@ import {
 import type { ConsumeCreditsRequest, ConsumeCreditsResponse } from "@platform/contracts/wire";
 
 import { creditPackages } from "../../config/billing";
-import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
+import type { PaymentProvider } from "../payments/provider";
 
 type CreditLedgerTransactionType = "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
 type CreditLedgerReferenceType = "payment" | "feature_usage" | "admin" | "bonus" | "voucher";
@@ -36,10 +36,7 @@ type ApplyCreditDeltaResult = {
 
 type BillingServiceDeps = {
   db: any;
-  env: {
-    DODO_PAYMENTS_API_KEY?: string;
-    DODO_PAYMENTS_ENVIRONMENT: "test_mode" | "live_mode";
-  };
+  paymentProvider: PaymentProvider;
   notifications: {
     createNotification: (input: {
       userId: string;
@@ -486,44 +483,15 @@ export function createBillingService(deps: BillingServiceDeps) {
       throw new Error("Invoice not available for this payment");
     }
 
-    const apiKey = deps.env.DODO_PAYMENTS_API_KEY;
-    if (!apiKey) {
-      throw new Error("DodoPayments API key not configured");
+    if (!deps.paymentProvider.getInvoice) {
+      throw new Error("Payment provider invoice support is not configured");
     }
 
-    const baseUrl =
-      deps.env.DODO_PAYMENTS_ENVIRONMENT === "live_mode"
-        ? "https://live.dodopayments.com"
-        : "https://test.dodopayments.com";
-
-    let response: Response;
-    try {
-      response = await fetch(
-        `${baseUrl}/invoices/payments/${paymentId}`,
-        withProviderTimeout({
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-        }),
-      );
-    } catch (error) {
-      throw new Error(isProviderTimeout(error) ? "Invoice provider request timed out" : "Invoice provider request failed");
-    }
-
-    if (!response.ok) {
-      throw new Error("Invoice provider request failed");
-    }
-
-    const invoiceData = (await response.json()) as { invoice_pdf?: string; url?: string };
-    if (!invoiceData.invoice_pdf && !invoiceData.url) {
-      throw new Error("Invoice URL not available in API response");
-    }
+    const invoice = await deps.paymentProvider.getInvoice(paymentId);
 
     return {
       success: true as const,
-      invoiceUrl: invoiceData.invoice_pdf || invoiceData.url,
+      invoiceUrl: invoice.invoiceUrl,
     };
   }
 

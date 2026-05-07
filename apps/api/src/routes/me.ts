@@ -84,21 +84,18 @@ export function createMeRouter() {
       return c.json({ success: false, error: "No billing customer found" }, 404);
     }
 
-    const dodoCustomerPortal = bootstrap.dodoPaymentsClient?.customers?.customerPortal;
-    if (!dodoCustomerPortal) {
+    const paymentProvider = bootstrap.paymentProviders.activeProvider;
+    if (!paymentProvider.createCustomerPortal) {
       return c.json({ success: false, error: "Customer portal is not configured" }, 503);
     }
 
     try {
-      const session = await dodoCustomerPortal.create(dodoCustomerId, {
-        return_url: createPortalReturnUrl(),
+      const session = await paymentProvider.createCustomerPortal({
+        customerId: dodoCustomerId,
+        returnUrl: createPortalReturnUrl(),
       });
 
-      if (!session?.link) {
-        return c.json({ success: false, error: "Customer portal URL not available" }, 502);
-      }
-
-      return c.json({ success: true, data: { portalUrl: session.link } });
+      return c.json({ success: true, data: { portalUrl: session.portalUrl } });
     } catch (error) {
       logger.error(
         {
