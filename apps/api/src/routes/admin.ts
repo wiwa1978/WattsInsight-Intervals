@@ -1043,6 +1043,11 @@ export function createAdminRouter() {
     return c.json({ success: true, data });
   });
 
+  router.post("/billing/reconcile", async (c) => {
+    const result = await bootstrap.billingReconciliationService.reconcileProviderBillingStateSafely();
+    return c.json({ success: true, data: bootstrap.billingReconciliationService.serializeResult(result) });
+  });
+
   router.get("/webhooks", async (c) => {
     const parsedQuery = parseQuery(webhookEventsQuerySchema, {
       limit: c.req.query("limit"),

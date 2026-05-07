@@ -5,6 +5,7 @@ import { createCheckoutRequestSchema } from "@platform/contracts";
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { creditPackages, subscriptionPlans } from "../config/billing";
+import { env } from "../env";
 import { parseJsonBody, validationError } from "../lib/http";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 
@@ -79,6 +80,18 @@ export function createPaymentsRouter() {
     });
 
     return c.json({ success: true, data: { checkoutUrl } });
+  });
+
+  router.get("/billing/reconcile", async (c) => {
+    const secret = env.BILLING_RECONCILIATION_SECRET;
+    const authorization = c.req.header("authorization");
+
+    if (!secret || authorization !== `Bearer ${secret}`) {
+      return c.json({ success: false, error: "Unauthorized" }, 401);
+    }
+
+    const result = await bootstrap.billingReconciliationService.reconcileProviderBillingStateSafely();
+    return c.json({ success: true, data: bootstrap.billingReconciliationService.serializeResult(result) });
   });
 
   return router;

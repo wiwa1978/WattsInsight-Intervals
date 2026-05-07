@@ -42,6 +42,7 @@ const jsonBodyRoutes = [
   /^\/admin\/users\/revoke-sessions$/,
   /^\/admin\/users\/set-password$/,
   /^\/admin\/users\/[^/]+\/credits\/adjust$/,
+  /^\/admin\/billing\/reconcile$/,
   /^\/admin\/discounts(?:\/.*)?$/,
   /^\/admin\/vouchers(?:\/.*)?$/,
   /^\/admin\/notifications\/send-all$/,

@@ -38,6 +38,7 @@ const envSchema = z.object({
   DODO_PAYMENTS_API_KEY: z.string().optional(),
   DODO_PAYMENTS_WEBHOOK_SECRET: z.string().optional(),
   DODO_PAYMENTS_ENVIRONMENT: z.enum(["test_mode", "live_mode"]).default("test_mode"),
+  BILLING_RECONCILIATION_SECRET: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),
   JWT_SECRET: z.string().min(16),

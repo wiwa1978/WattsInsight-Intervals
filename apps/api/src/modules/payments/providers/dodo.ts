@@ -8,7 +8,7 @@ import {
   buildDodoCheckoutUrl,
 } from "../../../lib/dodo-checkout";
 import { isProviderTimeout, withProviderTimeout } from "../../../lib/provider-fetch";
-import type { PaymentProvider } from "../provider";
+import type { PaymentProvider, ProviderListParams } from "../provider";
 
 type DodoPaymentProviderOptions = {
   apiKey?: string;
@@ -23,6 +23,22 @@ type DodoInvoiceResponse = {
   url?: string;
 };
 
+type DodoListResponse<T> = {
+  items?: T[];
+  next_cursor?: string | null;
+  nextCursor?: string | null;
+};
+
+type DodoPaymentListItem = {
+  payment_id: string;
+  status?: string | null;
+};
+
+type DodoSubscriptionListItem = {
+  subscription_id: string;
+  status?: string | null;
+};
+
 function dodoApiBaseUrl(environment: "test_mode" | "live_mode") {
   return environment === "live_mode" ? "https://live.dodopayments.com" : "https://test.dodopayments.com";
 }
@@ -33,6 +49,53 @@ function checkoutBaseUrl(environment: "test_mode" | "live_mode") {
 
 function invoiceUrlFromResponse(invoiceData: DodoInvoiceResponse) {
   return invoiceData.invoice_pdf ?? invoiceData.invoice_url ?? invoiceData.url;
+}
+
+function toQueryString(params: Record<string, string | number | undefined>) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      searchParams.set(key, String(value));
+    }
+  }
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+function dodoListParams(params?: ProviderListParams) {
+  return toQueryString({
+    page_size: params?.pageSize,
+    cursor: params?.cursor,
+  });
+}
+
+async function dodoApiRequest<T>(options: DodoPaymentProviderOptions, path: string, timeoutMessage: string): Promise<T> {
+  if (!options.apiKey) {
+    throw new Error("Payment provider API key not configured");
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `${dodoApiBaseUrl(options.environment)}${path}`,
+      withProviderTimeout({
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${options.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+  } catch (error) {
+    throw new Error(isProviderTimeout(error) ? timeoutMessage : "Payment provider request failed");
+  }
+
+  if (!response.ok) {
+    throw new Error("Payment provider request failed");
+  }
+
+  return response.json() as Promise<T>;
 }
 
 export function createDodoPaymentProvider(options: DodoPaymentProviderOptions): PaymentProvider {
@@ -77,31 +140,7 @@ export function createDodoPaymentProvider(options: DodoPaymentProviderOptions): 
       return { portalUrl: session.link };
     },
     async getInvoice(paymentId) {
-      if (!options.apiKey) {
-        throw new Error("Payment provider API key not configured");
-      }
-
-      let response: Response;
-      try {
-        response = await fetch(
-          `${dodoApiBaseUrl(options.environment)}/invoices/payments/${paymentId}`,
-          withProviderTimeout({
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${options.apiKey}`,
-              "Content-Type": "application/json",
-            },
-          }),
-        );
-      } catch (error) {
-        throw new Error(isProviderTimeout(error) ? "Invoice provider request timed out" : "Invoice provider request failed");
-      }
-
-      if (!response.ok) {
-        throw new Error("Invoice provider request failed");
-      }
-
-      const invoiceData = (await response.json()) as DodoInvoiceResponse;
+      const invoiceData = await dodoApiRequest<DodoInvoiceResponse>(options, `/invoices/payments/${paymentId}`, "Invoice provider request timed out");
       const invoiceUrl = invoiceUrlFromResponse(invoiceData);
       if (!invoiceUrl) {
         throw new Error("Invoice URL not available in API response");
@@ -109,5 +148,39 @@ export function createDodoPaymentProvider(options: DodoPaymentProviderOptions): 
 
       return { invoiceUrl, invoiceData };
     },
+    finance: options.apiKey
+      ? {
+          async listPayments(params) {
+            const data = await dodoApiRequest<DodoListResponse<DodoPaymentListItem>>(
+              options,
+              `/payments${dodoListParams(params)}`,
+              "Payment provider finance request timed out",
+            );
+            return {
+              items: (data.items ?? []).map((payment) => ({
+                paymentId: payment.payment_id,
+                status: payment.status,
+                raw: payment,
+              })),
+              nextCursor: data.next_cursor ?? data.nextCursor ?? null,
+            };
+          },
+          async listSubscriptions(params) {
+            const data = await dodoApiRequest<DodoListResponse<DodoSubscriptionListItem>>(
+              options,
+              `/subscriptions${dodoListParams(params)}`,
+              "Payment provider finance request timed out",
+            );
+            return {
+              items: (data.items ?? []).map((subscription) => ({
+                subscriptionId: subscription.subscription_id,
+                status: subscription.status,
+                raw: subscription,
+              })),
+              nextCursor: data.next_cursor ?? data.nextCursor ?? null,
+            };
+          },
+        }
+      : undefined,
   };
 }
