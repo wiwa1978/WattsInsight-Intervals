@@ -6,18 +6,18 @@ import { discounts } from "@platform/platform-db";
 
 import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
 
-type DodoDiscountType = "percentage";
+type ProviderDiscountType = "percentage";
 
-type DodoDiscount = {
+type ProviderDiscount = {
   discount_id: string;
   code: string | null;
   amount: number;
-  type: DodoDiscountType;
+  type: ProviderDiscountType;
 };
 
-type DodoCreateDiscountRequest = {
+type ProviderCreateDiscountRequest = {
   amount: number;
-  type: DodoDiscountType;
+  type: ProviderDiscountType;
   code: string | null;
   expires_at: string | null;
   name: string | null;
@@ -26,7 +26,7 @@ type DodoCreateDiscountRequest = {
   usage_limit: number | null;
 };
 
-type DodoUpdateDiscountRequest = Partial<DodoCreateDiscountRequest>;
+type ProviderUpdateDiscountRequest = Partial<ProviderCreateDiscountRequest>;
 
 type DiscountType = "fixed" | "percentage";
 type DiscountStatus = "active" | "inactive" | "expired";
@@ -83,6 +83,13 @@ function getDodoApiBaseUrl(environment: "test_mode" | "live_mode") {
   return environment === "live_mode" ? "https://live.dodopayments.com" : "https://test.dodopayments.com";
 }
 
+function withProviderDiscountId<T extends { dodoDiscountId?: string | null }>(discount: T) {
+  return {
+    ...discount,
+    providerDiscountId: discount.dodoDiscountId ?? null,
+  };
+}
+
 export function createDiscountsService(deps: DiscountsServiceDeps) {
   function normalizeLimit(limit: number, max = 100) {
     if (!Number.isFinite(limit)) {
@@ -117,7 +124,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     return { ...discount, status: refreshedStatus };
   }
 
-  async function dodoRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  async function providerDiscountRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const apiKey = deps.env.DODO_PAYMENTS_API_KEY;
     if (!apiKey) {
       throw new Error("DODO_PAYMENTS_API_KEY is not configured");
@@ -138,11 +145,11 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
         }),
       );
     } catch (error) {
-      throw new Error(isProviderTimeout(error) ? "Dodo provider request timed out" : "Dodo provider request failed");
+      throw new Error(isProviderTimeout(error) ? "Discount provider request timed out" : "Discount provider request failed");
     }
 
     if (!response.ok) {
-      throw new Error("Dodo provider request failed");
+      throw new Error("Discount provider request failed");
     }
 
     if (response.status === 204) {
@@ -152,32 +159,32 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     return response.json() as Promise<T>;
   }
 
-  async function createDodoDiscount(data: DodoCreateDiscountRequest): Promise<DodoDiscount> {
-    return dodoRequest<DodoDiscount>("/discounts", {
+  async function createProviderDiscount(data: ProviderCreateDiscountRequest): Promise<ProviderDiscount> {
+    return providerDiscountRequest<ProviderDiscount>("/discounts", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
-  async function updateDodoDiscount(id: string, data: DodoUpdateDiscountRequest): Promise<DodoDiscount> {
-    return dodoRequest<DodoDiscount>(`/discounts/${id}`, {
+  async function updateProviderDiscount(id: string, data: ProviderUpdateDiscountRequest): Promise<ProviderDiscount> {
+    return providerDiscountRequest<ProviderDiscount>(`/discounts/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
   }
 
-  async function deleteDodoDiscount(id: string): Promise<void> {
-    await dodoRequest<void>(`/discounts/${id}`, {
+  async function deleteProviderDiscount(id: string): Promise<void> {
+    await providerDiscountRequest<void>(`/discounts/${id}`, {
       method: "DELETE",
     });
   }
 
-  async function listDodoDiscounts(): Promise<DodoDiscount[]> {
-    return dodoRequest<DodoDiscount[]>("/discounts");
+  async function listProviderDiscounts(): Promise<ProviderDiscount[]> {
+    return providerDiscountRequest<ProviderDiscount[]>("/discounts");
   }
 
-  async function validateDodoDiscountCode(code: string): Promise<{ valid: boolean }> {
-    const list = await listDodoDiscounts();
+  async function validateProviderDiscountCode(code: string): Promise<{ valid: boolean }> {
+    const list = await listProviderDiscounts();
     const found = list.find((item) => item.code === code);
     return { valid: !found };
   }
@@ -195,9 +202,9 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       return { valid: false, error: "Discount code already exists" };
     }
 
-    const dodoValidation = await validateDodoDiscountCode(normalizedCode);
-    if (!dodoValidation.valid) {
-      return { valid: false, error: "Discount code already exists in Dodo Payments" };
+    const providerValidation = await validateProviderDiscountCode(normalizedCode);
+    if (!providerValidation.valid) {
+      return { valid: false, error: "Discount code already exists in payment provider" };
     }
 
     return { valid: true };
@@ -266,7 +273,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
     const total = totalResult[0]?.count || 0;
     return {
-      discounts: refreshedDiscountsList,
+      discounts: refreshedDiscountsList.map(withProviderDiscountId),
       total,
       hasMore: normalizedOffset + normalizedLimit < total,
     };
@@ -295,7 +302,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     }
 
     const refreshedDiscount = await refreshDiscountStatus(discount);
-    return { success: true, discount: refreshedDiscount };
+    return { success: true, discount: withProviderDiscountId(refreshedDiscount) };
   }
 
   async function createDiscount(input: CreateDiscountInput) {
@@ -317,7 +324,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       return discountFailure(codeValidation.error || "Invalid discount code");
     }
 
-    const dodoDiscountData: DodoCreateDiscountRequest = {
+    const providerDiscountData: ProviderCreateDiscountRequest = {
       amount: Math.round(input.value * 100),
       type: "percentage",
       code: normalizedCode,
@@ -328,7 +335,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       usage_limit: input.maxUses ?? null,
     };
 
-    const dodoDiscount = await createDodoDiscount(dodoDiscountData);
+    const providerDiscount = await createProviderDiscount(providerDiscountData);
     const status = inferDiscountStatus(input.startDate, input.endDate);
 
     let created;
@@ -344,7 +351,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
             endDate: input.endDate,
             maxUses: input.maxUses,
             currentUses: 0,
-            dodoDiscountId: dodoDiscount.discount_id,
+            dodoDiscountId: providerDiscount.discount_id,
             status,
           })
           .returning();
@@ -353,14 +360,14 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       });
     } catch (error) {
       try {
-        await deleteDodoDiscount(dodoDiscount.discount_id);
+        await deleteProviderDiscount(providerDiscount.discount_id);
       } catch {
         // Preserve the local persistence failure; reconciliation can retry provider cleanup separately.
       }
       throw error;
     }
 
-    return discountSuccess({ discount: created });
+    return discountSuccess({ discount: withProviderDiscountId(created) });
   }
 
   async function updateDiscount(input: UpdateDiscountInput) {
@@ -409,13 +416,13 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     if (input.status !== undefined) updateData.status = input.status;
 
     if (existing.dodoDiscountId) {
-      const dodoUpdateData: DodoUpdateDiscountRequest = {};
-      if (input.code !== undefined) dodoUpdateData.code = input.code;
-      if (input.value !== undefined) dodoUpdateData.amount = Math.round(input.value * 100);
-      if (input.endDate !== undefined) dodoUpdateData.expires_at = input.endDate.toISOString();
-      if (input.maxUses !== undefined) dodoUpdateData.usage_limit = input.maxUses ?? null;
-      if (Object.keys(dodoUpdateData).length > 0) {
-        await updateDodoDiscount(existing.dodoDiscountId, dodoUpdateData);
+      const providerUpdateData: ProviderUpdateDiscountRequest = {};
+      if (input.code !== undefined) providerUpdateData.code = input.code;
+      if (input.value !== undefined) providerUpdateData.amount = Math.round(input.value * 100);
+      if (input.endDate !== undefined) providerUpdateData.expires_at = input.endDate.toISOString();
+      if (input.maxUses !== undefined) providerUpdateData.usage_limit = input.maxUses ?? null;
+      if (Object.keys(providerUpdateData).length > 0) {
+        await updateProviderDiscount(existing.dodoDiscountId, providerUpdateData);
       }
     }
 
@@ -425,7 +432,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       .where(eq(discounts.id, input.id))
       .returning();
 
-    return discountSuccess({ discount: updated, previousDiscount: existing });
+    return discountSuccess({ discount: withProviderDiscountId(updated), previousDiscount: withProviderDiscountId(existing) });
   }
 
   async function deleteDiscount(id: string) {
@@ -438,11 +445,11 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     }
 
     if (existing.dodoDiscountId) {
-      await deleteDodoDiscount(existing.dodoDiscountId);
+      await deleteProviderDiscount(existing.dodoDiscountId);
     }
 
     await deps.db.delete(discounts).where(eq(discounts.id, id));
-    return discountSuccess({ previousDiscount: existing });
+    return discountSuccess({ previousDiscount: withProviderDiscountId(existing) });
   }
 
   return {

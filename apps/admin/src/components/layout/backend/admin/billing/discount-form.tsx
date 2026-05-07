@@ -66,7 +66,7 @@ export function DiscountForm({
     resolver: zodResolver(discountFormSchema),
     defaultValues: {
       code: initialData?.code || "",
-      type: "percentage", // Always percentage for Dodo Payments
+      type: "percentage",
       value: initialData?.value || 10,
       startDate: initialData?.startDate || new Date(),
       endDate: initialData?.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now

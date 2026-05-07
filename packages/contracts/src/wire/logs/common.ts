@@ -17,13 +17,13 @@ export const logFilesQuerySchema = z.object({
   stream: logStreamSchema.default("app"),
 });
 
+export const logFileNameSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}(?:\.audit)?\.jsonl$/);
+
 export const logEntriesQuerySchema = z.object({
   stream: logStreamSchema.default("app"),
-  file: z.string().trim().min(1).max(255).optional(),
+  file: logFileNameSchema.optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
-
-export const logFileNameSchema = z.string().regex(/^[A-Za-z0-9._-]+\.jsonl$/);
 
 export type ClientLogInput = z.infer<typeof clientLogSchema>;
 export type LogStream = z.infer<typeof logStreamSchema>;

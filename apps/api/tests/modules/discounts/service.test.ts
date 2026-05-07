@@ -107,7 +107,7 @@ describe("createDiscountsService", () => {
   });
 
   // Verifies a remote discount is deleted when local persistence fails after provider creation.
-  it("cleans up dodo discount when local creation fails", async () => {
+  it("cleans up provider discount when local creation fails", async () => {
     const localError = new Error("local insert failed");
     const db = {
       query: {
@@ -203,7 +203,7 @@ describe("createDiscountsService", () => {
   });
 
   // Verifies remote validation failures do not fail open anymore.
-  it("fails closed when dodo validation errors", async () => {
+  it("fails closed when provider validation errors", async () => {
     (fetch as any).mockRejectedValueOnce(new Error("network failure"));
 
     const service = createDiscountsService({
@@ -211,11 +211,11 @@ describe("createDiscountsService", () => {
       env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
     });
 
-    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Dodo provider request failed");
+    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Discount provider request failed");
   });
 
   // Verifies provider response bodies are never leaked through errors.
-  it("sanitizes dodo provider response failures", async () => {
+  it("sanitizes discount provider response failures", async () => {
     (fetch as any).mockResolvedValueOnce({
       ok: false,
       status: 500,
@@ -235,12 +235,12 @@ describe("createDiscountsService", () => {
     }
 
     expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).toBe("Dodo provider request failed");
+    expect((error as Error).message).toBe("Discount provider request failed");
     expect((error as Error).message).not.toContain("provider secret details");
   });
 
   // Verifies provider timeouts have a stable sanitized error.
-  it("sanitizes dodo provider timeouts", async () => {
+  it("sanitizes discount provider timeouts", async () => {
     (fetch as any).mockRejectedValueOnce(new DOMException("The operation timed out", "TimeoutError"));
 
     const service = createDiscountsService({
@@ -248,11 +248,11 @@ describe("createDiscountsService", () => {
       env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
     });
 
-    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Dodo provider request timed out");
+    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Discount provider request timed out");
   });
 
   // Verifies remote provider deletion occurs before local discount deletion.
-  it("deletes remote dodo discount before local deletion", async () => {
+  it("deletes provider discount before local deletion", async () => {
     const deleteWhere = vi.fn().mockResolvedValue(undefined);
     const dbDelete = vi.fn().mockReturnValue({ where: deleteWhere });
 
@@ -272,7 +272,7 @@ describe("createDiscountsService", () => {
 
     const result = await service.deleteDiscount("d1");
 
-    expect(result).toEqual({ success: true, previousDiscount: { id: "d1", dodoDiscountId: "dd_1" } });
+    expect(result).toEqual({ success: true, previousDiscount: { id: "d1", dodoDiscountId: "dd_1", providerDiscountId: "dd_1" } });
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("/discounts/dd_1"),
       expect.objectContaining({ method: "DELETE" }),
@@ -324,8 +324,8 @@ describe("createDiscountsService", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  // Verifies changed discount codes are normalized locally and synced to Dodo.
-  it("syncs discount code updates to dodo", async () => {
+  // Verifies changed discount codes are normalized locally and synced to the provider.
+  it("syncs discount code updates to the provider", async () => {
     const updateReturning = vi.fn().mockResolvedValue([{ id: "d1", code: "SAVE-NEW-1234" }]);
     const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
     const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
