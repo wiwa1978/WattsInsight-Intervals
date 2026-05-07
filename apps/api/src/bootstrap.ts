@@ -20,6 +20,7 @@ import { getDodoCheckoutProductsForBillingMode } from "./lib/dodo-billing-produc
 import { createAdminService } from "./modules/admin/service";
 import { createAuditService } from "./modules/audit/service";
 import { createCheckoutIntentsService } from "./modules/billing/checkout-intents";
+import { createBillingReconciliationService } from "./modules/billing/reconciliation";
 import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
@@ -83,6 +84,7 @@ const billingService = createBillingService({
   paymentProvider: paymentProviders.activeProvider,
   notifications: notificationsService,
 });
+const billingReconciliationService = createBillingReconciliationService({ db, paymentProvider: paymentProviders.activeProvider });
 const subscriptionService = createSubscriptionService({ db, paymentProvider: paymentProviders.activeProvider });
 const checkoutIntentsService = createCheckoutIntentsService({ db });
 const adminService = createAdminService({
@@ -374,6 +376,7 @@ export const bootstrap = {
   adminService,
   auditService,
   billingService,
+  billingReconciliationService,
   checkoutIntentsService,
   subscriptionService,
   discountsService,

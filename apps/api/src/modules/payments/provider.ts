@@ -1,6 +1,13 @@
 export type PaymentProviderName = "dodo";
 
 export type BillingMode = "credits" | "subscriptions";
+export type ProviderPaymentStatus = "completed" | "pending" | "failed" | "refunded" | string;
+export type ProviderSubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "expired" | "paused" | string;
+
+export type ProviderListParams = {
+  pageSize?: number;
+  cursor?: string;
+};
 
 export type CreateCheckoutInput = {
   productId: string;
@@ -29,6 +36,28 @@ export type CustomerPortalResult = {
   portalUrl: string;
 };
 
+export type ProviderPaymentListItem = {
+  paymentId: string;
+  status?: ProviderPaymentStatus | null;
+  raw?: unknown;
+};
+
+export type ProviderSubscriptionListItem = {
+  subscriptionId: string;
+  status?: ProviderSubscriptionStatus | null;
+  raw?: unknown;
+};
+
+export type ProviderListResult<T> = {
+  items: T[];
+  nextCursor?: string | null;
+};
+
+export type PaymentProviderFinance = {
+  listPayments(params?: ProviderListParams): Promise<ProviderListResult<ProviderPaymentListItem>>;
+  listSubscriptions(params?: ProviderListParams): Promise<ProviderListResult<ProviderSubscriptionListItem>>;
+};
+
 export type PaymentProviderCapabilities = {
   checkout: boolean;
   customerPortal: boolean;
@@ -43,6 +72,7 @@ export type PaymentProvider = {
   createCheckoutUrl(input: CreateCheckoutInput): Promise<string> | string;
   createCustomerPortal?(input: CustomerPortalInput): Promise<CustomerPortalResult>;
   getInvoice?(paymentId: string): Promise<InvoiceResult>;
+  finance?: PaymentProviderFinance;
 };
 
 export type PaymentProviderRegistry = {

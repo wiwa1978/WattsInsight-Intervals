@@ -244,6 +244,12 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
       "200": jsonResponse("Service health status", healthResponseSchema),
     },
   }),
+  route("get", "/ready", ["System"], "Readiness check", {
+    responses: {
+      "200": jsonResponse("Service readiness status", healthResponseSchema),
+      "503": jsonResponse("Service not ready", genericErrorSchema),
+    },
+  }),
   route("get", "/countries", ["System"], "List countries for a locale", {
     parameters: [queryParameter("lang", countriesQuerySchema.shape.lang)],
     responses: {
@@ -264,6 +270,10 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     parameters: [headerParameter("x-dodo-signature", z.string(), true)],
     requestBody: requestBody(genericObjectSchema),
     responses: defaultResponses("Webhook processed", ["400", "401", "413"]),
+  }),
+  route("get", "/billing/reconcile", ["Billing"], "Run scheduled billing reconciliation", {
+    security: [{ bearerAuth: [] }],
+    responses: defaultResponses("Billing reconciliation result", ["401"]),
   }),
 
   route("post", "/auth/mobile/token", ["Auth"], "Create native-client access and refresh tokens", {
@@ -510,6 +520,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/billing/subscription-stats", ["Admin Billing"], "Get subscription billing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription billing statistics", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-plan-distribution", ["Admin Billing"], "Get subscription plan distribution", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription plan distribution", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-events", ["Admin Billing"], "List subscription events", { security: cookieOrBearerAuth, parameters: optionalLimitParameters, responses: defaultResponses("Subscription events", ["400", "401", "403"]) }),
+  route("post", "/admin/billing/reconcile", ["Admin Billing"], "Run billing reconciliation", { security: cookieOrBearerAuth, responses: defaultResponses("Billing reconciliation result", ["401", "403"]) }),
 
   route("get", "/admin/webhooks", ["Admin Webhooks"], "List payment webhook events", { security: cookieOrBearerAuth, parameters: webhookEventsParameters, responses: defaultResponses("Webhook events", ["400", "401", "403"]) }),
   route("get", "/admin/webhooks/stats", ["Admin Webhooks"], "Get payment webhook processing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Webhook statistics", ["401", "403"]) }),
