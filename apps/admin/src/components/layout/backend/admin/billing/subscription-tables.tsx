@@ -27,7 +27,7 @@ function statusVariant(status: string) {
 }
 
 export async function SubscriptionTable({ subscriptions }: { subscriptions: SubscriptionRow[] }) {
-  const t = await getTranslations("admin.billing.subscription.subscriptions");
+  const t = await getTranslations("admin.billing.subscriptionsMode.subscriptions");
 
   return (
     <Card>
@@ -45,7 +45,7 @@ export async function SubscriptionTable({ subscriptions }: { subscriptions: Subs
                 <TableHead>{t("table.plan")}</TableHead>
                 <TableHead>{t("table.status")}</TableHead>
                 <TableHead>{t("table.periodEnd")}</TableHead>
-                <TableHead>{t("table.dodoSubscription")}</TableHead>
+                <TableHead>{t("table.subscriptionId")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -79,7 +79,7 @@ export async function SubscriptionTable({ subscriptions }: { subscriptions: Subs
 }
 
 export async function SubscriptionEventsTable({ events }: { events: SubscriptionEvent[] }) {
-  const t = await getTranslations("admin.billing.subscription.events");
+  const t = await getTranslations("admin.billing.subscriptionsMode.events");
 
   return (
     <Card>

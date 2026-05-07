@@ -4,8 +4,8 @@ import {
   completeAdminStepUpApi,
   getAdminStepUpStatusApi,
   getAdminAllPurchasesApi,
-  getAdminAllSubscriptionsApi,
   getAdminAllTransactionsApi,
+  getAdminBillingSubscriptionFinanceSummaryApi,
   getAdminBillingSubscriptionEventsApi,
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
@@ -56,7 +56,7 @@ describe("admin API", () => {
   });
 
   it("encodes search email when fetching admin billing subscriptions", async () => {
-    await getAdminAllSubscriptionsApi(25, 50, "alice+admin@example.com");
+    await getAdminBillingSubscriptionsApi(25, 50, "alice+admin@example.com");
 
     expect(apiRequestMock).toHaveBeenCalledWith(
       "/admin/billing/subscriptions?limit=25&offset=50&searchEmail=alice%2Badmin%40example.com",
@@ -64,7 +64,7 @@ describe("admin API", () => {
   });
 
   it("fetches admin subscription billing stats", async () => {
-    await getAdminSubscriptionStatsApi();
+    await getAdminBillingSubscriptionStatsApi();
 
     expect(apiRequestMock).toHaveBeenCalledWith("/admin/billing/subscription-stats");
   });
@@ -80,15 +80,17 @@ describe("admin API", () => {
 
   it("calls subscription billing endpoints", async () => {
     await getAdminBillingSubscriptionStatsApi();
+    await getAdminBillingSubscriptionFinanceSummaryApi();
     await getAdminBillingSubscriptionPlanDistributionApi();
     await getAdminBillingSubscriptionEventsApi(25);
     await getAdminBillingSubscriptionsApi(20, 40, "alice+admin@example.com");
 
     expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/admin/billing/subscription-stats");
-    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/billing/subscription-plan-distribution");
-    expect(apiRequestMock).toHaveBeenNthCalledWith(3, "/admin/billing/subscription-events?limit=25");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/billing/subscription-finance-summary");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(3, "/admin/billing/subscription-plan-distribution");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(4, "/admin/billing/subscription-events?limit=25");
     expect(apiRequestMock).toHaveBeenNthCalledWith(
-      4,
+      5,
       "/admin/billing/subscriptions?limit=20&offset=40&searchEmail=alice%2Badmin%40example.com",
     );
   });
