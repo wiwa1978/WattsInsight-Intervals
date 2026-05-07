@@ -75,7 +75,7 @@ export function SubscriptionsTable({ subscriptions, t }: SubscriptionsTableProps
                   <TableCell>
                     {subscription.currentPeriodEnd ? formatDateTime(subscription.currentPeriodEnd) : "-"}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{subscription.dodoSubscriptionId}</TableCell>
+                  <TableCell className="font-mono text-xs">{subscription.providerSubscriptionId}</TableCell>
                 </TableRow>
               ))
             )}
