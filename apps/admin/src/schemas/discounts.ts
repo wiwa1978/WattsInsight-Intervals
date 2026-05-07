@@ -49,19 +49,19 @@ export const adminUpdateDiscountSchema = z.object({
 });
 
 // ============================================================================
-// Dodo Payments API Validation Schemas
+// Payment Provider API Validation Schemas
 // ============================================================================
 
 /**
- * Discount type enum for Dodo Payments API
- * Note: Dodo Payments only supports percentage-based discounts
+ * Discount type enum for payment provider APIs.
+ * The current provider only supports percentage-based discounts.
  */
-export const dodoDiscountTypeSchema = z.literal("percentage", {
-  message: "Dodo Payments only supports percentage-based discounts",
+export const providerDiscountTypeSchema = z.literal("percentage", {
+  message: "The payment provider only supports percentage-based discounts",
 });
 
 /**
- * Schema for creating a discount in Dodo Payments
+ * Schema for creating a discount in the payment provider.
  * Matches the exact API specification:
  * - amount: integer<int32> required - basis points (e.g., 540 = 5.4%)
  * - type: "percentage" required
@@ -72,7 +72,7 @@ export const dodoDiscountTypeSchema = z.literal("percentage", {
  * - subscription_cycles: integer<int32> | null: Number of subscription billing cycles
  * - usage_limit: integer<int32> | null: Must be >= 1 if provided
  */
-export const dodoCreateDiscountSchema = z.object({
+export const providerCreateDiscountSchema = z.object({
   amount: z
     .number({
       message: "Amount is required and must be a number",
@@ -80,7 +80,7 @@ export const dodoCreateDiscountSchema = z.object({
     .int("Amount must be an integer")
     .safe("Amount must be a safe integer")
     .min(1, "Amount must be at least 1"),
-  type: dodoDiscountTypeSchema,
+  type: providerDiscountTypeSchema,
   code: z.string().nullable().optional(),
   expires_at: z.string().datetime().nullable().optional(),
   name: z.string().nullable().optional(),
@@ -106,10 +106,10 @@ export const dodoCreateDiscountSchema = z.object({
 });
 
 /**
- * Schema for updating a discount in Dodo Payments
+ * Schema for updating a discount in the payment provider.
  * All fields are optional
  */
-export const dodoUpdateDiscountSchema = z.object({
+export const providerUpdateDiscountSchema = z.object({
   amount: z
     .number({
       message: "Amount must be a number",
@@ -118,7 +118,7 @@ export const dodoUpdateDiscountSchema = z.object({
     .safe("Amount must be a safe integer")
     .min(1, "Amount must be at least 1")
     .optional(),
-  type: dodoDiscountTypeSchema.optional(),
+  type: providerDiscountTypeSchema.optional(),
   code: z.string().nullable().optional(),
   expires_at: z.string().datetime().nullable().optional(),
   name: z.string().nullable().optional(),
@@ -144,9 +144,9 @@ export const dodoUpdateDiscountSchema = z.object({
 });
 
 /**
- * Schema for Dodo Payments discount response
+ * Schema for payment provider discount responses.
  */
-export const dodoDiscountSchema = z.object({
+export const providerDiscountSchema = z.object({
   amount: z.number().int().safe(),
   business_id: z.string(),
   code: z.string().nullable(),
@@ -157,6 +157,6 @@ export const dodoDiscountSchema = z.object({
   restricted_to: z.array(z.string()).nullable(),
   subscription_cycles: z.number().int().safe().nullable(),
   times_used: z.number().int().safe(),
-  type: dodoDiscountTypeSchema,
+  type: providerDiscountTypeSchema,
   usage_limit: z.number().int().safe().nullable(),
 });

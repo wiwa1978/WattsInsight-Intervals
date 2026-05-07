@@ -19,6 +19,7 @@ export interface Discount {
   endDate: string;
   maxUses: number | null;
   currentUses: number;
+  providerDiscountId: string | null;
   dodoDiscountId: string | null;
   status: DiscountStatus;
   createdAt: string;
@@ -89,20 +90,20 @@ export type DiscountActionResult =
     };
 
 // ============================================================================
-// Dodo Payments API Types
+// Payment Provider API Types
 // ============================================================================
 
 /**
- * Discount type enum for Dodo Payments API
- * Note: Dodo Payments only supports percentage-based discounts
+ * Discount type enum for payment provider APIs.
+ * The current provider only supports percentage-based discounts.
  * - percentage: Percentage-based discount (e.g., 540 basis points = 5.4%)
  */
-export type DodoDiscountType = "percentage";
+export type ProviderDiscountType = "percentage";
 
 /**
- * Response from Dodo Payments when creating/retrieving a discount
+ * Response from the payment provider when creating/retrieving a discount.
  */
-export interface DodoDiscount {
+export interface ProviderDiscount {
   amount: number; // integer<int32> - basis points for percentage (e.g., 540 = 5.4%)
   business_id: string;
   code: string | null;
@@ -113,16 +114,16 @@ export interface DodoDiscount {
   restricted_to: string[] | null; // List of product IDs
   subscription_cycles: number | null; // integer<int32>
   times_used: number; // integer<int32>
-  type: DodoDiscountType; // always "percentage"
+  type: ProviderDiscountType; // always "percentage"
   usage_limit: number | null; // integer<int32>
 }
 
 /**
- * Request body for creating a discount in Dodo Payments
+ * Request body for creating a discount in the payment provider.
  */
-export interface DodoCreateDiscountRequest {
+export interface ProviderCreateDiscountRequest {
   amount: number; // integer<int32> required - basis points (e.g., 540 = 5.4%)
-  type: DodoDiscountType; // always "percentage"
+  type: ProviderDiscountType; // always "percentage"
   code: string | null; // optional
   expires_at: string | null; // ISO 8601 date-time, optional
   name: string | null; // optional
@@ -132,11 +133,11 @@ export interface DodoCreateDiscountRequest {
 }
 
 /**
- * Request body for updating a discount in Dodo Payments
+ * Request body for updating a discount in the payment provider.
  */
-export interface DodoUpdateDiscountRequest {
+export interface ProviderUpdateDiscountRequest {
   amount?: number; // integer<int32> - basis points (e.g., 540 = 5.4%)
-  type?: DodoDiscountType; // always "percentage"
+  type?: ProviderDiscountType; // always "percentage"
   code?: string | null;
   expires_at?: string | null; // ISO 8601 date-time
   name?: string | null;

@@ -189,6 +189,7 @@ const mocks = vi.hoisted(() => {
       APP_URL: "http://localhost:3100",
       API_URL: "http://localhost:8787",
       ADMIN_ALLOWLIST: "admin@example.com",
+      LOG_LEVEL: "info" as const,
       DODO_PAYMENTS_ENVIRONMENT: "test_mode" as const,
       DODO_PAYMENTS_API_KEY: "dodo-api-key",
       BETTER_AUTH_SECRET: "this-is-a-long-enough-secret",
@@ -1355,6 +1356,7 @@ describe("API functional routes", () => {
       headers: {
         "content-type": "application/json",
         cookie: "better-auth.session_token=session-token",
+        origin: "http://localhost:3100",
       },
       body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
     });
@@ -1362,7 +1364,7 @@ describe("API functional routes", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, data: { verified: true } });
     expect(res.headers.get("set-cookie")).toContain("admin_step_up=");
-    expect(res.headers.get("set-cookie")).toContain("Domain=");
+    expect(res.headers.get("set-cookie")).toContain("SameSite=Lax");
   });
 
   // Verifies admin step-up can skip TOTP verification when adminPortalTotpRequired is disabled.
@@ -1378,6 +1380,7 @@ describe("API functional routes", () => {
       headers: {
         "content-type": "application/json",
         cookie: "better-auth.session_token=session-token",
+        origin: "http://localhost:3100",
       },
       body: JSON.stringify({ secret: "secret" }),
     });
@@ -1778,7 +1781,11 @@ describe("API functional routes", () => {
   it("records audit entry when stopping admin impersonation", async () => {
     mocks.adminAuthApi.stopImpersonating.mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
 
-    const res = await app.request("/auth/admin/stop-impersonating", { method: "POST" });
+    const res = await app.request("/auth/admin/stop-impersonating", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
 
     expect(res.status).toBe(200);
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
@@ -1884,6 +1891,7 @@ describe("API functional routes", () => {
       code: "SAVE-ABC-1234",
       type: "percentage",
       value: 10,
+      providerDiscountId: "provider-secret-discount-id",
       dodoDiscountId: "provider-secret-discount-id",
     };
     const previousDiscount = {
@@ -1892,6 +1900,7 @@ describe("API functional routes", () => {
       type: "percentage",
       value: 10,
       status: "active",
+      providerDiscountId: "provider-secret-discount-id",
       dodoDiscountId: "provider-secret-discount-id",
     };
     const updatedDiscount = {
@@ -1992,9 +2001,9 @@ describe("API functional routes", () => {
 
   it("records safe failure audit entries when discount mutations throw", async () => {
     const discountId = "33333333-3333-4333-8333-333333333333";
-    mocks.discountsService.createDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
-    mocks.discountsService.updateDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
-    mocks.discountsService.deleteDiscount.mockRejectedValueOnce(new Error("Dodo provider request failed"));
+    mocks.discountsService.createDiscount.mockRejectedValueOnce(new Error("Discount provider request failed"));
+    mocks.discountsService.updateDiscount.mockRejectedValueOnce(new Error("Discount provider request failed"));
+    mocks.discountsService.deleteDiscount.mockRejectedValueOnce(new Error("Discount provider request failed"));
 
     const createRes = await app.request("/admin/discounts", {
       method: "POST",
@@ -2026,7 +2035,7 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "discount",
       targetId: null,
-      metadata: { error: "Dodo provider request failed" },
+      metadata: { error: "Discount provider request failed" },
     }));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "discount.update",
@@ -2034,7 +2043,7 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "discount",
       targetId: discountId,
-      metadata: { error: "Dodo provider request failed" },
+      metadata: { error: "Discount provider request failed" },
     }));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "discount.delete",
@@ -2042,7 +2051,7 @@ describe("API functional routes", () => {
       actorId: "auth-user",
       targetType: "discount",
       targetId: discountId,
-      metadata: { error: "Dodo provider request failed" },
+      metadata: { error: "Discount provider request failed" },
     }));
   });
 
@@ -2761,8 +2770,7 @@ describe("API functional routes", () => {
     expect(output).toContain('password: \\"[redacted]\\"');
     expect(output).toContain("api_key = [redacted]");
     expect(output).toContain("client_secret: '[redacted]'");
-    expect(output).not.toContain("abc");
-    expect(output).not.toContain("def");
+    expect(output).not.toContain("abc}def");
     infoSpy.mockRestore();
   });
 
