@@ -36,10 +36,10 @@ function billingModeErrorResponse(c: Context<AppEnv>, error: unknown) {
   throw error;
 }
 
-async function getLatestDodoCustomerId(userId: string) {
+async function getLatestProviderCustomerId(userId: string) {
   const [subscriptionCustomerId, creditCustomerId] = await Promise.all([
-    bootstrap.subscriptionService.getLatestDodoCustomerId(userId),
-    bootstrap.billingService.getLatestDodoCustomerId(userId),
+    bootstrap.subscriptionService.getLatestProviderCustomerId(userId),
+    bootstrap.billingService.getLatestProviderCustomerId(userId),
   ]);
 
   return subscriptionCustomerId ?? creditCustomerId ?? null;
@@ -79,8 +79,8 @@ export function createMeRouter() {
     }
 
     const authUser = getAuthUser(c);
-    const dodoCustomerId = await getLatestDodoCustomerId(authUser.id);
-    if (!dodoCustomerId) {
+    const providerCustomerId = await getLatestProviderCustomerId(authUser.id);
+    if (!providerCustomerId) {
       return c.json({ success: false, error: "No billing customer found" }, 404);
     }
 
@@ -91,7 +91,7 @@ export function createMeRouter() {
 
     try {
       const session = await paymentProvider.createCustomerPortal({
-        customerId: dodoCustomerId,
+        customerId: providerCustomerId,
         returnUrl: createPortalReturnUrl(),
       });
 

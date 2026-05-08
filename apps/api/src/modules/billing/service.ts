@@ -54,7 +54,7 @@ type BillingServiceDeps = {
 type PaymentStatus = "completed" | "pending" | "failed" | "refunded";
 
 type PaymentSnapshot = {
-  provider: "dodo";
+  provider: string;
   customerId?: string;
   packageKey: string;
   priceExclVat: number;
@@ -200,7 +200,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     packageKey: string,
     paymentId: string,
     paymentStatus: PaymentStatus,
-    dodoCustomerId?: string,
+    providerCustomerId?: string,
     pricingData?: {
       priceExclVat: number;
       priceInclVat: number;
@@ -208,7 +208,7 @@ export function createBillingService(deps: BillingServiceDeps) {
       currency: string;
     },
     snapshotData?: {
-      provider?: "dodo";
+      provider?: string;
       customerId?: string;
     },
   ) {
@@ -224,7 +224,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     const currency = pricingData?.currency ?? "EUR";
     const paymentSnapshot = buildPaymentSnapshot({
       provider: snapshotData?.provider ?? "dodo",
-      customerId: snapshotData?.customerId ?? dodoCustomerId,
+      customerId: snapshotData?.customerId ?? providerCustomerId,
       packageKey,
       priceExclVat,
       priceInclVat,
@@ -291,14 +291,15 @@ export function createBillingService(deps: BillingServiceDeps) {
 
         const shouldGrantCredits = paymentStatus === "completed" && !existingPurchase.creditsGrantedAt;
         const creditsGrantedAt = shouldGrantCredits ? new Date() : existingPurchase.creditsGrantedAt;
-        const nextDodoCustomerId = dodoCustomerId ?? existingPurchase.dodoCustomerId;
+        const nextProviderCustomerId = providerCustomerId ?? existingPurchase.providerCustomerId ?? existingPurchase.dodoCustomerId;
 
-        if (existingPurchase.paymentStatus !== paymentStatus || dodoCustomerId || shouldGrantCredits || pricingData) {
+        if (existingPurchase.paymentStatus !== paymentStatus || providerCustomerId || shouldGrantCredits || pricingData) {
           await tx
             .update(creditPurchases)
             .set({
               paymentStatus,
-              dodoCustomerId: nextDodoCustomerId,
+              providerCustomerId: nextProviderCustomerId,
+              dodoCustomerId: nextProviderCustomerId,
               price: priceInclVat,
               priceExclVat,
               priceInclVat,
@@ -319,7 +320,8 @@ export function createBillingService(deps: BillingServiceDeps) {
         const purchase = {
           ...existingPurchase,
           paymentStatus,
-          dodoCustomerId: nextDodoCustomerId,
+          providerCustomerId: nextProviderCustomerId,
+          dodoCustomerId: nextProviderCustomerId,
           creditsGrantedAt,
           paymentSnapshot,
         };
@@ -342,7 +344,8 @@ export function createBillingService(deps: BillingServiceDeps) {
           vatAmount,
           currency,
           paymentId,
-          dodoCustomerId,
+          providerCustomerId,
+          dodoCustomerId: providerCustomerId,
           paymentStatus,
           creditsGrantedAt,
           paymentSnapshot,
@@ -449,15 +452,29 @@ export function createBillingService(deps: BillingServiceDeps) {
     return rows[0] ?? null;
   }
 
-  async function getLatestDodoCustomerId(userId: string) {
+  async function getLatestProviderCustomerId(userId: string) {
     const [purchase] = await deps.db
+      .select({
+        providerCustomerId: creditPurchases.providerCustomerId,
+        dodoCustomerId: creditPurchases.dodoCustomerId,
+      })
+      .from(creditPurchases)
+      .where(and(eq(creditPurchases.userId, userId), isNotNull(creditPurchases.providerCustomerId)))
+      .orderBy(desc(creditPurchases.createdAt))
+      .limit(1);
+
+    if (purchase?.providerCustomerId) {
+      return purchase.providerCustomerId;
+    }
+
+    const [legacyPurchase] = await deps.db
       .select({ dodoCustomerId: creditPurchases.dodoCustomerId })
       .from(creditPurchases)
       .where(and(eq(creditPurchases.userId, userId), isNotNull(creditPurchases.dodoCustomerId)))
       .orderBy(desc(creditPurchases.createdAt))
       .limit(1);
 
-    return purchase?.dodoCustomerId ?? null;
+    return legacyPurchase?.dodoCustomerId ?? null;
   }
 
   async function downloadInvoice(userId: string, paymentId: string) {
@@ -585,7 +602,8 @@ export function createBillingService(deps: BillingServiceDeps) {
     processCreditDisputeLoss,
     getUserByEmail,
     getUserById,
-    getLatestDodoCustomerId,
+    getLatestProviderCustomerId,
+    getLatestDodoCustomerId: getLatestProviderCustomerId,
     downloadInvoice,
     applyAdminCreditAdjustment,
     consumeCredits,

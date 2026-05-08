@@ -1,4 +1,4 @@
-export type PaymentProviderName = "dodo";
+export type PaymentProviderName = "dodo" | (string & {});
 
 export type BillingMode = "credits" | "subscriptions";
 export type ProviderPaymentStatus = "completed" | "pending" | "failed" | "refunded" | string;
@@ -97,8 +97,14 @@ export type PaymentProviderRegistry = {
   getProvider(name?: PaymentProviderName): PaymentProvider;
 };
 
-export function createPaymentProviderRegistry(activeProvider: PaymentProvider): PaymentProviderRegistry {
-  const providers = new Map<PaymentProviderName, PaymentProvider>([[activeProvider.name, activeProvider]]);
+export function createPaymentProviderRegistry(
+  activeProvider: PaymentProvider,
+  additionalProviders: PaymentProvider[] = [],
+): PaymentProviderRegistry {
+  const providers = new Map<PaymentProviderName, PaymentProvider>([
+    [activeProvider.name, activeProvider],
+    ...additionalProviders.map((provider) => [provider.name, provider] as const),
+  ]);
 
   return {
     activeProvider,

@@ -232,7 +232,7 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
         }
         
         // Hide download button for seeded/fake payment IDs (format: pay_{timestamp}_{random})
-        // Real DodoPayments payment IDs have a different format
+        // Real provider payment IDs have a different format
         const isSeededPayment = /^pay_\d+_[a-z0-9]+$/.test(paymentId);
         if (isSeededPayment) {
           return (

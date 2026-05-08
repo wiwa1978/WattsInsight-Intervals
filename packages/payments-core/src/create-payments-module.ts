@@ -7,18 +7,11 @@ import {
   type WebhookVerifyResult,
   verifyDodoWebhookSignatureDetailed,
 } from "./providers/dodo/webhook-verify";
-import type { CreatePaymentsModuleOptions, WebhookFailureAuditEvent } from "./types";
+import type { CreatePaymentsModuleOptions, PaymentWebhookProviderConfig, WebhookFailureAuditEvent } from "./types";
 
 type SafeWebhookMetadata = Pick<WebhookFailureAuditEvent, "providerEventId" | "eventType" | "paymentId">;
-type PaymentWebhookProvider = "dodo";
-
-type PaymentWebhookDispatcher = {
-  provider: PaymentWebhookProvider;
-  signatureHeaderName: string;
-  secret?: string;
-  toleranceSeconds?: number;
-  verify?: CreatePaymentsModuleOptions["verifyDodoWebhook"];
-  mapEvent(payload: unknown): ReturnType<typeof mapDodoEvent>;
+type PaymentWebhookDispatcher = Omit<PaymentWebhookProviderConfig, "verify"> & {
+  verify?: PaymentWebhookProviderConfig["verify"];
 };
 
 const UNAUTHENTICATED_WEBHOOK_METADATA: SafeWebhookMetadata = {
@@ -117,19 +110,39 @@ function contextRequestId(c: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
-function paymentWebhookDispatcherForProvider(provider: string, options: CreatePaymentsModuleOptions): PaymentWebhookDispatcher | null {
-  if (provider !== "dodo") {
-    return null;
-  }
-
-  return {
+function paymentWebhookDispatchers(options: CreatePaymentsModuleOptions): PaymentWebhookDispatcher[] {
+  return [{
     provider: "dodo",
     signatureHeaderName: "x-dodo-signature",
     secret: options.dodoWebhookSecret,
     toleranceSeconds: options.dodoWebhookToleranceSeconds,
     verify: options.verifyDodoWebhook,
     mapEvent: mapDodoEvent,
-  };
+  }, ...(options.webhookProviders ?? [])];
+}
+
+function paymentWebhookDispatcherForProvider(provider: string, options: CreatePaymentsModuleOptions): PaymentWebhookDispatcher | null {
+  return paymentWebhookDispatchers(options).find((dispatcher) => dispatcher.provider === provider) ?? null;
+}
+
+async function verifyWebhookSignature(dispatcher: PaymentWebhookDispatcher, rawBody: string, signatureHeader: string | null): Promise<WebhookVerifyResult> {
+  const result = dispatcher.verify
+    ? await dispatcher.verify(rawBody, signatureHeader)
+    : verifyDodoWebhookSignatureDetailed(
+        rawBody,
+        signatureHeader,
+        dispatcher.secret,
+        { toleranceSeconds: dispatcher.toleranceSeconds },
+      );
+
+  // Allow boolean returns from custom verifiers for backward compat.
+  if (typeof result === "boolean") {
+    return result
+      ? ({ ok: true } as const)
+      : ({ ok: false, reason: "signature_mismatch" } as const);
+  }
+
+  return result;
 }
 
 async function recordWebhookFailure(
@@ -168,23 +181,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     const correlationId = c.req.header("x-correlation-id") ?? requestId;
     const rawBody = await c.req.text();
 
-    const verification: WebhookVerifyResult = dispatcher.verify
-      ? await (async () => {
-          const result = await dispatcher.verify!(rawBody, signatureHeader);
-          // Allow boolean returns from custom verifiers for backward compat.
-          if (typeof result === "boolean") {
-            return result
-              ? ({ ok: true } as const)
-              : ({ ok: false, reason: "signature_mismatch" } as const);
-          }
-          return result;
-        })()
-      : verifyDodoWebhookSignatureDetailed(
-          rawBody,
-          signatureHeader,
-          dispatcher.secret,
-          { toleranceSeconds: dispatcher.toleranceSeconds },
-        );
+    const verification = await verifyWebhookSignature(dispatcher, rawBody, signatureHeader);
 
     if (!verification.ok) {
       await recordWebhookFailure(options, dispatcher.provider, UNAUTHENTICATED_WEBHOOK_METADATA, verification.reason);

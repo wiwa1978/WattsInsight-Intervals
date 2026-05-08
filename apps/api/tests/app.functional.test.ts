@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
     getCreditHistory: vi.fn(),
     getCreditPurchases: vi.fn(),
     downloadInvoice: vi.fn(),
+    getLatestProviderCustomerId: vi.fn(),
     getLatestDodoCustomerId: vi.fn(),
     processCreditPurchase: vi.fn(),
     getUserByEmail: vi.fn(),
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => {
     getSubscriptionFinanceSummary: vi.fn(),
     listUserSubscriptionPayments: vi.fn(),
     downloadSubscriptionInvoice: vi.fn(),
+    getLatestProviderCustomerId: vi.fn(),
     getLatestDodoCustomerId: vi.fn(),
     recordSubscriptionPayment: vi.fn(),
     upsertUserSubscription: vi.fn(),
@@ -477,7 +479,7 @@ describe("API functional routes", () => {
     mocks.adminAuthApi.getSession.mockResolvedValue({ user: { twoFactorEnabled: true } });
     mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
     mocks.auditService.listAuditEntries.mockResolvedValue([]);
-    mocks.subscriptionService.getLatestDodoCustomerId.mockResolvedValue(null);
+    mocks.subscriptionService.getLatestProviderCustomerId.mockResolvedValue(null);
     clearRequestGuardrailStateForTests();
   });
 
@@ -806,9 +808,9 @@ describe("API functional routes", () => {
     expect(url.searchParams.get("cancel_url")).toBe("http://localhost:3100/billing?cancel=true");
   });
 
-  // Verifies customer portal endpoint creates a Dodo portal session for the authenticated user's known Dodo customer.
+  // Verifies customer portal endpoint creates a provider portal session for the authenticated user's known customer.
   it("returns a customer portal URL for the authenticated user", async () => {
-    mocks.billingService.getLatestDodoCustomerId.mockResolvedValueOnce("cus_auth_user");
+    mocks.billingService.getLatestProviderCustomerId.mockResolvedValueOnce("cus_auth_user");
     mocks.dodoCustomerPortal.create.mockResolvedValueOnce({ link: "https://test.customer.dodopayments.com/session/portal_123" });
 
     const res = await app.request("/me/customer-portal", { method: "POST" });
@@ -818,15 +820,15 @@ describe("API functional routes", () => {
       success: true,
       data: { portalUrl: "https://test.customer.dodopayments.com/session/portal_123" },
     });
-    expect(mocks.billingService.getLatestDodoCustomerId).toHaveBeenCalledWith("auth-user");
+    expect(mocks.billingService.getLatestProviderCustomerId).toHaveBeenCalledWith("auth-user");
     expect(mocks.dodoCustomerPortal.create).toHaveBeenCalledWith("cus_auth_user", {
       return_url: "http://localhost:3100/billing",
     });
   });
 
-  // Verifies customer portal endpoint returns a client-safe error before calling Dodo when no customer is known.
-  it("returns 404 when the authenticated user has no Dodo customer", async () => {
-    mocks.billingService.getLatestDodoCustomerId.mockResolvedValueOnce(null);
+  // Verifies customer portal endpoint returns a client-safe error before calling the provider when no customer is known.
+  it("returns 404 when the authenticated user has no provider customer", async () => {
+    mocks.billingService.getLatestProviderCustomerId.mockResolvedValueOnce(null);
 
     const res = await app.request("/me/customer-portal", { method: "POST" });
 
@@ -2637,7 +2639,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(200);
-    const output = infoSpy.mock.calls.map((call) => String(call[0])).join("\n");
+    const output = infoSpy.mock.calls.map((call) => String(call[0])).find((line) => line.includes("client payload")) ?? "";
     expect(output).toContain('\\"token\\": [redacted]');
     expect(output).toContain('\\"password\\": \\"[redacted]\\"');
     expect(output).toContain('\\"client_secret\\" : [redacted]');

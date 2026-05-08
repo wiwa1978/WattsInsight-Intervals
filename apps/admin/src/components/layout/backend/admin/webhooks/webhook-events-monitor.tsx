@@ -130,7 +130,7 @@ export function WebhookEventsMonitor({ events, stats, limit, activeFilters }: We
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <FilterField label="Provider" value={filters.provider} placeholder="dodo" onChange={(value) => set("provider", value)} onEnter={applyFilters} />
+              <FilterField label="Provider" value={filters.provider} placeholder="provider" onChange={(value) => set("provider", value)} onEnter={applyFilters} />
               <FilterField label="Event type" value={filters.eventType} placeholder="payment.succeeded" onChange={(value) => set("eventType", value)} onEnter={applyFilters} />
               <FilterField label="Payment ID" value={filters.paymentId} placeholder="pay_123" onChange={(value) => set("paymentId", value)} onEnter={applyFilters} />
               <div className="flex gap-2">
