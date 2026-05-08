@@ -1073,6 +1073,35 @@
             "paused": "Paused"
           }
         },
+        "payments": {
+          "title": "Subscription payments",
+          "empty": "No subscription payments found.",
+          "unknownUser": "Unknown",
+          "table": {
+            "user": "User",
+            "plan": "Plan",
+            "status": "Status",
+            "amount": "Amount",
+            "payment": "Payment",
+            "date": "Date",
+            "actions": "Actions"
+          },
+          "refund": {
+            "action": "Refund",
+            "success": "Subscription payment refund created.",
+            "error": "Failed to create subscription refund.",
+            "missingPayment": "Payment ID is missing.",
+            "dialog": {
+              "title": "Refund subscription payment",
+              "description": "This starts a provider refund for the selected subscription payment.",
+              "reason": "Reason",
+              "secret": "Admin secret",
+              "cancel": "Cancel",
+              "submit": "Create refund",
+              "submitting": "Creating..."
+            }
+          }
+        },
         "events": {
           "title": "Subscription events",
           "empty": "No subscription events found.",

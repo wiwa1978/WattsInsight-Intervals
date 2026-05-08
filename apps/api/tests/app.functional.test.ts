@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => {
   const subscriptionService = {
     getUserSubscription: vi.fn(),
     listSubscriptions: vi.fn(),
+    listSubscriptionPayments: vi.fn(),
     getSubscriptionStats: vi.fn(),
     getPlanDistribution: vi.fn(),
     listSubscriptionEvents: vi.fn(),
@@ -1168,6 +1169,24 @@ describe("API functional routes", () => {
     await expect(res.json()).resolves.toEqual({
       success: true,
       data: { subscriptions: [{ id: "sub-row-1", providerSubscriptionId: "sub_1" }], total: 1, hasMore: false },
+    });
+  });
+
+  it("passes pagination and search to subscription payments endpoint", async () => {
+    setBillingModeForTest("subscriptions");
+    mocks.subscriptionService.listSubscriptionPayments.mockResolvedValueOnce({
+      payments: [{ id: "sp_1", paymentId: "pay_1", userEmail: "alice@example.com" }],
+      total: 1,
+      hasMore: false,
+    });
+
+    const res = await app.request("/admin/billing/subscription-payments?limit=5&offset=10&searchEmail=alice@example.com");
+
+    expect(res.status).toBe(200);
+    expect(mocks.subscriptionService.listSubscriptionPayments).toHaveBeenCalledWith(5, 10, "alice@example.com");
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: { payments: [{ id: "sp_1", paymentId: "pay_1", userEmail: "alice@example.com" }], total: 1, hasMore: false },
     });
   });
 

@@ -1073,6 +1073,35 @@
             "paused": "Gepauzeerd"
           }
         },
+        "payments": {
+          "title": "Abonnementsbetalingen",
+          "empty": "Geen abonnementsbetalingen gevonden.",
+          "unknownUser": "Onbekend",
+          "table": {
+            "user": "Gebruiker",
+            "plan": "Plan",
+            "status": "Status",
+            "amount": "Bedrag",
+            "payment": "Betaling",
+            "date": "Datum",
+            "actions": "Acties"
+          },
+          "refund": {
+            "action": "Terugbetalen",
+            "success": "Terugbetaling voor abonnementsbetaling aangemaakt.",
+            "error": "Terugbetaling voor abonnement aanmaken mislukt.",
+            "missingPayment": "Betalings-ID ontbreekt.",
+            "dialog": {
+              "title": "Abonnementsbetaling terugbetalen",
+              "description": "Dit start een providerterugbetaling voor de geselecteerde abonnementsbetaling.",
+              "reason": "Reden",
+              "secret": "Admin-geheim",
+              "cancel": "Annuleren",
+              "submit": "Terugbetaling aanmaken",
+              "submitting": "Aanmaken..."
+            }
+          }
+        },
         "events": {
           "title": "Abonnementsgebeurtenissen",
           "empty": "Geen abonnementsgebeurtenissen gevonden.",

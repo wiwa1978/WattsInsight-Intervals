@@ -1,12 +1,14 @@
 import {
   banAdminUserApi,
   createAdminCreditRefundApi,
+  createAdminSubscriptionRefundApi,
   getAdminAllPurchasesApi,
   getAdminAllSubscriptionsApi,
   getAdminAllTransactionsApi,
   getAdminBillingStatsApi,
   getAdminBillingSubscriptionEventsApi,
   getAdminBillingSubscriptionFinanceSummaryApi,
+  getAdminBillingSubscriptionPaymentsApi,
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
@@ -41,6 +43,7 @@ import type {
   AdminDashboardStats,
   AdminCreditRefundResponseData,
   AdminCreditsDashboard,
+  AdminSubscriptionRefundResponseData,
   AdminUserDetail,
   AdminUsersList,
   AdminUserStats,
@@ -57,6 +60,7 @@ import type {
   SubscriptionEvent,
   SubscriptionFinanceSummary,
   SubscriptionPlanDistributionPoint,
+  SubscriptionPaymentsList,
   SubscriptionStats,
   SubscriptionsList,
   TransactionPoint,
@@ -103,6 +107,7 @@ const emptySubscriptionStats: SubscriptionStats = {
   annualRecurringRevenue: 0,
 };
 const emptySubscriptionsList: SubscriptionsList = { subscriptions: [], total: 0, hasMore: false };
+const emptySubscriptionPaymentsList: SubscriptionPaymentsList = { payments: [], total: 0, hasMore: false };
 const emptySubscriptionFinanceSummary: SubscriptionFinanceSummary = {
   currency: "EUR",
   grossRevenue: 0,
@@ -304,6 +309,22 @@ export async function getAdminBillingSubscriptions(limit: number = 20, offset: n
 
     throw error;
   }
+}
+
+export async function getAdminBillingSubscriptionPayments(limit: number = 20, offset: number = 0, searchEmail?: string): Promise<SubscriptionPaymentsList> {
+  try {
+    return await getAdminBillingSubscriptionPaymentsApi(limit, offset, searchEmail);
+  } catch (error) {
+    if (isSubscriptionBillingDisabledError(error)) {
+      return emptySubscriptionPaymentsList;
+    }
+
+    throw error;
+  }
+}
+
+export async function createAdminSubscriptionRefund(payload: { paymentId: string; reason?: string; secret: string }): Promise<AdminSubscriptionRefundResponseData> {
+  return createAdminSubscriptionRefundApi(payload);
 }
 
 export async function getAdminBillingSubscriptionPlanDistribution(): Promise<SubscriptionPlanDistributionPoint[]> {

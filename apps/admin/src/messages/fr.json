@@ -997,6 +997,35 @@
             "paused": "En pause"
           }
         },
+        "payments": {
+          "title": "Paiements d'abonnement",
+          "empty": "Aucun paiement d'abonnement trouvé.",
+          "unknownUser": "Inconnu",
+          "table": {
+            "user": "Utilisateur",
+            "plan": "Offre",
+            "status": "Statut",
+            "amount": "Montant",
+            "payment": "Paiement",
+            "date": "Date",
+            "actions": "Actions"
+          },
+          "refund": {
+            "action": "Rembourser",
+            "success": "Remboursement du paiement d'abonnement créé.",
+            "error": "Échec de la création du remboursement d'abonnement.",
+            "missingPayment": "ID de paiement manquant.",
+            "dialog": {
+              "title": "Rembourser le paiement d'abonnement",
+              "description": "Cela démarre un remboursement fournisseur pour le paiement d'abonnement sélectionné.",
+              "reason": "Raison",
+              "secret": "Secret administrateur",
+              "cancel": "Annuler",
+              "submit": "Créer le remboursement",
+              "submitting": "Création..."
+            }
+          }
+        },
         "events": {
           "title": "Événements d'abonnement",
           "empty": "Aucun événement d'abonnement trouvé.",

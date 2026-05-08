@@ -4,7 +4,7 @@ import { CreditsDashboard } from "@/components/layout/backend/admin/billing/cred
 import { SubscriptionFinanceSummary } from "@/components/layout/backend/admin/billing/subscription-finance-summary";
 import { SubscriptionPlanDistribution } from "@/components/layout/backend/admin/billing/subscription-plan-distribution";
 import { SubscriptionStatsGrid } from "@/components/layout/backend/admin/billing/subscription-stats-grid";
-import { SubscriptionEventsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
+import { SubscriptionEventsTable, SubscriptionPaymentsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
 import { AdminBillingTabs, type AdminBillingSection } from "@/components/layout/backend/admin/billing/admin-billing-tabs";
 import { DiscountsSection } from "@/components/layout/backend/admin/billing/discounts-section";
 import { VouchersSection } from "@/components/layout/backend/admin/billing/vouchers-section";
@@ -12,6 +12,7 @@ import { getMyApplicationConfig } from "@/lib/api/me";
 import {
   getAdminBillingSubscriptionEvents,
   getAdminBillingSubscriptionFinanceSummary,
+  getAdminBillingSubscriptionPayments,
   getAdminBillingSubscriptionPlanDistribution,
   getAdminBillingSubscriptionStats,
   getAdminBillingSubscriptions,
@@ -84,11 +85,12 @@ async function AdminBillingOverview({
 
 async function AdminSubscriptionBillingPage() {
   const t = await getTranslations("admin.billing.subscriptionsMode");
-  const [stats, financeSummary, distribution, subscriptions, events] = await Promise.all([
+  const [stats, financeSummary, distribution, subscriptions, payments, events] = await Promise.all([
     getAdminBillingSubscriptionStats(),
     getAdminBillingSubscriptionFinanceSummary(),
     getAdminBillingSubscriptionPlanDistribution(),
     getAdminBillingSubscriptions(50, 0),
+    getAdminBillingSubscriptionPayments(50, 0),
     getAdminBillingSubscriptionEvents(50),
   ]);
 
@@ -113,6 +115,7 @@ async function AdminSubscriptionBillingPage() {
 
       <div className="grid gap-6 lg:grid-cols-1">
         <SubscriptionTable subscriptions={subscriptions.subscriptions} />
+        <SubscriptionPaymentsTable initialPayments={payments.payments} />
         <SubscriptionEventsTable events={events} />
       </div>
     </>

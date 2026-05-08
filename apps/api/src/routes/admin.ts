@@ -1034,6 +1034,31 @@ export function createAdminRouter() {
     return c.json({ success: true, data });
   });
 
+  router.get("/billing/subscription-payments", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const parsedQuery = parseQuery(billingListQuerySchema, {
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+      searchEmail: c.req.query("searchEmail"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid subscription payments query");
+    }
+
+    const data = await bootstrap.subscriptionService.listSubscriptionPayments(
+      parsedQuery.data.limit,
+      parsedQuery.data.offset,
+      parsedQuery.data.searchEmail,
+    );
+    return c.json({ success: true, data });
+  });
+
   router.get("/billing/subscription-stats", async (c) => {
     try {
       ensureSubscriptionBillingEnabled();

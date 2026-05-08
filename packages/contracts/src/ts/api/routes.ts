@@ -87,6 +87,8 @@ export const apiRoutes = {
     billingSubscriptionRefunds: "/admin/billing/subscription-refunds",
     billingSubscriptions: (limit = 20, offset = 0, searchEmail?: string) =>
       withQuery("/admin/billing/subscriptions", { limit, offset, searchEmail }),
+    billingSubscriptionPayments: (limit = 20, offset = 0, searchEmail?: string) =>
+      withQuery("/admin/billing/subscription-payments", { limit, offset, searchEmail }),
     billingSubscriptionStats: "/admin/billing/subscription-stats",
     billingSubscriptionFinanceSummary: "/admin/billing/subscription-finance-summary",
     billingSubscriptionPlanDistribution: "/admin/billing/subscription-plan-distribution",

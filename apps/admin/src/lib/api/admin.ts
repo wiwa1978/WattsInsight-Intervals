@@ -5,6 +5,7 @@ import type {
   AdminDashboardStats,
   AdminCreditRefundResponseData,
   AdminCreditsDashboard,
+  AdminSubscriptionRefundResponseData,
   AdminSearchUser,
   AdminUserDetail,
   AdminUsersList,
@@ -25,6 +26,7 @@ import type {
   SubscriptionEvent,
   SubscriptionFinanceSummary,
   SubscriptionPlanDistributionPoint,
+  SubscriptionPaymentsList,
   SubscriptionStats,
   SubscriptionsList,
   TransactionPoint,
@@ -244,6 +246,24 @@ export async function createAdminCreditRefundApi(payload: { paymentId: string; r
 export async function getAdminBillingSubscriptionsApi(limit = 20, offset = 0, searchEmail?: string) {
   const result = await apiRequest<{ success: boolean; data: SubscriptionsList }>(
     apiRoutes.admin.billingSubscriptions(limit, offset, searchEmail),
+  );
+  return result.data;
+}
+
+export async function getAdminBillingSubscriptionPaymentsApi(limit = 20, offset = 0, searchEmail?: string) {
+  const result = await apiRequest<{ success: boolean; data: SubscriptionPaymentsList }>(
+    apiRoutes.admin.billingSubscriptionPayments(limit, offset, searchEmail),
+  );
+  return result.data;
+}
+
+export async function createAdminSubscriptionRefundApi(payload: { paymentId: string; reason?: string; secret: string }) {
+  const result = await apiRequest<{ success: boolean; data: AdminSubscriptionRefundResponseData; error?: string }>(
+    apiRoutes.admin.billingSubscriptionRefunds,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
   );
   return result.data;
 }

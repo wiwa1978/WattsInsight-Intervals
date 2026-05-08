@@ -233,6 +233,56 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       .limit(normalizedLimit);
   }
 
+  async function listSubscriptionPayments(limit = 20, offset = 0, searchEmail?: string) {
+    const normalizedLimit = normalizeLimit(limit, 100);
+    const normalizedOffset = normalizeOffset(offset);
+    const normalizedSearchEmail = normalizeSearchEmail(searchEmail);
+    const whereCondition = normalizedSearchEmail ? like(user.email, `%${normalizedSearchEmail}%`) : undefined;
+
+    const [payments, totalCountResult] = await Promise.all([
+      deps.db
+        .select({
+          id: subscriptionPayments.id,
+          userId: subscriptionPayments.userId,
+          planKey: subscriptionPayments.planKey,
+          providerSubscriptionId: subscriptionPayments.providerSubscriptionId,
+          dodoSubscriptionId: subscriptionPayments.dodoSubscriptionId,
+          paymentStatus: subscriptionPayments.paymentStatus,
+          paymentId: subscriptionPayments.paymentId,
+          priceExclVat: subscriptionPayments.priceExclVat,
+          priceInclVat: subscriptionPayments.priceInclVat,
+          vatAmount: subscriptionPayments.vatAmount,
+          currency: subscriptionPayments.currency,
+          paymentMethod: subscriptionPayments.paymentMethod,
+          paymentMethodType: subscriptionPayments.paymentMethodType,
+          refundStatus: subscriptionPayments.refundStatus,
+          errorCode: subscriptionPayments.errorCode,
+          errorMessage: subscriptionPayments.errorMessage,
+          createdAt: subscriptionPayments.createdAt,
+          userName: user.name,
+          userEmail: user.email,
+        })
+        .from(subscriptionPayments)
+        .innerJoin(user, eq(subscriptionPayments.userId, user.id))
+        .where(whereCondition)
+        .orderBy(desc(subscriptionPayments.createdAt))
+        .limit(normalizedLimit)
+        .offset(normalizedOffset),
+      deps.db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(subscriptionPayments)
+        .innerJoin(user, eq(subscriptionPayments.userId, user.id))
+        .where(whereCondition),
+    ]);
+
+    const total = totalCountResult[0]?.count ?? 0;
+    return {
+      payments,
+      total,
+      hasMore: normalizedOffset + normalizedLimit < total,
+    };
+  }
+
   async function downloadSubscriptionInvoice(userId: string, paymentId: string) {
     const [payment] = await deps.db
       .select({
@@ -615,6 +665,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     getUserSubscription,
     recordSubscriptionPayment,
     listUserSubscriptionPayments,
+    listSubscriptionPayments,
     downloadSubscriptionInvoice,
     createSubscriptionRefund,
     getLatestProviderCustomerId,

@@ -122,6 +122,12 @@ export const subscriptionPaymentSchema = z.object({
   createdAt: z.string(),
 });
 
+export const adminSubscriptionPaymentListItemSchema = subscriptionPaymentSchema.extend({
+  userId: z.string(),
+  userName: z.string().nullable().optional(),
+  userEmail: z.string().optional(),
+});
+
 export const adminBillingWarningSchema = z.object({
   source: z.string(),
   message: z.string(),
@@ -184,6 +190,11 @@ export const adminCreditRefundResponseDataSchema = z.object({
   purchase: creditPurchaseSchema,
 });
 
+export const adminSubscriptionRefundResponseDataSchema = z.object({
+  refund: adminRefundSchema,
+  payment: adminSubscriptionPaymentListItemSchema.partial({ userName: true, userEmail: true }),
+});
+
 export const subscriptionStatsSchema = z.object({
   totalSubscriptions: z.number().int().nonnegative(),
   activeSubscriptions: z.number().int().nonnegative(),
@@ -244,6 +255,12 @@ export const subscriptionsListSchema = z.object({
   hasMore: z.boolean(),
 });
 
+export const subscriptionPaymentsListSchema = z.object({
+  payments: z.array(adminSubscriptionPaymentListItemSchema),
+  total: z.number().int().nonnegative(),
+  hasMore: z.boolean(),
+});
+
 export const applicationConfigSchema = z.object({
   billing: z.object({
     enabled: z.boolean(),
@@ -270,6 +287,7 @@ export const creditsConsumedChartResponseSchema = successResultSchema(z.array(cr
 export const userSubscriptionResponseSchema = successResultSchema(userSubscriptionSchema.nullable());
 export const subscriptionPaymentsResponseSchema = successResultSchema(z.array(subscriptionPaymentSchema));
 export const subscriptionsListResponseSchema = successResultSchema(subscriptionsListSchema);
+export const subscriptionPaymentsListResponseSchema = successResultSchema(subscriptionPaymentsListSchema);
 export const subscriptionStatsResponseSchema = successResultSchema(subscriptionStatsSchema);
 export const subscriptionFinanceSummaryResponseSchema = successResultSchema(subscriptionFinanceSummarySchema);
 export const subscriptionPlanDistributionResponseSchema = successResultSchema(z.array(subscriptionPlanDistributionPointSchema));
@@ -277,6 +295,7 @@ export const subscriptionEventsResponseSchema = successResultSchema(z.array(subs
 export const applicationConfigResponseSchema = successResultSchema(applicationConfigSchema);
 export const adminCreditsDashboardResponseSchema = successResultSchema(adminCreditsDashboardSchema);
 export const adminCreditRefundResponseSchema = successResultSchema(adminCreditRefundResponseDataSchema);
+export const adminSubscriptionRefundResponseSchema = successResultSchema(adminSubscriptionRefundResponseDataSchema);
 
 export const consumeCreditsResponseSchema = z.object({
   transactionId: z.string(),
@@ -302,7 +321,9 @@ export type PurchasesList = z.infer<typeof purchasesListSchema>;
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 export type UserSubscription = z.infer<typeof userSubscriptionSchema>;
 export type SubscriptionPayment = z.infer<typeof subscriptionPaymentSchema>;
+export type AdminSubscriptionPaymentListItem = z.infer<typeof adminSubscriptionPaymentListItemSchema>;
 export type SubscriptionsList = z.infer<typeof subscriptionsListSchema>;
+export type SubscriptionPaymentsList = z.infer<typeof subscriptionPaymentsListSchema>;
 export type SubscriptionStats = z.infer<typeof subscriptionStatsSchema>;
 export type SubscriptionFinanceSummary = z.infer<typeof subscriptionFinanceSummarySchema>;
 export type SubscriptionPlanDistributionPoint = z.infer<typeof subscriptionPlanDistributionPointSchema>;
@@ -313,3 +334,4 @@ export type AdminBillingPagination = z.infer<typeof adminBillingPaginationSchema
 export type AdminCreditsDashboard = z.infer<typeof adminCreditsDashboardSchema>;
 export type AdminRefund = z.infer<typeof adminRefundSchema>;
 export type AdminCreditRefundResponseData = z.infer<typeof adminCreditRefundResponseDataSchema>;
+export type AdminSubscriptionRefundResponseData = z.infer<typeof adminSubscriptionRefundResponseDataSchema>;
