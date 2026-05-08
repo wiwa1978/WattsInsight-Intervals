@@ -1348,6 +1348,41 @@ describe("API functional routes", () => {
     expect(mocks.adminAuthApi.verifyTotp).not.toHaveBeenCalled();
   });
 
+  it("requires admin secret before allowing first-time TOTP enrollment", async () => {
+    mocks.adminService.verifyAdminLoginSecret = vi.fn().mockResolvedValueOnce({ success: true });
+    mocks.adminAuthApi.getSession.mockResolvedValueOnce({ user: { twoFactorEnabled: false } });
+
+    const res = await app.request("/admin/step-up/totp-enrollment", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: "better-auth.session_token=session-token",
+        origin: "http://localhost:3100",
+      },
+      body: JSON.stringify({ secret: "secret" }),
+    });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true, data: { canEnrollTotp: true } });
+  });
+
+  it("rejects first-time TOTP enrollment when admin secret is invalid", async () => {
+    mocks.adminService.verifyAdminLoginSecret = vi.fn().mockResolvedValueOnce({ success: false });
+
+    const res = await app.request("/admin/step-up/totp-enrollment", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: "better-auth.session_token=session-token",
+        origin: "http://localhost:3100",
+      },
+      body: JSON.stringify({ secret: "wrong" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(mocks.adminAuthApi.getSession).not.toHaveBeenCalled();
+  });
+
   // Verifies admin step-up completion validates secret and TOTP and returns cookie marker.
   it("completes admin step-up and sets marker cookie", async () => {
     mocks.adminService.verifyAdminLoginSecret = vi.fn().mockResolvedValueOnce({ success: true });

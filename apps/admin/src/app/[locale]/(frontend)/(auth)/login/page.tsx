@@ -28,7 +28,7 @@ import { authClient, twoFactor } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
 import { signInSchema } from "@/schemas";
 import { getMainAppLoginUrl } from "@/lib/main-app-url";
-import { completeAdminStepUp, getAdminStepUpStatus } from "@/lib/services/admin";
+import { completeAdminStepUp, getAdminStepUpStatus, prepareAdminTotpEnrollment } from "@/lib/services/admin";
 
 const DEFAULT_REDIRECT = "/admin/overview";
 
@@ -59,6 +59,7 @@ function LoginPageContent() {
   const [enrollmentSecret, setEnrollmentSecret] = React.useState<string | null>(null);
   const [enrollmentUri, setEnrollmentUri] = React.useState<string | null>(null);
   const [enrollmentQrCode, setEnrollmentQrCode] = React.useState<string | null>(null);
+  const [totpCodeRequired, setTotpCodeRequired] = React.useState(false);
 
   const callbackUrl = searchParams.get("callbackUrl");
   const redirectTo = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : DEFAULT_REDIRECT;
@@ -87,6 +88,7 @@ function LoginPageContent() {
   });
 
   const isSubmitting = passwordForm.formState.isSubmitting;
+  const showTotpCode = totpCodeRequired || Boolean(enrollmentSecret);
 
   React.useEffect(() => {
     if (!enrollmentUri) {
@@ -113,7 +115,7 @@ function LoginPageContent() {
   }, [enrollmentUri]);
 
   async function onPasswordSubmit(values: AdminLoginInput) {
-    const { error } = await authClient.signIn.email({
+    const { data, error } = await authClient.signIn.email({
       email: values.email,
       password: values.password,
       ...(authConfig.rememberMeEnabled && { rememberMe: values.rememberMe }),
@@ -123,6 +125,26 @@ function LoginPageContent() {
       passwordForm.setError("root", { message: getErrorMessage(error) });
       passwordForm.resetField("password");
       return;
+    }
+
+    const signInNeedsTotp = Boolean((data as { twoFactorRedirect?: boolean } | null | undefined)?.twoFactorRedirect);
+    if (signInNeedsTotp) {
+      setTotpCodeRequired(true);
+
+      if (!values.totpCode) {
+        passwordForm.setError("totpCode", {
+          message: "Enter a valid 6-digit authentication code",
+        });
+        return;
+      }
+
+      const verify = await twoFactor.verifyTotp({ code: values.totpCode });
+      if (verify.error) {
+        passwordForm.setError("totpCode", {
+          message: "Enter a valid 6-digit authentication code",
+        });
+        return;
+      }
     }
 
     const status = await enforceAdminAccess();
@@ -145,6 +167,8 @@ function LoginPageContent() {
         }
 
         if (!enrollmentSecret) {
+          await prepareAdminTotpEnrollment({ secret: values.adminSecret });
+
           const setup = await twoFactor.enable({ password: values.password });
           const setupData = setup && typeof setup === "object" && "data" in setup
             ? (setup as { data?: { totpURI?: string } | null }).data
@@ -164,9 +188,7 @@ function LoginPageContent() {
 
           setEnrollmentSecret(secret);
           setEnrollmentUri(totpUri ?? null);
-          passwordForm.setError("root", {
-            message: "Two-factor was not enabled yet. Add the setup key below in your authenticator app and submit again with a fresh code.",
-          });
+          setTotpCodeRequired(true);
           return;
         }
 
@@ -200,6 +222,7 @@ function LoginPageContent() {
       setEnrollmentSecret(null);
       setEnrollmentUri(null);
       setEnrollmentQrCode(null);
+      setTotpCodeRequired(false);
       return;
     }
 
@@ -222,6 +245,7 @@ function LoginPageContent() {
     setEnrollmentSecret(null);
     setEnrollmentUri(null);
     setEnrollmentQrCode(null);
+    setTotpCodeRequired(false);
   }
 
   return (
@@ -251,6 +275,9 @@ function LoginPageContent() {
                 {enrollmentSecret && (
                   <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
                     <div className="mb-2 font-medium">First-time authenticator setup</div>
+                    <p className="mb-3">
+                      Add this setup key in your authenticator app, then enter the fresh 6-digit code to finish signing in.
+                    </p>
                     {enrollmentQrCode && (
                       <div className="mb-3 flex justify-center">
                         <img
@@ -311,8 +338,8 @@ function LoginPageContent() {
                 <FormField
                   control={passwordForm.control}
                   name="adminSecret"
-                    render={({ field }) => (
-                      <FormItem>
+                  render={({ field }) => (
+                    <FormItem>
                       <FormLabel>{t("adminSecret")}</FormLabel>
                       <FormControl>
                         <PasswordInput
@@ -327,7 +354,7 @@ function LoginPageContent() {
                   )}
                 />
 
-                {authConfig.adminPortalTotpRequired && (
+                {authConfig.adminPortalTotpRequired && showTotpCode && (
                   <FormField
                     control={passwordForm.control}
                     name="totpCode"

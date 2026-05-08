@@ -46,6 +46,13 @@ export async function getAdminStepUpStatusApi() {
   }>("/admin/step-up/status");
 }
 
+export async function prepareAdminTotpEnrollmentApi(payload: { secret: string }) {
+  return apiRequest<{ success: boolean; data: { canEnrollTotp: boolean } }>("/admin/step-up/totp-enrollment", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function completeAdminStepUpApi(payload: { secret: string; totpCode?: string }) {
   return apiRequest<{ success: boolean; data: { verified: boolean } }>("/admin/step-up/complete", {
     method: "POST",

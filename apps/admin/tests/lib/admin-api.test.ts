@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   completeAdminStepUpApi,
   getAdminStepUpStatusApi,
+  prepareAdminTotpEnrollmentApi,
   getAdminAllPurchasesApi,
   getAdminAllTransactionsApi,
   getAdminBillingSubscriptionFinanceSummaryApi,
@@ -97,15 +98,20 @@ describe("admin API", () => {
 
   it("calls admin step-up endpoints", async () => {
     await getAdminStepUpStatusApi();
+    await prepareAdminTotpEnrollmentApi({ secret: "secret" });
     await completeAdminStepUpApi({ secret: "secret", totpCode: "123456" });
     await completeAdminStepUpApi({ secret: "secret" });
 
     expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/admin/step-up/status");
-    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/step-up/complete", {
+    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/step-up/totp-enrollment", {
+      method: "POST",
+      body: JSON.stringify({ secret: "secret" }),
+    });
+    expect(apiRequestMock).toHaveBeenNthCalledWith(3, "/admin/step-up/complete", {
       method: "POST",
       body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
     });
-    expect(apiRequestMock).toHaveBeenNthCalledWith(3, "/admin/step-up/complete", {
+    expect(apiRequestMock).toHaveBeenNthCalledWith(4, "/admin/step-up/complete", {
       method: "POST",
       body: JSON.stringify({ secret: "secret" }),
     });

@@ -34,6 +34,7 @@ import {
   verifyAdminBanSecretApi,
   completeAdminStepUpApi,
   getAdminStepUpStatusApi,
+  prepareAdminTotpEnrollmentApi,
 } from "@/lib/api/admin";
 import type {
   AdminDashboardStats,
@@ -134,6 +135,10 @@ export async function verifyAdminBanSecret(secret: string) {
 
 export async function getAdminStepUpStatus() {
   return getAdminStepUpStatusApi();
+}
+
+export async function prepareAdminTotpEnrollment(payload: { secret: string }) {
+  return prepareAdminTotpEnrollmentApi(payload);
 }
 
 export async function completeAdminStepUp(payload: { secret: string; totpCode?: string }) {

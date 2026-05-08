@@ -74,6 +74,10 @@ const adminStepUpSchema = z.object({
   totpCode: z.string().regex(/^\d{6}$/).optional(),
 });
 
+const adminTotpEnrollmentSchema = z.object({
+  secret: z.string().min(1),
+});
+
 const adminAllowlist = new Set(
   (env.ADMIN_ALLOWLIST ?? "")
     .split(",")
@@ -546,6 +550,36 @@ export function createAdminRouter() {
         canEnrollTotp: allowTotpEnrollment,
       },
     });
+  });
+
+  router.post("/step-up/totp-enrollment", async (c) => {
+    const authUser = getAuthUser(c);
+    const allowTotpEnrollment = canEnrollTotp(authUser);
+    const parsedBody = parseJsonBody(adminTotpEnrollmentSchema, await c.req.json().catch(() => null));
+
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid admin step-up payload");
+    }
+
+    const verifyAdminLoginSecret = bootstrap.adminService.verifyAdminLoginSecret ?? bootstrap.adminService.verifyAdminBanSecret;
+    const secretResult = await verifyAdminLoginSecret(parsedBody.data.secret);
+    if (!secretResult.success || !allowTotpEnrollment) {
+      return forbidden(c, "Invalid admin step-up credentials");
+    }
+
+    if (!bootstrap.authModule.auth.api?.getSession) {
+      return c.json({ success: false, error: "Unable to verify TOTP session" }, 500);
+    }
+
+    const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
+      | { user?: { twoFactorEnabled?: boolean | null } }
+      | null;
+
+    if (!authConfig.adminPortalTotpRequired || currentSession?.user?.twoFactorEnabled) {
+      return c.json({ success: false, error: "TOTP enrollment is not required" }, 400);
+    }
+
+    return c.json({ success: true, data: { canEnrollTotp: true } });
   });
 
   router.post("/step-up/complete", async (c) => {
