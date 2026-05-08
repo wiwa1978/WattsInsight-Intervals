@@ -5,8 +5,10 @@ import { and, count, desc, eq, gte, ilike, lte, or, type SQL } from "drizzle-orm
 
 import {
   banUserSchema,
+  adminCreditsDashboardQuerySchema,
   billingListQuerySchema,
   billingRangeQuerySchema,
+  createCreditRefundSchema,
   discountIdParamSchema,
   discountListQuerySchema,
   generateDiscountCodeSchema,
@@ -925,6 +927,73 @@ export function createAdminRouter() {
 
     const data = await bootstrap.adminService.getCreditsConsumedData(parsedQuery.data.timeRange);
     return c.json({ success: true, data });
+  });
+
+  router.get("/billing/credits-dashboard", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const parsedQuery = parseQuery(adminCreditsDashboardQuerySchema, {
+      creditsPurchasesPage: c.req.query("creditsPurchasesPage"),
+      creditsPurchasesSearch: c.req.query("creditsPurchasesSearch"),
+      creditsRefundsPage: c.req.query("creditsRefundsPage"),
+      creditsRefundsSearch: c.req.query("creditsRefundsSearch"),
+      range: c.req.query("range"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid credits dashboard query");
+    }
+
+    const data = await bootstrap.adminCreditsDashboardService.getDashboard(parsedQuery.data);
+    return c.json({ success: true, data });
+  });
+
+  router.post("/billing/credit-refunds", async (c) => {
+    return withJsonBody(c, createCreditRefundSchema, "Invalid credit refund payload", async (body) => {
+      const secretFailure = await requireAdminActionSecret(c, body.secret);
+      if (secretFailure) return secretFailure;
+
+      const actor = getAuthUser(c);
+      let result: Awaited<ReturnType<typeof bootstrap.billingService.createCreditRefund>>;
+
+      try {
+        result = await bootstrap.billingService.createCreditRefund({
+          paymentId: body.paymentId,
+          reason: body.reason,
+          actorUserId: actor.id,
+        });
+      } catch (error) {
+        const message = safeErrorMessage(error, "Failed to create credit refund");
+        const status = message === "Credit purchase not found" ? 404 : message === "Only completed credit purchases can be refunded" ? 400 : 502;
+        return c.json({ success: false, error: message }, status);
+      }
+
+      const auditFailure = await recordMutationAudit(c, {
+        action: "billing.credit_refund.create",
+        outcome: "success",
+        targetType: "credit_purchase",
+        targetId: result.purchase.id,
+        after: {
+          paymentId: result.purchase.paymentId,
+          paymentStatus: result.purchase.paymentStatus,
+          refundId: result.refund.refundId,
+          refundStatus: result.refund.status,
+        },
+        metadata: {
+          reason: body.reason ?? null,
+          userId: result.purchase.userId,
+          amount: result.refund.amount ?? null,
+          currency: result.refund.currency ?? null,
+        },
+      });
+      if (auditFailure) return auditFailure;
+
+      return c.json({ success: true, data: { refund: result.refund, purchase: result.purchase } });
+    });
   });
 
   router.get("/users/:userId/subscription", async (c) => {

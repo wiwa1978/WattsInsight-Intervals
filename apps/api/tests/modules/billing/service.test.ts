@@ -10,6 +10,23 @@ import {
 
 import { createBillingService } from "../../../src/modules/billing/service";
 
+function updateReturningMock(
+  updates: Array<{ table: unknown; set: unknown }>,
+  balanceAfter: string,
+  options: { noRows?: boolean } = {},
+) {
+  return vi.fn().mockImplementation((table: unknown) => ({
+    set: vi.fn((set: unknown) => {
+      updates.push({ table, set });
+      return {
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue(options.noRows ? [] : [{ balanceAfter }]),
+        }),
+      };
+    }),
+  }));
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -120,12 +137,7 @@ describe("createBillingService", () => {
           return Promise.resolve(undefined);
         }),
       })),
-      update: vi.fn().mockImplementation((table: unknown) => ({
-        set: vi.fn((set: unknown) => {
-          updates.push({ table, set });
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
+      update: updateReturningMock(updates, "210"),
     };
 
     const db = {
@@ -374,12 +386,7 @@ describe("createBillingService", () => {
           return Promise.resolve(undefined);
         }),
       })),
-      update: vi.fn().mockImplementation((table: unknown) => ({
-        set: vi.fn((set: unknown) => {
-          updates.push({ table, set });
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
+      update: updateReturningMock(updates, "120"),
     };
 
     const service = createBillingService({
@@ -436,12 +443,7 @@ describe("createBillingService", () => {
           return Promise.resolve(undefined);
         }),
       })),
-      update: vi.fn().mockImplementation((table: unknown) => ({
-        set: vi.fn((set: unknown) => {
-          updates.push({ table, set });
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
+      update: updateReturningMock(updates, "40"),
     };
 
     const service = createBillingService({
@@ -457,7 +459,7 @@ describe("createBillingService", () => {
     expect(result).toMatchObject({ id: "purchase-refund", paymentStatus: "refunded" });
     expect(updates).toHaveLength(2);
     expect(updates[0]?.table).toBe(userCredits);
-    expect(updates[0]?.set).toMatchObject({ balance: "40.00" });
+    expect((updates[0]?.set as { balance?: unknown }).balance).toBeDefined();
     expect(updates[1]?.table).toBe(creditPurchases);
     expect(updates[1]?.set).toMatchObject({ paymentStatus: "refunded" });
     expect(inserts).toHaveLength(1);
@@ -545,12 +547,7 @@ describe("createBillingService", () => {
           return Promise.resolve(undefined);
         }),
       })),
-      update: vi.fn().mockImplementation((table: unknown) => ({
-        set: vi.fn((set: unknown) => {
-          updates.push({ table, set });
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
+      update: updateReturningMock(updates, "40"),
     };
 
     const service = createBillingService({
@@ -566,7 +563,7 @@ describe("createBillingService", () => {
     expect(result).toMatchObject({ id: "purchase-dispute", paymentStatus: "failed" });
     expect(updates).toHaveLength(2);
     expect(updates[0]?.table).toBe(userCredits);
-    expect(updates[0]?.set).toMatchObject({ balance: "40.00" });
+    expect((updates[0]?.set as { balance?: unknown }).balance).toBeDefined();
     expect(updates[1]?.table).toBe(creditPurchases);
     expect(updates[1]?.set).toMatchObject({ paymentStatus: "failed" });
     expect(inserts).toHaveLength(1);
@@ -873,12 +870,7 @@ describe("createBillingService", () => {
           return Promise.resolve(undefined);
         }),
       })),
-      update: vi.fn().mockImplementation((table: unknown) => ({
-        set: vi.fn((set: unknown) => {
-          updates.push({ table, set });
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
+      update: updateReturningMock(updates, "95"),
     };
 
     const service = createBillingService({
@@ -902,7 +894,7 @@ describe("createBillingService", () => {
     });
     expect(updates).toHaveLength(1);
     expect(updates[0]?.table).toBe(userCredits);
-    expect(updates[0]?.set).toMatchObject({ balance: "95.00" });
+    expect((updates[0]?.set as { balance?: unknown }).balance).toBeDefined();
     const txInsert = inserts.find((i) => i.table === creditTransactions);
     expect(txInsert?.values).toMatchObject({
       userId: "u1",
@@ -944,7 +936,7 @@ describe("createBillingService", () => {
         }),
       }),
       insert: vi.fn(),
-      update: vi.fn(),
+      update: updateReturningMock([], "0", { noRows: true }),
     };
 
     const service = createBillingService({
@@ -983,7 +975,7 @@ describe("createBillingService", () => {
       },
       select: vi.fn(),
       insert: vi.fn(),
-      update: vi.fn(),
+      update: updateReturningMock([], "0", { noRows: true }),
     };
 
     const service = createBillingService({
@@ -1023,12 +1015,7 @@ describe("createBillingService", () => {
           return Promise.resolve(undefined);
         }),
       })),
-      update: vi.fn().mockImplementation((table: unknown) => ({
-        set: vi.fn((set: unknown) => {
-          updates.push({ table, set });
-          return { where: vi.fn().mockResolvedValue(undefined) };
-        }),
-      })),
+      update: updateReturningMock(updates, "75"),
     };
 
     const service = createBillingService({

@@ -409,7 +409,13 @@ export function createAdminService(deps: AdminServiceDeps) {
   }
 
   async function getBillingStats() {
-    const [totalPurchasesResult, totalCreditsPurchasedResult, totalCreditsConsumedResult, totalRevenueResult] =
+    const [
+      totalPurchasesResult,
+      totalCreditsPurchasedResult,
+      totalCreditsConsumedResult,
+      totalRevenueResult,
+      creditTransactionTotalsResult,
+    ] =
       await Promise.all([
         deps.db
           .select({ count: sql<number>`COUNT(*)` })
@@ -434,13 +440,32 @@ export function createAdminService(deps: AdminServiceDeps) {
           })
           .from(creditPurchases)
           .where(eq(creditPurchases.paymentStatus, "completed")),
+        deps.db
+          .select({
+            voucher: sql<number>`COALESCE(SUM(CASE WHEN ${creditTransactions.type} = 'voucher' THEN CAST(${creditTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+            bonus: sql<number>`COALESCE(SUM(CASE WHEN ${creditTransactions.type} = 'bonus' THEN CAST(${creditTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+            refund: sql<number>`COALESCE(SUM(CASE WHEN ${creditTransactions.type} = 'refund' THEN CAST(${creditTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+            adminAdjustment: sql<number>`COALESCE(SUM(CASE WHEN ${creditTransactions.type} = 'admin_adjustment' THEN CAST(${creditTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+          })
+          .from(creditTransactions),
       ]);
+
+    const purchasedCredits = Number(totalCreditsPurchasedResult[0]?.purchased ?? 0);
+    const purchaseBonusCredits = Number(totalCreditsPurchasedResult[0]?.bonus ?? 0);
+    const voucherCredits = Number(creditTransactionTotalsResult[0]?.voucher ?? 0);
+    const bonusCredits = Number(creditTransactionTotalsResult[0]?.bonus ?? 0);
+    const refundCredits = Number(creditTransactionTotalsResult[0]?.refund ?? 0);
+    const adminAdjustmentCredits = Number(creditTransactionTotalsResult[0]?.adminAdjustment ?? 0);
 
     return {
       totalPurchases: totalPurchasesResult[0]?.count ?? 0,
-      totalCreditsPurchased: Number(totalCreditsPurchasedResult[0]?.total ?? 0),
-      purchasedCredits: Number(totalCreditsPurchasedResult[0]?.purchased ?? 0),
-      bonusCredits: Number(totalCreditsPurchasedResult[0]?.bonus ?? 0),
+      totalCreditsPurchased: purchasedCredits + purchaseBonusCredits + voucherCredits + refundCredits + adminAdjustmentCredits,
+      purchasedCredits,
+      bonusCredits,
+      purchaseBonusCredits,
+      voucherCredits,
+      refundCredits,
+      adminAdjustmentCredits,
       totalCreditsConsumed: Number(totalCreditsConsumedResult[0]?.total ?? 0),
       totalRevenue: centsToEur(totalRevenueResult[0]?.total ?? 0),
     };
@@ -507,11 +532,14 @@ export function createAdminService(deps: AdminServiceDeps) {
     };
   }
 
-  async function getAllPurchases(limit = 20, offset = 0, searchEmail?: string) {
+  async function getAllPurchases(limit = 20, offset = 0, searchEmail?: string, paymentStatus?: "pending" | "completed" | "failed" | "refunded") {
     const normalizedLimit = normalizeLimit(limit, 100);
     const normalizedOffset = normalizeOffset(offset);
     const normalizedSearchEmail = normalizeSearchEmail(searchEmail);
-    const whereCondition = normalizedSearchEmail ? like(user.email, `%${normalizedSearchEmail}%`) : undefined;
+    const conditions = [];
+    if (normalizedSearchEmail) conditions.push(like(user.email, `%${normalizedSearchEmail}%`));
+    if (paymentStatus) conditions.push(eq(creditPurchases.paymentStatus, paymentStatus));
+    const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
     const [purchases, totalCountResult] = await Promise.all([
       deps.db
         .select({

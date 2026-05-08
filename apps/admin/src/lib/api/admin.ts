@@ -3,6 +3,8 @@ import { apiRequest } from "./client";
 import type { AdminCreateDiscountInput, AdminUpdateDiscountInput, DiscountStatus } from "@/types/discounts";
 import type {
   AdminDashboardStats,
+  AdminCreditRefundResponseData,
+  AdminCreditsDashboard,
   AdminSearchUser,
   AdminUserDetail,
   AdminUsersList,
@@ -209,6 +211,32 @@ export async function getAdminTransactionDataApi(timeRange: "daily" | "weekly" |
 export async function getAdminCreditsConsumedDataApi(timeRange: "daily" | "weekly" | "monthly" | "yearly") {
   const result = await apiRequest<{ success: boolean; data: CreditsConsumedPoint[] }>(
     `/admin/billing/credits-consumed-chart?timeRange=${timeRange}`,
+  );
+  return result.data;
+}
+
+export type AdminCreditsDashboardQuery = {
+  creditsPurchasesPage?: number;
+  creditsPurchasesSearch?: string;
+  creditsRefundsPage?: number;
+  creditsRefundsSearch?: string;
+  range?: "7d" | "30d" | "90d" | "12m" | "ytd";
+};
+
+export async function getAdminCreditsDashboardApi(query: AdminCreditsDashboardQuery = {}) {
+  const result = await apiRequest<{ success: boolean; data: AdminCreditsDashboard }>(
+    apiRoutes.admin.billingCreditsDashboard(query),
+  );
+  return result.data;
+}
+
+export async function createAdminCreditRefundApi(payload: { paymentId: string; reason?: string; secret: string }) {
+  const result = await apiRequest<{ success: boolean; data: AdminCreditRefundResponseData; error?: string }>(
+    apiRoutes.admin.billingCreditRefunds,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
   );
   return result.data;
 }

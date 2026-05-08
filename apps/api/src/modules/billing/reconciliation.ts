@@ -54,7 +54,7 @@ function serializeResult(result: BillingReconciliationResult) {
 export function createBillingReconciliationService(deps: BillingReconciliationDeps) {
   async function reconcileProviderBillingState(): Promise<BillingReconciliationResult> {
     const finance = deps.paymentProvider.finance;
-    if (!finance) {
+    if (!finance?.listPayments || !finance.listSubscriptions) {
       throw new Error("Payment provider finance support is not configured");
     }
 

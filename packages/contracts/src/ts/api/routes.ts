@@ -6,6 +6,14 @@ import { discountStatusSchema } from "../../wire/discounts/common";
 
 type DiscountStatus = z.infer<typeof discountStatusSchema>;
 
+type AdminCreditsDashboardQuery = {
+  creditsPurchasesPage?: number;
+  creditsPurchasesSearch?: string;
+  creditsRefundsPage?: number;
+  creditsRefundsSearch?: string;
+  range?: "7d" | "30d" | "90d" | "12m" | "ytd";
+};
+
 function withQuery(path: string, params: Record<string, string | number | boolean | undefined>) {
   const searchParams = new URLSearchParams();
 
@@ -73,6 +81,10 @@ export const apiRoutes = {
       withQuery("/admin/billing/transactions-chart", { timeRange }),
     billingCreditsConsumedChart: (timeRange: "daily" | "weekly" | "monthly" | "yearly") =>
       withQuery("/admin/billing/credits-consumed-chart", { timeRange }),
+    billingCreditsDashboard: (query: AdminCreditsDashboardQuery = {}) =>
+      withQuery("/admin/billing/credits-dashboard", query),
+    billingCreditRefunds: "/admin/billing/credit-refunds",
+    billingSubscriptionRefunds: "/admin/billing/subscription-refunds",
     billingSubscriptions: (limit = 20, offset = 0, searchEmail?: string) =>
       withQuery("/admin/billing/subscriptions", { limit, offset, searchEmail }),
     billingSubscriptionStats: "/admin/billing/subscription-stats",

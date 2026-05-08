@@ -24,12 +24,12 @@ describe("subscription service helpers", () => {
 
   it("calculates recurring revenue from active subscriptions", () => {
     expect(calculateSubscriptionRecurringRevenue([
-      { planKey: "starter", status: "active" },
-      { planKey: "pro", status: "trialing" },
-      { planKey: "starter", status: "canceled" },
+      { planKey: "Bronze", status: "active" },
+      { planKey: "Silver", status: "trialing" },
+      { planKey: "Bronze", status: "canceled" },
     ])).toEqual({
-      monthlyRecurringRevenue: 68,
-      annualRecurringRevenue: 816,
+      monthlyRecurringRevenue: 35,
+      annualRecurringRevenue: 420,
     });
   });
 

@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   decimal,
   index,
   integer,
@@ -24,6 +25,20 @@ export type SubscriptionStatus =
   | "paused";
 
 export type CheckoutIntentStatus = "pending" | "completed" | "failed" | "cancelled" | "expired";
+export type SubscriptionPaymentStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "refunded"
+  | "cancelled"
+  | "processing"
+  | "requires_customer_action"
+  | "requires_merchant_action"
+  | "requires_payment_method"
+  | "requires_confirmation"
+  | "requires_capture"
+  | "partially_captured"
+  | "partially_captured_and_capturable";
 
 export const userCredits = pgTable(
   "user_credits",
@@ -182,6 +197,7 @@ export const userSubscriptions = pgTable(
     currentPeriodStart: timestamp("current_period_start", { withTimezone: true }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+    providerEventAt: timestamp("provider_event_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt,
     updatedAt,
   },
@@ -192,6 +208,7 @@ export const userSubscriptions = pgTable(
     uniqueIndex("user_subscriptions_dodo_subscription_id_idx").on(table.dodoSubscriptionId),
     index("user_subscriptions_status_idx").on(table.status),
     index("user_subscriptions_plan_key_idx").on(table.planKey),
+    index("user_subscriptions_provider_event_at_idx").on(table.providerEventAt),
   ],
 );
 
@@ -232,13 +249,18 @@ export const subscriptionPayments = pgTable(
     paymentProvider: text("payment_provider").default("dodo").notNull(),
     paymentId: text("payment_id").notNull(),
     paymentStatus: text("payment_status")
-      .$type<"pending" | "completed" | "failed" | "refunded">()
+      .$type<SubscriptionPaymentStatus>()
       .default("pending")
       .notNull(),
     priceExclVat: integer("price_excl_vat").notNull(),
     priceInclVat: integer("price_incl_vat").notNull(),
     vatAmount: integer("vat_amount").notNull(),
     currency: text("currency").default("EUR").notNull(),
+    paymentMethod: text("payment_method"),
+    paymentMethodType: text("payment_method_type"),
+    refundStatus: text("refund_status"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
     paymentSnapshot: jsonb("payment_snapshot"),
     createdAt,
     updatedAt,
@@ -251,6 +273,8 @@ export const subscriptionPayments = pgTable(
     index("subscription_payments_provider_subscription_id_idx").on(table.providerSubscriptionId),
     index("subscription_payments_subscription_id_idx").on(table.dodoSubscriptionId),
     index("subscription_payments_status_created_at_idx").on(table.paymentStatus, table.createdAt),
+    index("subscription_payments_method_created_at_idx").on(table.paymentMethod, table.createdAt),
+    index("subscription_payments_error_code_created_at_idx").on(table.errorCode, table.createdAt),
   ],
 );
 
@@ -264,6 +288,7 @@ export const discounts = pgTable(
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }).notNull(),
     maxUses: integer("max_uses"),
+    subscriptionCycles: integer("subscription_cycles"),
     currentUses: integer("current_uses").default(0).notNull(),
     providerDiscountId: text("provider_discount_id").unique(),
     dodoDiscountId: text("dodo_discount_id").unique(),
@@ -279,8 +304,13 @@ export const discounts = pgTable(
     index("discounts_provider_discount_id_idx").on(table.providerDiscountId),
     index("discounts_dodo_discount_id_idx").on(table.dodoDiscountId),
     index("discounts_status_idx").on(table.status),
+    index("discounts_status_created_at_idx").on(table.status, table.createdAt),
     index("discounts_start_date_idx").on(table.startDate),
     index("discounts_end_date_idx").on(table.endDate),
+    check(
+      "discounts_subscription_cycles_range",
+      sql`${table.subscriptionCycles} IS NULL OR (${table.subscriptionCycles} >= 1 AND ${table.subscriptionCycles} <= 999)`,
+    ),
   ],
 );
 

@@ -513,8 +513,8 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
           currency: subscriptionPayments.currency,
         })
         .from(subscriptionPayments),
-      deps.paymentProvider?.finance?.listPayments({ pageSize: 100 }).catch(() => null) ?? Promise.resolve(null),
-      deps.paymentProvider?.finance?.listSubscriptions({ pageSize: 100 }).catch(() => null) ?? Promise.resolve(null),
+      deps.paymentProvider?.finance?.listPayments?.({ pageSize: 100 }).catch(() => null) ?? Promise.resolve(null),
+      deps.paymentProvider?.finance?.listSubscriptions?.({ pageSize: 100 }).catch(() => null) ?? Promise.resolve(null),
     ]);
 
     const localPaymentIds = new Set(localPayments.map((payment: { paymentId: string }) => payment.paymentId));

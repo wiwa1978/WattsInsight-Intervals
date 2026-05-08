@@ -41,6 +41,22 @@ export const billingListQuerySchema = paginationQuerySchema.extend({
   searchEmail: z.string().trim().email().max(255).optional(),
 });
 
+export const adminBillingDashboardRangeSchema = z.enum(["7d", "30d", "90d", "12m", "ytd"]);
+
+export const adminCreditsDashboardQuerySchema = z.object({
+  creditsPurchasesPage: z.coerce.number().int().min(1).default(1),
+  creditsPurchasesSearch: z.string().trim().max(255).optional(),
+  creditsRefundsPage: z.coerce.number().int().min(1).default(1),
+  creditsRefundsSearch: z.string().trim().max(255).optional(),
+  range: adminBillingDashboardRangeSchema.default("30d"),
+});
+
+export const createCreditRefundSchema = z.object({
+  paymentId: z.string().trim().min(1, "Payment ID is required").max(255),
+  reason: z.string().trim().max(3000, "Reason must be 3000 characters or fewer").optional(),
+  secret: z.string().trim().min(1).max(255),
+});
+
 export const createSubscriptionRefundSchema = z.object({
   paymentId: z.string().trim().min(1, "Payment ID is required").max(255),
   reason: z.string().trim().max(3000, "Reason must be 3000 characters or fewer").optional(),

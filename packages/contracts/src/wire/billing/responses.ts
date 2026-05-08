@@ -46,6 +46,10 @@ export const billingStatsSchema = z.object({
   totalCreditsPurchased: z.number().nonnegative(),
   purchasedCredits: z.number().nonnegative(),
   bonusCredits: z.number().nonnegative(),
+  purchaseBonusCredits: z.number().nonnegative().optional(),
+  voucherCredits: z.number().optional(),
+  refundCredits: z.number().optional(),
+  adminAdjustmentCredits: z.number().optional(),
   totalCreditsConsumed: z.number().nonnegative(),
   totalRevenue: z.number().nonnegative(),
 });
@@ -64,6 +68,12 @@ export const transactionPointSchema = z.object({
 export const creditsConsumedPointSchema = z.object({
   period: z.string(),
   consumed: z.number().nonnegative(),
+});
+
+export const adminTransactionListItemSchema = creditTransactionSchema.extend({
+  userId: z.string(),
+  userName: z.string().nullable().optional(),
+  userEmail: z.string(),
 });
 
 export const subscriptionStatusSchema = z.enum([
@@ -98,13 +108,80 @@ export const subscriptionPaymentSchema = z.object({
   planKey: z.string(),
   providerSubscriptionId: z.string().nullable().optional(),
   dodoSubscriptionId: z.string().nullable().optional(),
-  paymentStatus: z.enum(["pending", "completed", "failed", "refunded"]),
+  paymentStatus: z.string(),
   paymentId: z.string(),
   priceExclVat: z.number().int().nonnegative(),
   priceInclVat: z.number().int().nonnegative(),
   vatAmount: z.number().int().nonnegative(),
   currency: z.string(),
+  paymentMethod: z.string().nullable().optional(),
+  paymentMethodType: z.string().nullable().optional(),
+  refundStatus: z.string().nullable().optional(),
+  errorCode: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
   createdAt: z.string(),
+});
+
+export const adminBillingWarningSchema = z.object({
+  source: z.string(),
+  message: z.string(),
+});
+
+export const adminBillingPaginationSchema = z.object({
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  totalItems: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+  search: z.string(),
+});
+
+export const adminCreditsDashboardSchema = z.object({
+  stats: billingStatsSchema.extend({
+    purchaseBonusCredits: z.number(),
+    voucherCredits: z.number(),
+    refundCredits: z.number(),
+    adminAdjustmentCredits: z.number(),
+  }),
+  revenue: z.object({
+    dailyData: z.array(revenuePointSchema),
+    weeklyData: z.array(revenuePointSchema),
+    monthlyData: z.array(revenuePointSchema),
+    yearlyData: z.array(revenuePointSchema),
+  }),
+  consumption: z.object({
+    dailyData: z.array(creditsConsumedPointSchema),
+    weeklyData: z.array(creditsConsumedPointSchema),
+    monthlyData: z.array(creditsConsumedPointSchema),
+    yearlyData: z.array(creditsConsumedPointSchema),
+  }),
+  activity: z.object({
+    dailyData: z.array(transactionPointSchema),
+    weeklyData: z.array(transactionPointSchema),
+    monthlyData: z.array(transactionPointSchema),
+    yearlyData: z.array(transactionPointSchema),
+  }),
+  transactions: z.array(adminTransactionListItemSchema),
+  purchases: z.array(creditPurchaseSchema),
+  refundablePurchases: z.array(creditPurchaseSchema),
+  refundedPurchases: z.array(creditPurchaseSchema),
+  pagination: z.object({
+    purchases: adminBillingPaginationSchema,
+    refunds: adminBillingPaginationSchema,
+  }),
+  warnings: z.array(adminBillingWarningSchema),
+});
+
+export const adminRefundSchema = z.object({
+  refundId: z.string(),
+  paymentId: z.string(),
+  status: z.string(),
+  amount: z.number().nullable().optional(),
+  currency: z.string().nullable().optional(),
+});
+
+export const adminCreditRefundResponseDataSchema = z.object({
+  refund: adminRefundSchema,
+  purchase: creditPurchaseSchema,
 });
 
 export const subscriptionStatsSchema = z.object({
@@ -150,11 +227,7 @@ export const subscriptionEventSchema = z.object({
 });
 
 export const transactionsListSchema = z.object({
-  transactions: z.array(creditTransactionSchema.extend({
-    userId: z.string(),
-    userName: z.string().nullable().optional(),
-    userEmail: z.string(),
-  })),
+  transactions: z.array(adminTransactionListItemSchema),
   total: z.number().int().nonnegative(),
   hasMore: z.boolean(),
 });
@@ -202,6 +275,8 @@ export const subscriptionFinanceSummaryResponseSchema = successResultSchema(subs
 export const subscriptionPlanDistributionResponseSchema = successResultSchema(z.array(subscriptionPlanDistributionPointSchema));
 export const subscriptionEventsResponseSchema = successResultSchema(z.array(subscriptionEventSchema));
 export const applicationConfigResponseSchema = successResultSchema(applicationConfigSchema);
+export const adminCreditsDashboardResponseSchema = successResultSchema(adminCreditsDashboardSchema);
+export const adminCreditRefundResponseSchema = successResultSchema(adminCreditRefundResponseDataSchema);
 
 export const consumeCreditsResponseSchema = z.object({
   transactionId: z.string(),
@@ -233,3 +308,8 @@ export type SubscriptionFinanceSummary = z.infer<typeof subscriptionFinanceSumma
 export type SubscriptionPlanDistributionPoint = z.infer<typeof subscriptionPlanDistributionPointSchema>;
 export type SubscriptionEvent = z.infer<typeof subscriptionEventSchema>;
 export type ApplicationConfig = z.infer<typeof applicationConfigSchema>;
+export type AdminBillingWarning = z.infer<typeof adminBillingWarningSchema>;
+export type AdminBillingPagination = z.infer<typeof adminBillingPaginationSchema>;
+export type AdminCreditsDashboard = z.infer<typeof adminCreditsDashboardSchema>;
+export type AdminRefund = z.infer<typeof adminRefundSchema>;
+export type AdminCreditRefundResponseData = z.infer<typeof adminCreditRefundResponseDataSchema>;

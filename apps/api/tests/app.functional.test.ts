@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     getLatestProviderCustomerId: vi.fn(),
     getLatestDodoCustomerId: vi.fn(),
     processCreditPurchase: vi.fn(),
+    createCreditRefund: vi.fn(),
     getUserByEmail: vi.fn(),
     consumeCredits: vi.fn(),
   };
@@ -56,6 +57,10 @@ const mocks = vi.hoisted(() => {
     getCreditsConsumedData: vi.fn(),
     searchUsers: vi.fn(),
     countActiveAdmins: vi.fn(),
+  };
+
+  const adminCreditsDashboardService = {
+    getDashboard: vi.fn(),
   };
 
   const notificationsService = {
@@ -178,6 +183,7 @@ const mocks = vi.hoisted(() => {
     checkoutIntentsService,
     subscriptionService,
     adminService,
+    adminCreditsDashboardService,
     notificationsService,
     discountsService,
     vouchersService,
@@ -232,6 +238,10 @@ vi.mock("../src/modules/billing/subscription-service", () => ({
 
 vi.mock("../src/modules/admin/service", () => ({
   createAdminService: () => mocks.adminService,
+}));
+
+vi.mock("../src/modules/billing/credits-dashboard-service", () => ({
+  createAdminCreditsDashboardService: () => mocks.adminCreditsDashboardService,
 }));
 
 vi.mock("../src/modules/notifications/service", () => ({
@@ -1031,6 +1041,116 @@ describe("API functional routes", () => {
         unmatchedProviderSubscriptions: 1,
       },
     });
+  });
+
+  it("returns the credits billing dashboard", async () => {
+    const dashboard = {
+      stats: {
+        totalPurchases: 2,
+        totalCreditsPurchased: 120,
+        purchasedCredits: 100,
+        bonusCredits: 20,
+        purchaseBonusCredits: 10,
+        voucherCredits: 5,
+        refundCredits: -10,
+        adminAdjustmentCredits: 15,
+        totalCreditsConsumed: 40,
+        totalRevenue: 25,
+      },
+      revenue: { dailyData: [], weeklyData: [], monthlyData: [], yearlyData: [] },
+      consumption: { dailyData: [], weeklyData: [], monthlyData: [], yearlyData: [] },
+      activity: { dailyData: [], weeklyData: [], monthlyData: [], yearlyData: [] },
+      transactions: [],
+      purchases: [],
+      refundablePurchases: [],
+      refundedPurchases: [],
+      pagination: {
+        purchases: { page: 2, pageSize: 20, totalItems: 25, totalPages: 2, search: "alice@example.com" },
+        refunds: { page: 3, pageSize: 20, totalItems: 41, totalPages: 3, search: "bob@example.com" },
+      },
+      warnings: [],
+    };
+    mocks.adminCreditsDashboardService.getDashboard.mockResolvedValueOnce(dashboard);
+
+    const res = await app.request(
+      "/admin/billing/credits-dashboard?creditsPurchasesPage=2&creditsPurchasesSearch=alice%40example.com&creditsRefundsPage=3&creditsRefundsSearch=bob%40example.com&range=90d",
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.adminCreditsDashboardService.getDashboard).toHaveBeenCalledWith({
+      creditsPurchasesPage: 2,
+      creditsPurchasesSearch: "alice@example.com",
+      creditsRefundsPage: 3,
+      creditsRefundsSearch: "bob@example.com",
+      range: "90d",
+    });
+    await expect(res.json()).resolves.toEqual({ success: true, data: dashboard });
+  });
+
+  it("creates credit refunds through the admin billing endpoint", async () => {
+    mocks.billingService.createCreditRefund.mockResolvedValueOnce({
+      purchase: {
+        id: "cp_1",
+        userId: "user_1",
+        paymentId: "pay_credit_1",
+        paymentStatus: "refunded",
+      },
+      refund: {
+        refundId: "ref_credit_1",
+        paymentId: "pay_credit_1",
+        status: "pending",
+        amount: 2500,
+        currency: "EUR",
+      },
+    });
+
+    const res = await app.request("/admin/billing/credit-refunds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ paymentId: " pay_credit_1 ", reason: "Duplicate purchase", secret: "admin-secret-value" }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.billingService.createCreditRefund).toHaveBeenCalledWith({
+      paymentId: "pay_credit_1",
+      reason: "Duplicate purchase",
+      actorUserId: "auth-user",
+    });
+    expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
+      action: "billing.credit_refund.create",
+      targetType: "credit_purchase",
+      targetId: "cp_1",
+    }));
+    await expect(res.json()).resolves.toEqual({
+      success: true,
+      data: {
+        purchase: {
+          id: "cp_1",
+          userId: "user_1",
+          paymentId: "pay_credit_1",
+          paymentStatus: "refunded",
+        },
+        refund: {
+          refundId: "ref_credit_1",
+          paymentId: "pay_credit_1",
+          status: "pending",
+          amount: 2500,
+          currency: "EUR",
+        },
+      },
+    });
+  });
+
+  it("validates credit refund payloads", async () => {
+    const res = await app.request("/admin/billing/credit-refunds", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ paymentId: " " }),
+    });
+
+    expect(res.status).toBe(400);
+    await expectValidationError(res, "Invalid credit refund payload");
+    expect(mocks.billingService.createCreditRefund).not.toHaveBeenCalled();
   });
 
   it("passes pagination and search to subscription billing endpoint", async () => {

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   banUserSchema,
+  adminCreditsDashboardQuerySchema,
   applicationConfigResponseSchema,
   billingListQuerySchema,
   billingRangeQuerySchema,
@@ -11,6 +12,7 @@ import {
   countriesQuerySchema,
   createCheckoutRequestSchema,
   createCheckoutResponseSchema,
+  createCreditRefundSchema,
   createSubscriptionRefundSchema,
   discountIdParamSchema,
   discountListQuerySchema,
@@ -508,6 +510,8 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/billing/purchases", ["Admin Billing"], "List billing purchases", { security: cookieOrBearerAuth, parameters: billingListParameters, responses: defaultResponses("Billing purchases", ["400", "401", "403"]) }),
   route("get", "/admin/billing/transactions-chart", ["Admin Billing"], "Get billing transactions chart", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Billing transactions chart", ["400", "401", "403"]) }),
   route("get", "/admin/billing/credits-consumed-chart", ["Admin Billing"], "Get credits consumed chart", { security: cookieOrBearerAuth, parameters: billingRangeParameters, responses: defaultResponses("Credits consumed chart", ["400", "401", "403"]) }),
+  route("get", "/admin/billing/credits-dashboard", ["Admin Billing"], "Get credits billing dashboard", { security: cookieOrBearerAuth, parameters: [queryParameter("creditsPurchasesPage", adminCreditsDashboardQuerySchema.shape.creditsPurchasesPage), queryParameter("creditsPurchasesSearch", adminCreditsDashboardQuerySchema.shape.creditsPurchasesSearch), queryParameter("creditsRefundsPage", adminCreditsDashboardQuerySchema.shape.creditsRefundsPage), queryParameter("creditsRefundsSearch", adminCreditsDashboardQuerySchema.shape.creditsRefundsSearch), queryParameter("range", adminCreditsDashboardQuerySchema.shape.range)], responses: defaultResponses("Credits billing dashboard", ["400", "401", "403"]) }),
+  route("post", "/admin/billing/credit-refunds", ["Admin Billing"], "Create credit purchase refund", { security: cookieOrBearerAuth, requestBody: requestBody(createCreditRefundSchema), responses: defaultResponses("Credit refund", ["400", "401", "403", "404"]) }),
   route("get", "/admin/billing/subscriptions", ["Admin Billing"], "List billing subscriptions", { security: cookieOrBearerAuth, parameters: billingListParameters, responses: defaultResponses("Billing subscriptions", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-stats", ["Admin Billing"], "Get subscription billing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription billing statistics", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-finance-summary", ["Admin Billing"], "Get subscription finance summary", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription finance summary", ["400", "401", "403"]) }),

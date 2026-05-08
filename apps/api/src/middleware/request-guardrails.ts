@@ -41,6 +41,7 @@ const jsonBodyRoutes = [
   /^\/admin\/users\/revoke-sessions$/,
   /^\/admin\/users\/set-password$/,
   /^\/admin\/users\/[^/]+\/credits\/adjust$/,
+  /^\/admin\/billing\/credit-refunds$/,
   /^\/admin\/billing\/subscription-refunds$/,
   /^\/admin\/billing\/reconcile$/,
   /^\/admin\/discounts(?:\/.*)?$/,
@@ -63,6 +64,7 @@ const routeGuardrails: RouteGuardrail[] = [
   { method: "POST", pattern: /^\/admin\/users\/ban$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 5 } },
   { method: "POST", pattern: /^\/admin\/users\/set-password$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 10 } },
   { method: "POST", pattern: /^\/admin\/users\/impersonate$/, maxBodyBytes: 4 * KIB, rateLimit: { windowMs: 60_000, max: 10 } },
+  { method: "POST", pattern: /^\/admin\/billing\/credit-refunds$/, maxBodyBytes: 8 * KIB, rateLimit: { windowMs: 60_000, max: 10 } },
   { method: "POST", pattern: /^\/admin\/billing\/subscription-refunds$/, maxBodyBytes: 8 * KIB, rateLimit: { windowMs: 60_000, max: 10 } },
 ];
 

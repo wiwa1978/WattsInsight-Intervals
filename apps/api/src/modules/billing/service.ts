@@ -428,6 +428,43 @@ export function createBillingService(deps: BillingServiceDeps) {
     return processCreditReversal(paymentId, "refund", { refundId });
   }
 
+  async function createCreditRefund(input: { paymentId: string; reason?: string | null; actorUserId?: string }) {
+    if (!deps.paymentProvider.createRefund) {
+      throw new Error("Payment provider refund support is not configured");
+    }
+
+    const purchase = await deps.db.query.creditPurchases.findFirst({
+      where: eq(creditPurchases.paymentId, input.paymentId),
+    });
+
+    if (!purchase) {
+      throw new Error("Credit purchase not found");
+    }
+
+    if (purchase.paymentStatus !== "completed") {
+      throw new Error("Only completed credit purchases can be refunded");
+    }
+
+    const refund = await deps.paymentProvider.createRefund({
+      paymentId: purchase.paymentId,
+      reason: input.reason ?? null,
+      metadata: {
+        initiated_by: "admin_api",
+        user_id: purchase.userId,
+        local_credit_purchase_id: purchase.id,
+        ...(input.actorUserId ? { actor_user_id: input.actorUserId } : {}),
+      },
+      idempotencyKey: `credit-refund:${purchase.paymentProvider}:${purchase.paymentId}`,
+    });
+
+    const updatedPurchase = await processCreditRefund(purchase.paymentId, refund.refundId);
+
+    return {
+      refund,
+      purchase: updatedPurchase,
+    };
+  }
+
   async function processCreditDisputeLoss(paymentId: string, disputeId?: string, disputeStatus?: string) {
     return processCreditReversal(paymentId, "dispute", { disputeId, disputeStatus });
   }
@@ -598,6 +635,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     getCreditHistory,
     getCreditPurchases,
     processCreditPurchase,
+    createCreditRefund,
     processCreditRefund,
     processCreditDisputeLoss,
     getUserByEmail,

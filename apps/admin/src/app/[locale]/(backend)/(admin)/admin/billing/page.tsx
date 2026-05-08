@@ -10,7 +10,7 @@ import { SubscriptionStatsGrid } from "@/components/layout/backend/admin/billing
 import { SubscriptionEventsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
 import { AdminTransactionHistoryTable } from "@/components/layout/backend/admin/shared/transaction-history-table";
 import { AdminPurchaseHistoryTable } from "@/components/layout/backend/admin/shared/purchase-history-table";
-import { AdminBillingTabs, type AdminBillingTab } from "@/components/layout/backend/admin/billing/admin-billing-tabs";
+import { AdminBillingTabs, type AdminBillingSection } from "@/components/layout/backend/admin/billing/admin-billing-tabs";
 import { DiscountsSection } from "@/components/layout/backend/admin/billing/discounts-section";
 import { VouchersSection } from "@/components/layout/backend/admin/billing/vouchers-section";
 import { getMyApplicationConfig } from "@/lib/api/me";
@@ -37,7 +37,7 @@ function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function billingTab(value: string | undefined): AdminBillingTab {
+function billingSection(value: string | undefined): AdminBillingSection {
   if (value === "discounts" || value === "vouchers") {
     return value;
   }
@@ -53,7 +53,7 @@ export default async function AdminBillingPage({ searchParams }: AdminBillingPag
   }
 
   const params = (await searchParams) ?? {};
-  const activeTab = billingTab(first(params.tab));
+  const activeSection = billingSection(first(params.section));
   const t = await getTranslations("admin.billing");
 
   return (
@@ -63,10 +63,10 @@ export default async function AdminBillingPage({ searchParams }: AdminBillingPag
         <p className="text-muted-foreground mt-2">{t("description")}</p>
       </div>
 
-      <AdminBillingTabs activeTab={activeTab}>
-        {activeTab === "discounts" ? (
+      <AdminBillingTabs activeSection={activeSection}>
+        {activeSection === "discounts" ? (
           <DiscountsSection />
-        ) : activeTab === "vouchers" ? (
+        ) : activeSection === "vouchers" ? (
           <VouchersSection />
         ) : (
           <AdminBillingOverview applicationConfig={applicationConfig} />

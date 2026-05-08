@@ -6,27 +6,27 @@ import { useTranslations } from "next-intl";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-export type AdminBillingTab = "overview" | "discounts" | "vouchers";
+export type AdminBillingSection = "overview" | "discounts" | "vouchers";
 
 type AdminBillingTabsProps = {
-  activeTab: AdminBillingTab;
+  activeSection: AdminBillingSection;
   children: React.ReactNode;
 };
 
-export function AdminBillingTabs({ activeTab, children }: AdminBillingTabsProps) {
+export function AdminBillingTabs({ activeSection, children }: AdminBillingTabsProps) {
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   function handleTabChange(value: string) {
-    const nextTab = value as AdminBillingTab;
+    const nextSection = value as AdminBillingSection;
     const nextParams = new URLSearchParams(searchParams.toString());
 
-    if (nextTab === "overview") {
-      nextParams.delete("tab");
+    if (nextSection === "overview") {
+      nextParams.delete("section");
     } else {
-      nextParams.set("tab", nextTab);
+      nextParams.set("section", nextSection);
     }
 
     const query = nextParams.toString();
@@ -34,7 +34,7 @@ export function AdminBillingTabs({ activeTab, children }: AdminBillingTabsProps)
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+    <Tabs value={activeSection} onValueChange={handleTabChange} className="space-y-6">
       <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
         <TabsTrigger value="overview">{t("admin.nav.billing")}</TabsTrigger>
         <TabsTrigger value="discounts">{t("admin.nav.discounts")}</TabsTrigger>

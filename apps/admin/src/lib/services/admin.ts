@@ -1,5 +1,6 @@
 import {
   banAdminUserApi,
+  createAdminCreditRefundApi,
   getAdminAllPurchasesApi,
   getAdminAllSubscriptionsApi,
   getAdminAllTransactionsApi,
@@ -10,6 +11,7 @@ import {
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
   getAdminCreditsConsumedDataApi,
+  getAdminCreditsDashboardApi,
   getAdminDashboardStatsApi,
   getSystemHealthApi,
   getAdminRevenueDataApi,
@@ -31,11 +33,14 @@ import {
   stopAdminImpersonationApi,
   unbanAdminUserApi,
   type AdminWebhookEventsQuery,
+  type AdminCreditsDashboardQuery,
   verifyAdminSecretApi,
   getAdminStatusApi,
 } from "@/lib/api/admin";
 import type {
   AdminDashboardStats,
+  AdminCreditRefundResponseData,
+  AdminCreditsDashboard,
   AdminUserDetail,
   AdminUsersList,
   AdminUserStats,
@@ -255,6 +260,14 @@ export async function getAdminTransactionData(timeRange: TimeRange): Promise<Tra
 
 export async function getAdminCreditsConsumedData(timeRange: TimeRange): Promise<CreditsConsumedPoint[]> {
   return getCreditBillingChartData(() => getAdminCreditsConsumedDataApi(timeRange));
+}
+
+export async function getAdminCreditsDashboard(query: AdminCreditsDashboardQuery = {}): Promise<AdminCreditsDashboard> {
+  return getAdminCreditsDashboardApi(query);
+}
+
+export async function createAdminCreditRefund(payload: { paymentId: string; reason?: string; secret: string }): Promise<AdminCreditRefundResponseData> {
+  return createAdminCreditRefundApi(payload);
 }
 
 export async function getAdminBillingSubscriptionStats(): Promise<SubscriptionStats> {

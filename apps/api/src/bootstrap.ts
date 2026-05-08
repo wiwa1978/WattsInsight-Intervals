@@ -21,6 +21,7 @@ import { createAdminService } from "./modules/admin/service";
 import { createAuditService } from "./modules/audit/service";
 import { createCheckoutIntentsService } from "./modules/billing/checkout-intents";
 import { createBillingReconciliationService } from "./modules/billing/reconciliation";
+import { createAdminCreditsDashboardService } from "./modules/billing/credits-dashboard-service";
 import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
@@ -118,6 +119,7 @@ const adminService = createAdminService({
   db,
   adminSecret: env.ADMIN_SECRET,
 });
+const adminCreditsDashboardService = createAdminCreditsDashboardService({ adminService });
 const discountsService = createDiscountsService({
   db,
   env,
@@ -381,6 +383,7 @@ export const bootstrap = {
   db,
   authModule,
   adminService,
+  adminCreditsDashboardService,
   auditService,
   billingService,
   billingReconciliationService,
