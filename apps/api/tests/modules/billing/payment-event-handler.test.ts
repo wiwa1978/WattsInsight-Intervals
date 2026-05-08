@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { applicationConfig } from "../../../src/config/application";
+import { subscriptionPlans } from "../../../src/config/billing";
 import { createPaymentEventHandler } from "../../../src/modules/billing/payment-event-handler";
 
 const originalBillingMode = applicationConfig.billing.mode;
+const starterPlan = subscriptionPlans.find((plan) => plan.key === "Bronze")!;
 
 afterEach(() => {
   (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = originalBillingMode;
@@ -113,8 +115,8 @@ describe("payment event handler billing modes", () => {
     const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({
       billingMode: "subscriptions",
       packageKey: null,
-      planKey: "starter",
-      productId: "pdt_subscription_starter",
+      planKey: starterPlan.key,
+      productId: starterPlan.productId,
     }));
     const handler = createPaymentEventHandler({
       creditPackages: [],
@@ -130,25 +132,25 @@ describe("payment event handler billing modes", () => {
       provider: "dodo",
       eventType: "payment.succeeded",
       paymentId: "pay_sub_1",
-      productId: "pdt_subscription_starter",
+      productId: starterPlan.productId,
       metadata: {
         billingMode: "subscriptions",
         userId: "user-1",
-        planKey: "starter",
-        productId: "pdt_subscription_starter",
+        planKey: starterPlan.key,
+        productId: starterPlan.productId,
         checkoutReferenceId: "checkout-ref-1",
         subscriptionId: "sub_1",
       },
       customerId: "cus_1",
       currency: "EUR",
-      totalAmount: 1900,
-      taxAmount: 190,
+      totalAmount: starterPlan.price,
+      taxAmount: 210,
       raw: {},
     });
 
     expect(recordSubscriptionPayment).toHaveBeenCalledWith({
       userId: "user-1",
-      planKey: "starter",
+      planKey: starterPlan.key,
       paymentId: "pay_sub_1",
       paymentStatus: "completed",
       providerCustomerId: "cus_1",
@@ -156,9 +158,9 @@ describe("payment event handler billing modes", () => {
       dodoCustomerId: "cus_1",
       dodoSubscriptionId: "sub_1",
       pricing: {
-        priceExclVat: 1710,
-        priceInclVat: 1900,
-        vatAmount: 190,
+        priceExclVat: starterPlan.price - 210,
+        priceInclVat: starterPlan.price,
+        vatAmount: 210,
         currency: "EUR",
       },
     });
@@ -285,8 +287,8 @@ describe("payment event handler billing modes", () => {
     const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({
       billingMode: "subscriptions",
       packageKey: null,
-      planKey: "starter",
-      productId: "pdt_subscription_starter",
+      planKey: starterPlan.key,
+      productId: starterPlan.productId,
       discountCode: "SAVE10",
     }));
     const recordSubscriptionPayment = vi.fn().mockResolvedValue({});
@@ -304,13 +306,13 @@ describe("payment event handler billing modes", () => {
       provider: "dodo",
       eventType: "payment.succeeded",
       paymentId: "pay_sub_1",
-      productId: "pdt_subscription_starter",
+      productId: starterPlan.productId,
       metadata: {
         billingMode: "subscriptions",
         userId: "user-1",
-        planKey: "starter",
+        planKey: starterPlan.key,
         discountCode: "SAVE10",
-        productId: "pdt_subscription_starter",
+        productId: starterPlan.productId,
         checkoutReferenceId: "checkout-ref-1",
         subscriptionId: "sub_1",
       },
@@ -323,10 +325,55 @@ describe("payment event handler billing modes", () => {
 
     expect(recordSubscriptionPayment).toHaveBeenCalledWith(expect.objectContaining({
       userId: "user-1",
-      planKey: "starter",
+      planKey: starterPlan.key,
       paymentId: "pay_sub_1",
       paymentStatus: "completed",
     }));
     expect(checkoutIntents.markCompleted).toHaveBeenCalledWith({ id: "intent-1", paymentId: "pay_sub_1" });
+  });
+
+  it("rejects undiscounted subscription payments with unexpected amounts", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "subscriptions";
+    const billing = createBillingDeps();
+    const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({
+      billingMode: "subscriptions",
+      packageKey: null,
+      planKey: starterPlan.key,
+      productId: starterPlan.productId,
+      discountCode: null,
+    }));
+    const recordSubscriptionPayment = vi.fn().mockResolvedValue({});
+    const handler = createPaymentEventHandler({
+      creditPackages: [],
+      billing,
+      checkoutIntents,
+      subscriptions: {
+        handleSubscriptionWebhook: vi.fn(),
+        recordSubscriptionPayment,
+      },
+    });
+
+    await expect(handler({
+      provider: "dodo",
+      eventType: "payment.succeeded",
+      paymentId: "pay_sub_bad_amount",
+      productId: starterPlan.productId,
+      metadata: {
+        billingMode: "subscriptions",
+        userId: "user-1",
+        planKey: starterPlan.key,
+        productId: starterPlan.productId,
+        checkoutReferenceId: "checkout-ref-1",
+        subscriptionId: "sub_1",
+      },
+      customerId: "cus_1",
+      currency: "EUR",
+      totalAmount: 500,
+      taxAmount: 50,
+      raw: {},
+    })).rejects.toThrow("expected amount");
+
+    expect(recordSubscriptionPayment).not.toHaveBeenCalled();
+    expect(checkoutIntents.markCompleted).not.toHaveBeenCalled();
   });
 });

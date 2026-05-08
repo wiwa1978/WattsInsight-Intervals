@@ -272,6 +272,13 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         throw new Error(`Refusing payment ${event.paymentId}: unknown subscription plan.`);
       }
 
+      const discountCode = getMetadataString(event.metadata, "discountCode");
+      if (!discountCode && event.totalAmount !== matchedPlan.price) {
+        throw new Error(
+          `Refusing payment ${event.paymentId}: expected amount ${matchedPlan.price}, received ${event.totalAmount}.`,
+        );
+      }
+
       await deps.subscriptions?.recordSubscriptionPayment?.({
         userId: foundUser.id,
         planKey,
