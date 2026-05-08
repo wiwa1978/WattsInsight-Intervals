@@ -15,7 +15,7 @@ import type {
   VoucherStatus,
 } from "@platform/contracts";
 
-import { billingConfig } from "../../config/billing";
+import { creditBillingConfig } from "../../config/billing";
 
 type VoucherRecord = typeof vouchers.$inferSelect;
 type VoucherQueryRecord = VoucherRecord & {
@@ -221,8 +221,8 @@ async function addVoucherCredits(tx: DbTransaction, userId: string, voucher: Vou
   const currentBalance = parseFloat(credits.balance);
   const newBalance = currentBalance + voucher.creditAmount;
 
-  if (newBalance > billingConfig.maxCredits) {
-    throw new Error(`Cannot exceed maximum credits limit of ${billingConfig.maxCredits}`);
+  if (newBalance > creditBillingConfig.maxCredits) {
+    throw new Error(`Cannot exceed maximum credits limit of ${creditBillingConfig.maxCredits}`);
   }
 
   const [updated] = await tx
@@ -233,12 +233,12 @@ async function addVoucherCredits(tx: DbTransaction, userId: string, voucher: Vou
     })
     .where(and(
       eq(userCredits.userId, userId),
-      sql`${userCredits.balance} + ${voucher.creditAmount} <= ${billingConfig.maxCredits}`,
+      sql`${userCredits.balance} + ${voucher.creditAmount} <= ${creditBillingConfig.maxCredits}`,
     ))
     .returning({ balanceAfter: userCredits.balance });
 
   if (!updated) {
-    throw new Error(`Cannot exceed maximum credits limit of ${billingConfig.maxCredits}`);
+    throw new Error(`Cannot exceed maximum credits limit of ${creditBillingConfig.maxCredits}`);
   }
 
   const balanceAfter = Number(updated.balanceAfter);
@@ -444,17 +444,13 @@ export function createVouchersService(deps: VouchersServiceDeps) {
 
     if (search) {
       const searchPattern = getVoucherSearchPattern(search);
+      const searchCondition = or(ilike(vouchers.code, searchPattern), ilike(user.email, searchPattern));
       const matchingVoucherIds = await deps.db
         .selectDistinct({ id: vouchers.id })
         .from(vouchers)
         .leftJoin(voucherAssignments, eq(vouchers.id, voucherAssignments.voucherId))
         .leftJoin(user, eq(voucherAssignments.userId, user.id))
-        .where(
-          and(
-            statusFilter,
-            or(ilike(vouchers.code, searchPattern), ilike(user.email, searchPattern)),
-          ),
-        )
+        .where(statusFilter ? and(statusFilter, searchCondition) : searchCondition)
         .orderBy(desc(vouchers.createdAt));
 
       if (matchingVoucherIds.length === 0) {
@@ -514,7 +510,10 @@ export function createVouchersService(deps: VouchersServiceDeps) {
       },
     });
 
-    const [{ count }] = await deps.db.select({ count: sql<number>`COUNT(*)` }).from(vouchers).where(statusFilter);
+    const countRows = statusFilter
+      ? await deps.db.select({ count: sql<number>`COUNT(*)` }).from(vouchers).where(statusFilter)
+      : await deps.db.select({ count: sql<number>`COUNT(*)` }).from(vouchers);
+    const [{ count }] = countRows;
 
     return {
       vouchers: vouchersList.map((voucher: unknown) => mapVoucherWithRelations(voucher as VoucherQueryRecord)),

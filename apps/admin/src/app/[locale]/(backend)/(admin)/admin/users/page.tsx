@@ -24,6 +24,11 @@ import {
 const USERS_QUERY_KEY = "admin-users";
 const USER_STATS_QUERY_KEY = "admin-user-stats";
 
+function promptAdminSecret() {
+  const secret = window.prompt("Enter admin secret to continue.");
+  return secret?.trim() || null;
+}
+
 export default function AdminUsersPage() {
   const t = useTranslations("admin.users");
   const tSuccess = useTranslations("admin.success");
@@ -62,8 +67,8 @@ export default function AdminUsersPage() {
   }, [queryClient]);
 
   const setRoleMutation = useMutation({
-    mutationFn: async ({ userId, role, reason, confirmed }: { userId: string; role: "user" | "admin"; reason?: string; confirmed?: boolean }) => {
-      const result = await setAdminUserRole(userId, role, { reason, confirmed });
+    mutationFn: async ({ userId, role, reason, confirmed, secret }: { userId: string; role: "user" | "admin"; reason?: string; confirmed?: boolean; secret: string }) => {
+      const result = await setAdminUserRole(userId, role, { reason, confirmed, secret });
       if ((result as { error?: unknown }).error) {
         throw new Error(tErrors("roleUpdateFailed"));
       }
@@ -79,8 +84,8 @@ export default function AdminUsersPage() {
   });
 
   const unbanMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const result = await unbanAdminUser(userId);
+    mutationFn: async ({ userId, secret }: { userId: string; secret: string }) => {
+      const result = await unbanAdminUser(userId, secret);
       if ((result as { error?: unknown }).error) {
         throw new Error(tErrors("unbanFailed"));
       }
@@ -96,8 +101,8 @@ export default function AdminUsersPage() {
   });
 
   const impersonateMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const result = await impersonateAdminUser(userId);
+    mutationFn: async ({ userId, secret }: { userId: string; secret: string }) => {
+      const result = await impersonateAdminUser(userId, secret);
       if ((result as { error?: unknown }).error) {
         throw new Error(tErrors("impersonateFailed"));
       }
@@ -114,8 +119,8 @@ export default function AdminUsersPage() {
   });
 
   const revokeSessionsMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const result = await revokeAdminUserSessions(userId);
+    mutationFn: async ({ userId, secret }: { userId: string; secret: string }) => {
+      const result = await revokeAdminUserSessions(userId, secret);
       if ((result as { error?: unknown }).error) {
         throw new Error(tErrors("revokeSessionsFailed"));
       }
@@ -130,9 +135,9 @@ export default function AdminUsersPage() {
   });
 
   const setPasswordMutation = useMutation({
-    mutationFn: async (userId: string) => {
+    mutationFn: async ({ userId, secret }: { userId: string; secret: string }) => {
       const password = generateRandomString(16);
-      const result = await setAdminUserPassword(userId, password);
+      const result = await setAdminUserPassword(userId, password, secret);
       if ((result as { error?: unknown }).error) {
         throw new Error("Failed to set password");
       }
@@ -186,11 +191,26 @@ export default function AdminUsersPage() {
         displayTotal={displayTotal}
         from={from}
         to={to}
-        onSetRole={(userId, role, options) => setRoleMutation.mutateAsync({ userId, role, ...options }).then(() => undefined)}
-        onUnban={(userId) => unbanMutation.mutateAsync(userId).then(() => undefined)}
-        onImpersonate={(userId) => impersonateMutation.mutateAsync(userId).then(() => undefined)}
-        onRevokeSessions={(userId) => revokeSessionsMutation.mutateAsync(userId).then(() => undefined)}
-        onSetPassword={(userId) => setPasswordMutation.mutateAsync(userId).then(() => undefined)}
+        onSetRole={(userId, role, options) => {
+          const secret = promptAdminSecret();
+          return secret ? setRoleMutation.mutateAsync({ userId, role, ...options, secret }).then(() => undefined) : Promise.resolve();
+        }}
+        onUnban={(userId) => {
+          const secret = promptAdminSecret();
+          return secret ? unbanMutation.mutateAsync({ userId, secret }).then(() => undefined) : Promise.resolve();
+        }}
+        onImpersonate={(userId) => {
+          const secret = promptAdminSecret();
+          return secret ? impersonateMutation.mutateAsync({ userId, secret }).then(() => undefined) : Promise.resolve();
+        }}
+        onRevokeSessions={(userId) => {
+          const secret = promptAdminSecret();
+          return secret ? revokeSessionsMutation.mutateAsync({ userId, secret }).then(() => undefined) : Promise.resolve();
+        }}
+        onSetPassword={(userId) => {
+          const secret = promptAdminSecret();
+          return secret ? setPasswordMutation.mutateAsync({ userId, secret }).then(() => undefined) : Promise.resolve();
+        }}
         onRefresh={() => {
           void refreshUsers();
         }}

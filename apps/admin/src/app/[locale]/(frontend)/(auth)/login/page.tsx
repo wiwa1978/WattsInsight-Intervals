@@ -8,7 +8,6 @@ import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import QRCode from "qrcode";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -27,24 +26,23 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { authClient, twoFactor } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
 import { signInSchema } from "@/schemas";
-import { getMainAppLoginUrl } from "@/lib/main-app-url";
-import { completeAdminStepUp, getAdminStepUpStatus, prepareAdminTotpEnrollment } from "@/lib/services/admin";
+import { getAdminStatus } from "@/lib/services/admin";
 
 const DEFAULT_REDIRECT = "/admin/overview";
 
 const adminLoginSchema = signInSchema.extend({
-  adminSecret: z.string().min(1, "Admin secret is required"),
   totpCode: z.string().regex(/^\d{6}$/, "Enter a valid 6-digit authentication code").optional().or(z.literal("")),
 });
 
 type AdminLoginInput = z.infer<typeof adminLoginSchema>;
+type AdminLoginStep = "credentials" | "verify-totp";
 
 async function enforceAdminAccess() {
   try {
-    const status = await getAdminStepUpStatus();
-    return { allowed: true, stepUpRequired: status.data.stepUpRequired };
+    await getAdminStatus();
+    return { allowed: true };
   } catch {
-    return { allowed: false, stepUpRequired: true };
+    return { allowed: false };
   }
 }
 
@@ -53,13 +51,8 @@ function LoginPageContent() {
   const tErrors = useTranslations("auth.errors");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const localeParam = searchParams.get("locale") || "en";
   const reason = searchParams.get("reason");
-  const needsStepUp = reason === "admin-step-up";
-  const [enrollmentSecret, setEnrollmentSecret] = React.useState<string | null>(null);
-  const [enrollmentUri, setEnrollmentUri] = React.useState<string | null>(null);
-  const [enrollmentQrCode, setEnrollmentQrCode] = React.useState<string | null>(null);
-  const [totpCodeRequired, setTotpCodeRequired] = React.useState(false);
+  const [loginStep, setLoginStep] = React.useState<AdminLoginStep>("credentials");
 
   const callbackUrl = searchParams.get("callbackUrl");
   const redirectTo = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : DEFAULT_REDIRECT;
@@ -82,39 +75,27 @@ function LoginPageContent() {
       email: "",
       password: "",
       rememberMe: false,
-      adminSecret: "",
       totpCode: "",
     },
   });
 
   const isSubmitting = passwordForm.formState.isSubmitting;
-  const showTotpCode = totpCodeRequired || Boolean(enrollmentSecret);
+  const isTotpStep = loginStep === "verify-totp";
 
-  React.useEffect(() => {
-    if (!enrollmentUri) {
-      setEnrollmentQrCode(null);
+  async function completeAdminLogin() {
+    try {
+      await getAdminStatus();
+    } catch {
+      passwordForm.setError("root", {
+        message: "This account is not allowed to access the admin portal.",
+      });
       return;
     }
 
-    let active = true;
-    QRCode.toDataURL(enrollmentUri, { width: 220, margin: 2 })
-      .then((dataUrl) => {
-        if (active) {
-          setEnrollmentQrCode(dataUrl);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setEnrollmentQrCode(null);
-        }
-      });
+    window.location.assign(redirectTo);
+  }
 
-    return () => {
-      active = false;
-    };
-  }, [enrollmentUri]);
-
-  async function onPasswordSubmit(values: AdminLoginInput) {
+  async function onCredentialsSubmit(values: AdminLoginInput) {
     const { data, error } = await authClient.signIn.email({
       email: values.email,
       password: values.password,
@@ -129,76 +110,7 @@ function LoginPageContent() {
 
     const signInNeedsTotp = Boolean((data as { twoFactorRedirect?: boolean } | null | undefined)?.twoFactorRedirect);
     if (signInNeedsTotp) {
-      setTotpCodeRequired(true);
-
-      if (!values.totpCode) {
-        passwordForm.setError("totpCode", {
-          message: "Enter a valid 6-digit authentication code",
-        });
-        return;
-      }
-
-      const verify = await twoFactor.verifyTotp({ code: values.totpCode });
-      if (verify.error) {
-        passwordForm.setError("totpCode", {
-          message: "Enter a valid 6-digit authentication code",
-        });
-        return;
-      }
-    }
-
-    const status = await enforceAdminAccess();
-    if (!status.allowed) {
-      await authClient.signOut();
-      router.replace(getMainAppLoginUrl(localeParam));
-      return;
-    }
-
-    try {
-      const current = await getAdminStepUpStatus();
-      const statusPayload = current.data;
-      if (statusPayload.totpRequired && !statusPayload.twoFactorEnabled) {
-        if (!statusPayload.canEnrollTotp) {
-          passwordForm.setError("root", {
-            message: "Invalid admin credentials. Please check the admin secret and authentication code.",
-          });
-          await authClient.signOut();
-          return;
-        }
-
-        if (!enrollmentSecret) {
-          await prepareAdminTotpEnrollment({ secret: values.adminSecret });
-
-          const setup = await twoFactor.enable({ password: values.password });
-          const setupData = setup && typeof setup === "object" && "data" in setup
-            ? (setup as { data?: { totpURI?: string } | null }).data
-            : undefined;
-          const setupError = setup && typeof setup === "object" && "error" in setup
-            ? (setup as { error?: { message?: string } | null }).error
-            : undefined;
-          const totpUri = setupData?.totpURI;
-          const secret = totpUri?.match(/secret=([^&]+)/)?.[1] ?? null;
-
-          if (!secret || setupError) {
-            passwordForm.setError("root", {
-              message: "Two-factor authentication must be enabled for admin access.",
-            });
-            return;
-          }
-
-          setEnrollmentSecret(secret);
-          setEnrollmentUri(totpUri ?? null);
-          setTotpCodeRequired(true);
-          return;
-        }
-
-        if (!values.totpCode) {
-          passwordForm.setError("totpCode", {
-            message: "Enter a valid 6-digit authentication code",
-          });
-          return;
-        }
-
+      if (values.totpCode) {
         const verify = await twoFactor.verifyTotp({ code: values.totpCode });
         if (verify.error) {
           passwordForm.setError("totpCode", {
@@ -206,46 +118,68 @@ function LoginPageContent() {
           });
           return;
         }
-      }
 
-      await completeAdminStepUp({
-        secret: values.adminSecret,
-        ...(values.totpCode ? { totpCode: values.totpCode } : {}),
-      });
-    } catch {
-      passwordForm.setError("root", {
-        message: "Invalid admin credentials. Please check the admin secret and authentication code.",
-      });
-      passwordForm.resetField("password");
-      passwordForm.resetField("adminSecret");
-      passwordForm.resetField("totpCode");
-      setEnrollmentSecret(null);
-      setEnrollmentUri(null);
-      setEnrollmentQrCode(null);
-      setTotpCodeRequired(false);
-      return;
-    }
+        const status = await enforceAdminAccess();
+        if (!status.allowed) {
+          await authClient.signOut();
+          passwordForm.setError("root", {
+            message: "This account is not allowed to access the admin portal.",
+          });
+          return;
+        }
 
-    try {
-      const finalStatus = await getAdminStepUpStatus();
-      if (finalStatus.data.stepUpRequired) {
-        passwordForm.setError("root", {
-          message: "Additional verification is still required before accessing the admin portal.",
-        });
+        await completeAdminLogin();
         return;
       }
-    } catch {
+
+      setLoginStep("verify-totp");
+      passwordForm.clearErrors();
+      passwordForm.resetField("totpCode");
+      return;
+    }
+
+    const status = await enforceAdminAccess();
+    if (!status.allowed) {
+      await authClient.signOut();
       passwordForm.setError("root", {
-        message: "Unable to complete admin verification. Please try again.",
+        message: "This account is not allowed to access the admin portal.",
       });
       return;
     }
 
-    router.push(redirectTo);
-    setEnrollmentSecret(null);
-    setEnrollmentUri(null);
-    setEnrollmentQrCode(null);
-    setTotpCodeRequired(false);
+    await completeAdminLogin();
+  }
+
+  async function onTotpSubmit(values: AdminLoginInput) {
+    if (!values.totpCode) {
+      passwordForm.setError("totpCode", {
+        message: "Enter a valid 6-digit authentication code",
+      });
+      return;
+    }
+
+    const verify = await twoFactor.verifyTotp({ code: values.totpCode });
+    if (verify.error) {
+      passwordForm.setError("totpCode", {
+        message: "Enter a valid 6-digit authentication code",
+      });
+      return;
+    }
+
+    const status = await enforceAdminAccess();
+    if (!status.allowed) {
+      await authClient.signOut();
+      passwordForm.setError("root", {
+        message: "This account is not allowed to access the admin portal.",
+      });
+      return;
+    }
+
+    await completeAdminLogin();
+  }
+
+  function onPasswordSubmit(values: AdminLoginInput) {
+    return isTotpStep ? onTotpSubmit(values) : onCredentialsSubmit(values);
   }
 
   return (
@@ -260,9 +194,9 @@ function LoginPageContent() {
           <Form {...passwordForm}>
             <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
               <div className="rounded-lg border bg-card p-6 space-y-4">
-                {needsStepUp && (
+                {reason === "forbidden-admin" && (
                   <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                    {t("stepUpRequired")}
+                    This account is not allowed to access the admin portal.
                   </div>
                 )}
 
@@ -272,89 +206,104 @@ function LoginPageContent() {
                   </div>
                 )}
 
-                {enrollmentSecret && (
-                  <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
-                    <div className="mb-2 font-medium">First-time authenticator setup</div>
-                    <p className="mb-3">
-                      Add this setup key in your authenticator app, then enter the fresh 6-digit code to finish signing in.
+                {loginStep === "verify-totp" && (
+                  <div className="rounded-lg border bg-muted/40 p-4 text-sm text-foreground shadow-sm">
+                    <div className="mb-2 font-semibold">Authenticator verification</div>
+                    <p className="text-muted-foreground">
+                      Enter the 6-digit code from your authenticator app to finish signing in.
                     </p>
-                    {enrollmentQrCode && (
-                      <div className="mb-3 flex justify-center">
-                        <img
-                          src={enrollmentQrCode}
-                          alt="Authenticator QR code"
-                          className="h-44 w-44 rounded border border-blue-200 bg-white p-2"
-                        />
-                      </div>
-                    )}
-                    Setup key for authenticator app: <span className="font-mono">{enrollmentSecret}</span>
-                    {enrollmentUri && (
-                      <div className="mt-2 break-all text-xs">
-                        URI: <span className="font-mono">{enrollmentUri}</span>
-                      </div>
-                    )}
                   </div>
                 )}
 
-                <FormField
-                  control={passwordForm.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("email")}</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder={t("emailPlaceholder")}
-                          autoComplete="email"
-                          disabled={isSubmitting}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {loginStep === "credentials" && (
+                  <>
+                    <FormField
+                      control={passwordForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("email")}</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="email"
+                              placeholder={t("emailPlaceholder")}
+                              autoComplete="email"
+                              disabled={isSubmitting}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <FormField
-                  control={passwordForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("password")}</FormLabel>
-                      <FormControl>
-                        <PasswordInput
-                          placeholder={t("passwordPlaceholder")}
-                          autoComplete="current-password"
-                          disabled={isSubmitting}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    <FormField
+                      control={passwordForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t("password")}</FormLabel>
+                          <FormControl>
+                            <PasswordInput
+                              placeholder={t("passwordPlaceholder")}
+                              autoComplete="current-password"
+                              disabled={isSubmitting}
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <FormField
-                  control={passwordForm.control}
-                  name="adminSecret"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t("adminSecret")}</FormLabel>
-                      <FormControl>
-                        <PasswordInput
-                          placeholder={t("adminSecretPlaceholder")}
-                          autoComplete="off"
-                          disabled={isSubmitting}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    {authConfig.adminPortalTotpRequired && (
+                      <FormField
+                        control={passwordForm.control}
+                        name="totpCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("totpCode")}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                maxLength={6}
+                                placeholder={t("totpCodePlaceholder")}
+                                autoComplete="one-time-code"
+                                disabled={isSubmitting}
+                                {...field}
+                                onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
-                {authConfig.adminPortalTotpRequired && showTotpCode && (
+                    {authConfig.rememberMeEnabled && (
+                      <FormField
+                        control={passwordForm.control}
+                        name="rememberMe"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal cursor-pointer">{t("rememberMe")}</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                  </>
+                )}
+
+                {authConfig.adminPortalTotpRequired && isTotpStep && (
                   <FormField
                     control={passwordForm.control}
                     name="totpCode"
@@ -380,25 +329,6 @@ function LoginPageContent() {
                   />
                 )}
 
-                {authConfig.rememberMeEnabled && (
-                  <FormField
-                    control={passwordForm.control}
-                    name="rememberMe"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center space-x-2 space-y-0">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <FormLabel className="font-normal cursor-pointer">{t("rememberMe")}</FormLabel>
-                      </FormItem>
-                    )}
-                  />
-                )}
-
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
@@ -406,7 +336,7 @@ function LoginPageContent() {
                       {t("submitting")}
                     </>
                   ) : (
-                    t("submit")
+                    isTotpStep ? "Verify and sign in" : t("submit")
                   )}
                 </Button>
               </div>

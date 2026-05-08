@@ -5,7 +5,6 @@ import { BackendBannerNotification } from "@/components/layout/backend/shared/ba
 import { DashboardSidebar } from "@/components/layout/backend/shared/dashboard-sidebar"
 import { DashboardNavProvider } from "@/components/providers/backend-nav-provider"
 import { getServerSession } from "@/lib/auth-session";
-import { getMainAppLoginUrl } from "@/lib/main-app-url";
 
 export const metadata: Metadata = {
   title: "(Admin) - Single Tenant with API SaaS boilerplate",
@@ -24,7 +23,7 @@ export default async function DashboardLayout({
   const session = await getServerSession();
 
   if (!session?.user?.id) {
-    redirect(getMainAppLoginUrl(locale));
+    redirect(`/${locale}/login`);
   }
 
   return (

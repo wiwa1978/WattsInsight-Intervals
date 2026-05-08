@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { requestId } from "hono/request-id";
-import { clearAdminStepUpCookieHeader, isAdminStepUpVerified } from "./middleware/admin-step-up";
 
 import type { AppEnv } from "./context";
 import { bootstrap } from "./bootstrap";
@@ -45,26 +44,10 @@ app.onError(errorHandler);
 app.use("/auth/admin/*", bootstrap.authModule.requireAuth);
 app.use("/auth/admin/*", bootstrap.authModule.requireAdminAccess);
 app.use("/auth/admin/*", async (c, next) => {
-  if (c.req.path === "/auth/admin/stop-impersonating") {
-    return next();
-  }
-
-  const authUser = c.get("authUser");
-  if (!authUser?.id) {
-    return c.json({ success: false, error: "Unauthorized" }, 401);
-  }
-
-  const verified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
-  c.set("adminStepUpVerified", verified);
-
-  return bootstrap.authModule.requireAdminStepUp(c, next);
-});
-app.use("/auth/admin/*", async (c, next) => {
   await next();
 
   if (c.res.status === 403) {
     c.res.headers.append("Set-Cookie", clearSessionCookieHeader());
-    c.res.headers.append("Set-Cookie", clearAdminStepUpCookieHeader());
   }
 });
 
@@ -77,28 +60,6 @@ app.route("/", createPaymentsRouter());
 app.route("/me", createMeRouter());
 app.use("/admin/*", bootstrap.authModule.requireAuth);
 app.use("/admin/*", bootstrap.authModule.requireAdminAccess);
-app.use("/admin/*", async (c, next) => {
-  if (c.req.path === "/admin/session" || c.req.path === "/admin/status" || c.req.path.startsWith("/admin/step-up")) {
-    return next();
-  }
-
-  const authUser = c.get("authUser");
-  if (!authUser?.id) {
-    return c.json({ success: false, error: "Unauthorized" }, 401);
-  }
-
-  const verified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
-  c.set("adminStepUpVerified", verified);
-
-  await next();
-});
-app.use("/admin/*", async (c, next) => {
-  if (c.req.path === "/admin/session" || c.req.path === "/admin/status" || c.req.path.startsWith("/admin/step-up")) {
-    return next();
-  }
-
-  return bootstrap.authModule.requireAdminStepUp(c, next);
-});
 app.route("/admin", createAdminRouter());
 app.route("/auth", createAuthRouter());
 app.route("/", createDocsRouter());

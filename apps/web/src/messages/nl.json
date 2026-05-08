@@ -701,7 +701,7 @@
         "expiryPlaceholder": "Kies een datum",
         "timeLabel": "Vervaltijd",
         "secretLabel": "Beheerdersgeheime sleutel",
-        "secretPlaceholder": "Voer de geheime ban-sleutel in",
+        "secretPlaceholder": "Voer het admingeheim in",
         "secretHint": "Dit voorkomt onbedoelde blokkeringen. Deel de sleutel alleen met vertrouwde beheerders.",
         "cancel": "Annuleren",
         "banUser": "Gebruiker blokkeren",
@@ -736,7 +736,7 @@
       "unbanFailed": "Kan gebruiker niet deblokkeren.",
       "impersonateFailed": "Kan gebruiker niet nabootsen.",
       "revokeSessionsFailed": "Kan gebruikerssessies niet intrekken.",
-      "invalidBanSecret": "Ongeldige beheerderssleutel."
+      "invalidBanSecret": "Ongeldig admingeheim."
     },
     "notifications": {
       "title": "Meldingen",
@@ -1125,20 +1125,20 @@
     "description": "Kies het tegoedpakket dat bij je behoeften past. Tegoed verloopt nooit.",
     "mostPopular": "Meest Populair",
     "packages": {
-      "bronze": {
-        "name": "Brons",
+      "starter": {
+        "name": "Starter",
         "description": "Perfect om te beginnen met ons platform.",
-        "cta": "Koop Brons"
+        "cta": "Koop Starter"
       },
-      "silver": {
-        "name": "Zilver",
+      "advanced": {
+        "name": "Advanced",
         "description": "Beste waarde met bonustegoed inbegrepen.",
-        "cta": "Koop Zilver"
+        "cta": "Koop Advanced"
       },
-      "gold": {
-        "name": "Goud",
+      "pro": {
+        "name": "Pro",
         "description": "Maximaal tegoed met de grootste bonus.",
-        "cta": "Koop Goud"
+        "cta": "Koop Pro"
       }
     },
     "features": {
@@ -1340,7 +1340,6 @@
   },
   "subscriptionProgressBar": {
     "label": "Abonnement",
-    "starter": "Starter",
     "upgrade": "Upgraden"
   }
 }

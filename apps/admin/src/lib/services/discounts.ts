@@ -105,8 +105,8 @@ export async function updateDiscount(input: AdminUpdateDiscountInput): Promise<D
   return discountSuccess({ discount: result.discount as Discount });
 }
 
-export async function deleteDiscount(id: string): Promise<DiscountActionResult> {
-  const result = await deleteDiscountApi(id);
+export async function deleteDiscount(id: string, secret: string): Promise<DiscountActionResult> {
+  const result = await deleteDiscountApi(id, secret);
   if (!result.success) {
     return discountFailure(result.error || "Failed to delete discount");
   }

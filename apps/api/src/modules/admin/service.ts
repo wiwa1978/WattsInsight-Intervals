@@ -6,7 +6,7 @@ import { creditPurchases, creditTransactions, user, userCredits, vouchers } from
 
 type AdminServiceDeps = {
   db: any;
-  adminBanSecret?: string;
+  adminSecret?: string;
 };
 
 function safeCompare(input: string, secret: string) {
@@ -61,13 +61,13 @@ export function createAdminService(deps: AdminServiceDeps) {
     return conditions.length > 0 ? and(...conditions) : undefined;
   }
 
-  async function verifyAdminBanSecret(secret: string) {
-    if (!deps.adminBanSecret) {
-      return { success: false as const, error: "Admin ban secret is not configured." };
+  async function verifySecret(input: string, configuredSecret: string | undefined, missingError: string) {
+    if (!configuredSecret) {
+      return { success: false as const, error: missingError };
     }
 
-    const trimmedInput = secret.trim();
-    const trimmedSecret = deps.adminBanSecret.trim();
+    const trimmedInput = input.trim();
+    const trimmedSecret = configuredSecret.trim();
 
     if (!trimmedInput) {
       return { success: false as const, error: "Secret key is required." };
@@ -82,8 +82,8 @@ export function createAdminService(deps: AdminServiceDeps) {
     };
   }
 
-  async function verifyAdminLoginSecret(secret: string) {
-    return verifyAdminBanSecret(secret);
+  async function verifyAdminSecret(secret: string) {
+    return verifySecret(secret, deps.adminSecret, "Admin secret is not configured.");
   }
 
   async function getDashboardStats() {
@@ -591,8 +591,7 @@ export function createAdminService(deps: AdminServiceDeps) {
   }
 
   return {
-    verifyAdminBanSecret,
-    verifyAdminLoginSecret,
+    verifyAdminSecret,
     getDashboardStats,
     getVoucherStats,
     getUsers,

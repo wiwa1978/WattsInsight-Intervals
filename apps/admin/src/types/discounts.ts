@@ -1,9 +1,12 @@
 import type { CreateDiscountInput, UpdateDiscountInput } from "@platform/contracts";
 
-export type AdminCreateDiscountInput = CreateDiscountInput;
+export type AdminCreateDiscountInput = CreateDiscountInput & {
+  secret: string;
+};
 
 export type AdminUpdateDiscountInput = Omit<UpdateDiscountInput, "id"> & {
   id: string;
+  secret: string;
 };
 
 // Discount type definitions
@@ -56,6 +59,7 @@ export interface DiscountFormData {
   startDate: Date;
   endDate: Date;
   maxUses?: number | null;
+  secret: string;
 }
 
 export type { CreateDiscountInput, UpdateDiscountInput };

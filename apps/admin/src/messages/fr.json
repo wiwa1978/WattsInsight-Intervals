@@ -192,11 +192,8 @@
       "emailPlaceholder": "vous@exemple.com",
       "password": "Mot de passe",
       "passwordPlaceholder": "••••••••",
-      "adminSecret": "Secret administrateur",
-      "adminSecretPlaceholder": "Entrez le secret administrateur",
       "totpCode": "Code d'authentification",
       "totpCodePlaceholder": "000000",
-      "stepUpRequired": "Une vérification administrateur supplémentaire est requise pour accéder à ce portail.",
       "rememberMe": "Se souvenir de moi",
       "forgotPassword": "Mot de passe oublié ?",
       "submit": "Se connecter",
@@ -721,9 +718,9 @@
         "expiryLabel": "Date d'expiration du bannissement (facultatif)",
         "expiryPlaceholder": "Choisir une date",
         "timeLabel": "Heure d'expiration",
-        "secretLabel": "Clé secrète administrateur",
-        "secretPlaceholder": "Saisissez la clé secrète de bannissement",
-        "secretHint": "Cela évite les bannissements accidentels. Partagez cette clé uniquement avec les administrateurs de confiance.",
+        "secretLabel": "Secret administrateur",
+        "secretPlaceholder": "Saisissez le secret administrateur",
+        "secretHint": "Requis pour les actions administrateur sensibles. Partagez ce secret uniquement avec les administrateurs de confiance.",
         "cancel": "Annuler",
         "banUser": "Bannir l'utilisateur",
         "banning": "Bannissement..."
@@ -757,7 +754,7 @@
       "unbanFailed": "Échec du débannissement de l'utilisateur.",
       "impersonateFailed": "Échec de l'usurpation d'identité.",
       "revokeSessionsFailed": "Échec de la révocation des sessions.",
-      "invalidBanSecret": "Clé secrète administrateur invalide."
+      "invalidBanSecret": "Secret administrateur invalide."
     },
     "notifications": {
       "title": "Notifications",
@@ -813,6 +810,10 @@
           "bannerExpiresAtPlaceholder": "Choisir une date",
           "bannerExpiresAtDescription": "La bannière sera masquée après cette date et heure",
           "bannerTime": "Heure d'expiration",
+          "secret": "Secret administrateur",
+          "secretPlaceholder": "Saisissez le secret administrateur",
+          "secretDescription": "Requis pour envoyer des notifications depuis le panneau administrateur.",
+          "secretRequired": "Le secret administrateur est requis",
           "submit": "Envoyer à Tous les Utilisateurs",
           "submitSelected": "Envoyer aux Utilisateurs Sélectionnés",
           "sending": "Envoi en cours..."
@@ -1150,7 +1151,11 @@
         "maxRedemptionsAllDescription": "Définissez combien d'utilisateurs au total peuvent utiliser ce bon.",
         "expiresAt": "Expire le",
         "expiresAtPlaceholder": "Choisissez une date d'expiration",
-        "expiresAtDescription": "Laissez vide pour garder le bon valide jusqu'à son utilisation ou sa désactivation manuelle."
+        "expiresAtDescription": "Laissez vide pour garder le bon valide jusqu'à son utilisation ou sa désactivation manuelle.",
+        "secret": "Secret administrateur",
+        "secretPlaceholder": "Saisissez le secret administrateur",
+        "secretDescription": "Requis pour créer ou mettre à jour des bons.",
+        "secretRequired": "Le secret administrateur est requis"
       },
       "success": {
         "created": "Bon créé avec succès.",
@@ -1327,20 +1332,20 @@
     "description": "Choisissez le forfait de crédits qui correspond à vos besoins. Les crédits n'expirent jamais.",
     "mostPopular": "Le Plus Populaire",
     "packages": {
-      "bronze": {
-        "name": "Bronze",
+      "starter": {
+        "name": "Starter",
         "description": "Parfait pour débuter avec notre plateforme.",
-        "cta": "Acheter Bronze"
+        "cta": "Acheter Starter"
       },
-      "silver": {
-        "name": "Argent",
+      "advanced": {
+        "name": "Advanced",
         "description": "Meilleure valeur avec crédits bonus inclus.",
-        "cta": "Acheter Argent"
+        "cta": "Acheter Advanced"
       },
-      "gold": {
-        "name": "Or",
+      "pro": {
+        "name": "Pro",
         "description": "Maximum de crédits avec le plus gros bonus.",
-        "cta": "Acheter Or"
+        "cta": "Acheter Pro"
       }
     },
     "features": {
@@ -1443,6 +1448,7 @@
     "purchase": "Achat",
     "chat": "Chat",
     "admin": "Admin",
+    "admins": "Admins",
     "users": "Utilisateurs",
     "notifications": "Notifications",
     "projects": "Projets",

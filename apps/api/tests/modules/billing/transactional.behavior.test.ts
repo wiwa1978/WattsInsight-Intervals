@@ -19,7 +19,7 @@ describe("billing transactional behavior", () => {
       notifications,
     });
 
-    await expect(service.processCreditPurchase("u1", "silver", "pay_tx_fail", "completed")).rejects.toThrow(
+    await expect(service.processCreditPurchase("u1", "advanced", "pay_tx_fail", "completed")).rejects.toThrow(
       "simulated transaction failure",
     );
     expect(notifications.createNotification).not.toHaveBeenCalled();

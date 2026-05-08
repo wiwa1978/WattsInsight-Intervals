@@ -116,7 +116,7 @@ const subscriptionService = createSubscriptionService({ db, paymentProvider: pay
 const checkoutIntentsService = createCheckoutIntentsService({ db });
 const adminService = createAdminService({
   db,
-  adminBanSecret: env.ADMIN_BAN_SECRET,
+  adminSecret: env.ADMIN_SECRET,
 });
 const discountsService = createDiscountsService({
   db,

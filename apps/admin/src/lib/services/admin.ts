@@ -31,10 +31,8 @@ import {
   stopAdminImpersonationApi,
   unbanAdminUserApi,
   type AdminWebhookEventsQuery,
-  verifyAdminBanSecretApi,
-  completeAdminStepUpApi,
-  getAdminStepUpStatusApi,
-  prepareAdminTotpEnrollmentApi,
+  verifyAdminSecretApi,
+  getAdminStatusApi,
 } from "@/lib/api/admin";
 import type {
   AdminDashboardStats,
@@ -129,20 +127,12 @@ async function getCreditBillingChartData<T>(loadData: () => Promise<T[]>): Promi
   }
 }
 
-export async function verifyAdminBanSecret(secret: string) {
-  return verifyAdminBanSecretApi(secret);
+export async function verifyAdminSecret(secret: string) {
+  return verifyAdminSecretApi(secret);
 }
 
-export async function getAdminStepUpStatus() {
-  return getAdminStepUpStatusApi();
-}
-
-export async function prepareAdminTotpEnrollment(payload: { secret: string }) {
-  return prepareAdminTotpEnrollmentApi(payload);
-}
-
-export async function completeAdminStepUp(payload: { secret: string; totpCode?: string }) {
-  return completeAdminStepUpApi(payload);
+export async function getAdminStatus() {
+  return getAdminStatusApi();
 }
 
 export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
@@ -369,31 +359,31 @@ export async function getUsers(
 export async function setAdminUserRole(
   userId: string,
   role: "user" | "admin",
-  options: { reason?: string; confirmed?: boolean } = {},
+  options: { reason?: string; confirmed?: boolean; secret: string },
 ) {
   return setAdminUserRoleApi(userId, role, options);
 }
 
-export async function unbanAdminUser(userId: string) {
-  return unbanAdminUserApi(userId);
+export async function unbanAdminUser(userId: string, secret: string) {
+  return unbanAdminUserApi(userId, secret);
 }
 
 export async function banAdminUser(payload: { userId: string; secret: string; banReason?: string; banExpiresIn?: number }) {
   return banAdminUserApi(payload);
 }
 
-export async function impersonateAdminUser(userId: string) {
-  return impersonateAdminUserApi(userId);
+export async function impersonateAdminUser(userId: string, secret: string) {
+  return impersonateAdminUserApi(userId, secret);
 }
 
 export async function stopAdminImpersonation(): ReturnType<typeof stopAdminImpersonationApi> {
   return stopAdminImpersonationApi();
 }
 
-export async function revokeAdminUserSessions(userId: string) {
-  return revokeAdminUserSessionsApi(userId);
+export async function revokeAdminUserSessions(userId: string, secret: string) {
+  return revokeAdminUserSessionsApi(userId, secret);
 }
 
-export async function setAdminUserPassword(userId: string, newPassword: string) {
-  return setAdminUserPasswordApi(userId, newPassword);
+export async function setAdminUserPassword(userId: string, newPassword: string, secret: string) {
+  return setAdminUserPasswordApi(userId, newPassword, secret);
 }

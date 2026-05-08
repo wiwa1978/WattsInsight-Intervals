@@ -28,7 +28,8 @@ import {
   createSubscriptionRefundSchema,
   createVoucherSchema,
   updateVoucherSchema,
-  verifyBanSecretSchema,
+  verifyAdminSecretSchema,
+  adminSecretOnlySchema,
   voucherIdParamSchema,
   voucherListQuerySchema,
   webhookEventIdParamSchema,
@@ -43,7 +44,6 @@ import { env } from "../env";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
-import { getAdminSessionTokenFromHeaders, issueAdminStepUpCookie, isAdminStepUpVerified } from "../middleware/admin-step-up";
 import { buildRoleChangeAuditMetadata, checkSetRoleGovernance, isImpersonatedSession } from "../modules/admin/governance";
 import { getAuditRequestContext } from "../modules/audit/service";
 import { logger } from "../observability/logger";
@@ -69,14 +69,16 @@ const adminUsersQuerySchema = paginationQuerySchema.extend({
   role: z.enum(["user", "admin"]).optional(),
 });
 
-const adminStepUpSchema = z.object({
-  secret: z.string().min(1),
-  totpCode: z.string().regex(/^\d{6}$/).optional(),
-});
+const adminActionSecretShape = {
+  secret: z.string().trim().min(1).max(255),
+};
 
-const adminTotpEnrollmentSchema = z.object({
-  secret: z.string().min(1),
-});
+const createDiscountWithSecretSchema = createDiscountSchema.extend(adminActionSecretShape);
+const updateDiscountWithSecretSchema = updateDiscountSchema.extend(adminActionSecretShape);
+const createVoucherWithSecretSchema = createVoucherSchema.and(z.object(adminActionSecretShape));
+const updateVoucherWithSecretSchema = updateVoucherSchema.and(z.object(adminActionSecretShape));
+const sendNotificationBaseWithSecretSchema = sendNotificationBaseSchema.extend(adminActionSecretShape);
+const sendNotificationToUsersWithSecretSchema = sendNotificationToUsersSchema.extend(adminActionSecretShape);
 
 const adminAllowlist = new Set(
   (env.ADMIN_ALLOWLIST ?? "")
@@ -438,6 +440,20 @@ export function createAdminRouter() {
     return forbidden(c, "Admin actions are blocked while impersonating another user.");
   }
 
+  async function requireAdminActionSecret(c: AdminContext, secret: string) {
+    const result = await bootstrap.adminService.verifyAdminSecret(secret);
+    if (!result.success) {
+      return forbidden(c, result.error ?? "Invalid admin secret");
+    }
+
+    return null;
+  }
+
+  function omitAdminSecret<T extends { secret: string }>(body: T) {
+    const { secret: _secret, ...rest } = body;
+    return rest;
+  }
+
   function withUserIdParam(c: AdminContext, handler: (userId: string) => Response | Promise<Response>) {
     return withParams(c, userIdParamSchema, { userId: c.req.param("userId") ?? "" }, "Invalid user id", ({ userId }) => handler(userId));
   }
@@ -462,6 +478,29 @@ export function createAdminRouter() {
         const result = await action(body, c.req.raw.headers);
         if (auditDetails && isSuccessfulMutationResult(result)) {
           const auditFailure = await recordAdminAuthAudit(c, body, auditDetails);
+          if (auditFailure) return auditFailure;
+        }
+        return c.json(result);
+      });
+    });
+  }
+
+  function registerAdminAuthSecretJsonAction<T extends { secret: string }>(
+    path: string,
+    schema: z.ZodSchema<T>,
+    errorMessage: string,
+    action: (body: Omit<T, "secret">, headers: Headers) => Promise<unknown>,
+    auditDetails?: AdminAuthAuditDetails<Omit<T, "secret">>,
+  ) {
+    router.post(path, (c) => {
+      return withJsonBody(c, schema, errorMessage, async (body) => {
+        const secretFailure = await requireAdminActionSecret(c, body.secret);
+        if (secretFailure) return secretFailure;
+
+        const actionBody = omitAdminSecret(body);
+        const result = await action(actionBody, c.req.raw.headers);
+        if (auditDetails && isSuccessfulMutationResult(result)) {
+          const auditFailure = await recordAdminAuthAudit(c, actionBody, auditDetails);
           if (auditFailure) return auditFailure;
         }
         return c.json(result);
@@ -494,7 +533,7 @@ export function createAdminRouter() {
   router.use("/*", bootstrap.authModule.requireAuth);
   router.use("/*", bootstrap.authModule.requireAdminAccess);
   router.use("/*", async (c, next) => {
-    if (c.req.path === "/admin/session" || c.req.path === "/admin/status" || c.req.path.startsWith("/admin/step-up")) {
+    if (c.req.path === "/admin/session" || c.req.path === "/admin/status") {
       return next();
     }
 
@@ -513,7 +552,6 @@ export function createAdminRouter() {
 
   router.get("/status", async (c) => {
     const authUser = getAuthUser(c);
-    const stepUpVerified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
     const allowTotpEnrollment = canEnrollTotp(authUser);
     const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
       | { user?: { twoFactorEnabled?: boolean | null } }
@@ -524,7 +562,6 @@ export function createAdminRouter() {
       success: true,
       data: {
         message: "Admin access granted.",
-        stepUpRequired: !stepUpVerified,
         totpRequired: authConfig.adminPortalTotpRequired,
         twoFactorEnabled,
         canEnrollTotp: allowTotpEnrollment,
@@ -532,132 +569,15 @@ export function createAdminRouter() {
     });
   });
 
-  router.get("/step-up/status", async (c) => {
-    const authUser = getAuthUser(c);
-    const stepUpVerified = isAdminStepUpVerified(c.req.raw.headers, authUser.id);
-    const allowTotpEnrollment = canEnrollTotp(authUser);
-    const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
-      | { user?: { twoFactorEnabled?: boolean | null } }
-      | null;
-    const twoFactorEnabled = Boolean(currentSession?.user?.twoFactorEnabled);
-
-    return c.json({
-      success: true,
-      data: {
-        stepUpRequired: !stepUpVerified,
-        totpRequired: authConfig.adminPortalTotpRequired,
-        twoFactorEnabled,
-        canEnrollTotp: allowTotpEnrollment,
-      },
-    });
-  });
-
-  router.post("/step-up/totp-enrollment", async (c) => {
-    const authUser = getAuthUser(c);
-    const allowTotpEnrollment = canEnrollTotp(authUser);
-    const parsedBody = parseJsonBody(adminTotpEnrollmentSchema, await c.req.json().catch(() => null));
-
-    if (!parsedBody.success) {
-      return validationError(c, "Invalid admin step-up payload");
-    }
-
-    const verifyAdminLoginSecret = bootstrap.adminService.verifyAdminLoginSecret ?? bootstrap.adminService.verifyAdminBanSecret;
-    const secretResult = await verifyAdminLoginSecret(parsedBody.data.secret);
-    if (!secretResult.success || !allowTotpEnrollment) {
-      return forbidden(c, "Invalid admin step-up credentials");
-    }
-
-    if (!bootstrap.authModule.auth.api?.getSession) {
-      return c.json({ success: false, error: "Unable to verify TOTP session" }, 500);
-    }
-
-    const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
-      | { user?: { twoFactorEnabled?: boolean | null } }
-      | null;
-
-    if (!authConfig.adminPortalTotpRequired || currentSession?.user?.twoFactorEnabled) {
-      return c.json({ success: false, error: "TOTP enrollment is not required" }, 400);
-    }
-
-    return c.json({ success: true, data: { canEnrollTotp: true } });
-  });
-
-  router.post("/step-up/complete", async (c) => {
-    const authUser = getAuthUser(c);
-    const allowTotpEnrollment = canEnrollTotp(authUser);
-    const parsedBody = parseJsonBody(adminStepUpSchema, await c.req.json().catch(() => null));
-
-    if (!parsedBody.success) {
-      return validationError(c, "Invalid admin step-up payload");
-    }
-
-    const verifyAdminLoginSecret = bootstrap.adminService.verifyAdminLoginSecret ?? bootstrap.adminService.verifyAdminBanSecret;
-    const secretResult = await verifyAdminLoginSecret(parsedBody.data.secret);
-    if (!secretResult.success) {
-      return forbidden(c, "Invalid admin step-up credentials");
-    }
-
-    if (!allowTotpEnrollment) {
-      return forbidden(c, "Invalid admin step-up credentials");
-    }
-
-    if (!bootstrap.authModule.auth.api?.getSession) {
-      return c.json({ success: false, error: "Unable to verify TOTP session" }, 500);
-    }
-
-    const currentSession = await bootstrap.authModule.auth.api.getSession({ headers: c.req.raw.headers }) as
-      | { user?: { twoFactorEnabled?: boolean | null } }
-      | null;
-
-    if (authConfig.adminPortalTotpRequired && !currentSession?.user?.twoFactorEnabled) {
-      return c.json({ success: false, error: "Two-factor setup is required for admin access" }, 403);
-    }
-
-    const verifyTotp = (bootstrap.authModule.auth.api as unknown as {
-      verifyTotp?: (args: {
-        body: { code: string };
-        headers: Headers;
-      }) => Promise<{ error?: { message?: string } | string } | null>;
-    }).verifyTotp;
-
-    if (authConfig.adminPortalTotpRequired) {
-      if (!verifyTotp) {
-        return c.json({ success: false, error: "Unable to verify TOTP" }, 500);
-      }
-
-      if (!parsedBody.data.totpCode) {
-        return validationError(c, "Invalid admin step-up payload");
-      }
-
-      const totpResult = await verifyTotp({
-        body: { code: parsedBody.data.totpCode },
-        headers: c.req.raw.headers,
-      });
-
-      if (totpResult && resultError(totpResult, "").length > 0) {
-        return forbidden(c, "Invalid admin step-up credentials");
-      }
-    }
-
-    const sessionToken = getAdminSessionTokenFromHeaders(c.req.raw.headers);
-    if (!sessionToken) {
-      return c.json({ success: false, error: "Missing session token" }, 401);
-    }
-
-    const response = c.json({ success: true, data: { verified: true } });
-    response.headers.append("Set-Cookie", issueAdminStepUpCookie(authUser.id, sessionToken));
-    return response;
-  });
-
-  router.post("/verify-ban-secret", async (c) => {
+  router.post("/verify-admin-secret", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsedBody = parseJsonBody(verifyBanSecretSchema, body);
+    const parsedBody = parseJsonBody(verifyAdminSecretSchema, body);
 
     if (!parsedBody.success) {
       return validationError(c, "Invalid secret payload");
     }
 
-    const result = await bootstrap.adminService.verifyAdminBanSecret(parsedBody.data.secret);
+    const result = await bootstrap.adminService.verifyAdminSecret(parsedBody.data.secret);
     return c.json(result, result.success ? 200 : 400);
   });
 
@@ -690,18 +610,22 @@ export function createAdminRouter() {
 
   router.post("/users/set-role", (c) => {
     return withJsonBody(c, setRoleSchema, "Invalid role payload", async (body) => {
+      const secretFailure = await requireAdminActionSecret(c, body.secret);
+      if (secretFailure) return secretFailure;
+
+      const roleChangeBody = omitAdminSecret(body);
       const targetUser = await bootstrap.adminService.getUserById(body.userId);
-      const selfRoleChangeBlock = blockIfSelfRoleChange(c, body.userId, targetUser, body.role);
+      const selfRoleChangeBlock = blockIfSelfRoleChange(c, roleChangeBody.userId, targetUser, roleChangeBody.role);
       if (selfRoleChangeBlock) return selfRoleChangeBlock;
 
-      const activeAdminCount = targetUser && isActiveAdmin(targetUser) && body.role !== "admin"
+      const activeAdminCount = targetUser && isActiveAdmin(targetUser) && roleChangeBody.role !== "admin"
         ? await bootstrap.adminService.countActiveAdmins()
         : undefined;
       const governance = checkSetRoleGovernance({
         previousRole: targetUser?.role,
-        nextRole: body.role,
-        reason: body.reason,
-        confirmed: body.confirmed,
+        nextRole: roleChangeBody.role,
+        reason: roleChangeBody.reason,
+        confirmed: roleChangeBody.confirmed,
         activeAdminCount,
       });
       if (!governance.allowed) {
@@ -709,16 +633,16 @@ export function createAdminRouter() {
       }
 
       const adminAuthApi = requireAdminAuthApi();
-      const roleBody = { userId: body.userId, role: body.role };
+      const roleBody = { userId: roleChangeBody.userId, role: roleChangeBody.role };
       const result = await adminAuthApi.setRole({ body: roleBody, headers: c.req.raw.headers });
       if (isSuccessfulMutationResult(result)) {
-        const roleChanged = !targetUser || targetUser.role !== body.role;
+        const roleChanged = !targetUser || targetUser.role !== roleChangeBody.role;
         if (roleChanged && typeof adminAuthApi.revokeUserSessions === "function") {
-          await adminAuthApi.revokeUserSessions({ body: { userId: body.userId }, headers: c.req.raw.headers }).catch((error: unknown) => {
-            logger.warn("Failed to revoke user sessions after admin role change", { userId: body.userId, error });
+          await adminAuthApi.revokeUserSessions({ body: { userId: roleChangeBody.userId }, headers: c.req.raw.headers }).catch((error: unknown) => {
+            logger.warn("Failed to revoke user sessions after admin role change", { userId: roleChangeBody.userId, error });
           });
         }
-        const auditFailure = await recordAdminAuthAudit(c, body, {
+        const auditFailure = await recordAdminAuthAudit(c, roleChangeBody, {
           action: "admin.user.set_role",
           targetType: "user",
           targetId: (body) => body.userId,
@@ -735,7 +659,7 @@ export function createAdminRouter() {
     });
   });
 
-  registerAdminAuthJsonAction("/users/unban", userOnlySchema, "Invalid unban payload", (body, headers) => {
+  registerAdminAuthSecretJsonAction("/users/unban", userOnlySchema, "Invalid unban payload", (body, headers) => {
     return requireAdminAuthApi().unbanUser({ body, headers });
   }, {
     action: "admin.user.unban",
@@ -746,10 +670,8 @@ export function createAdminRouter() {
 
   router.post("/users/ban", (c) => {
     return withJsonBody(c, banUserSchema, "Invalid ban payload", async (body) => {
-      const secretResult = await bootstrap.adminService.verifyAdminBanSecret(body.secret);
-      if (!secretResult.success) {
-        return forbidden(c, secretResult.error ?? "Invalid admin ban secret");
-      }
+      const secretFailure = await requireAdminActionSecret(c, body.secret);
+      if (secretFailure) return secretFailure;
 
       const targetUser = await bootstrap.adminService.getUserById(body.userId);
       const lastAdminBlock = await blockIfLastActiveAdminBan(c, targetUser);
@@ -772,14 +694,18 @@ export function createAdminRouter() {
 
   router.post("/users/impersonate", (c) => {
     return withJsonBody(c, userOnlySchema, "Invalid impersonation payload", async (body) => {
+      const secretFailure = await requireAdminActionSecret(c, body.secret);
+      if (secretFailure) return secretFailure;
+
+      const impersonationBody = omitAdminSecret(body);
       const actor = getAuthUser(c);
-      const targetUser = await bootstrap.adminService.getUserById(body.userId);
+      const targetUser = await bootstrap.adminService.getUserById(impersonationBody.userId);
 
       if (!targetUser) {
         return c.json({ success: false, error: "User not found" }, 404);
       }
 
-      if (actor.id === body.userId) {
+      if (actor.id === impersonationBody.userId) {
         return forbidden(c, "You cannot impersonate yourself.");
       }
 
@@ -792,7 +718,7 @@ export function createAdminRouter() {
       }
 
       const response = (await requireAdminAuthApi().impersonateUser({
-        body,
+        body: impersonationBody,
         headers: c.req.raw.headers,
         asResponse: true,
       })) as Response;
@@ -800,7 +726,7 @@ export function createAdminRouter() {
       const payload = await jsonResponse.clone().json().catch(() => null);
 
       if (jsonResponse.ok && isSuccessfulMutationResult(payload)) {
-        const auditFailure = await recordAdminAuthAudit(c, body, {
+        const auditFailure = await recordAdminAuthAudit(c, impersonationBody, {
           action: "admin.impersonation.start",
           targetType: "user",
           targetId: (body) => body.userId,
@@ -812,7 +738,7 @@ export function createAdminRouter() {
     });
   });
 
-  registerAdminAuthJsonAction("/users/revoke-sessions", userOnlySchema, "Invalid session revoke payload", (body, headers) => {
+  registerAdminAuthSecretJsonAction("/users/revoke-sessions", userOnlySchema, "Invalid session revoke payload", (body, headers) => {
     return requireAdminAuthApi().revokeUserSessions({ body, headers });
   }, {
     action: "admin.user.revoke_sessions",
@@ -821,7 +747,7 @@ export function createAdminRouter() {
     after: () => ({ sessionsRevoked: true }),
   });
 
-  registerAdminAuthJsonAction("/users/set-password", setUserPasswordSchema, "Invalid password payload", (body, headers) => {
+  registerAdminAuthSecretJsonAction("/users/set-password", setUserPasswordSchema, "Invalid password payload", (body, headers) => {
     return requireAdminAuthApi().setUserPassword({ body, headers });
   }, {
     action: "admin.user.set_password",
@@ -1091,13 +1017,17 @@ export function createAdminRouter() {
 
   router.post("/billing/subscription-refunds", async (c) => {
     return withJsonBody(c, createSubscriptionRefundSchema, "Invalid subscription refund payload", async (body) => {
+      const secretFailure = await requireAdminActionSecret(c, body.secret);
+      if (secretFailure) return secretFailure;
+
+      const refundBody = omitAdminSecret(body);
       const actor = getAuthUser(c);
       let result: Awaited<ReturnType<typeof bootstrap.subscriptionService.createSubscriptionRefund>>;
 
       try {
         result = await bootstrap.subscriptionService.createSubscriptionRefund({
-          paymentId: body.paymentId,
-          reason: body.reason,
+          paymentId: refundBody.paymentId,
+          reason: refundBody.reason,
           actorUserId: actor.id,
         });
       } catch (error) {
@@ -1118,7 +1048,7 @@ export function createAdminRouter() {
           refundStatus: result.refund.status,
         },
         metadata: {
-          reason: body.reason ?? null,
+          reason: refundBody.reason ?? null,
           userId: result.payment.userId,
           amount: result.refund.amount ?? null,
           currency: result.refund.currency ?? null,
@@ -1131,6 +1061,14 @@ export function createAdminRouter() {
   });
 
   router.post("/billing/reconcile", async (c) => {
+    const parsedBody = parseJsonBody(adminSecretOnlySchema, await c.req.json().catch(() => null));
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid reconciliation payload");
+    }
+
+    const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+    if (secretFailure) return secretFailure;
+
     const result = await bootstrap.billingReconciliationService.reconcileProviderBillingStateSafely();
     return c.json({ success: true, data: bootstrap.billingReconciliationService.serializeResult(result) });
   });
@@ -1264,13 +1202,16 @@ export function createAdminRouter() {
 
   router.post("/discounts", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsedBody = parseJsonBody(createDiscountSchema, body);
+    const parsedBody = parseJsonBody(createDiscountWithSecretSchema, body);
 
     if (!parsedBody.success) {
       return validationError(c, "Invalid discount payload");
     }
 
-    const bodyData = parsedBody.data;
+    const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+    if (secretFailure) return secretFailure;
+
+    const bodyData = omitAdminSecret(parsedBody.data);
     let result: Awaited<ReturnType<typeof bootstrap.discountsService.createDiscount>>;
     try {
       result = await bootstrap.discountsService.createDiscount({
@@ -1312,18 +1253,22 @@ export function createAdminRouter() {
 
   router.patch("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
-      return withJsonBody(c, updateDiscountSchema, "Invalid discount update payload", async (bodyData) => {
+      return withJsonBody(c, updateDiscountWithSecretSchema, "Invalid discount update payload", async (bodyData) => {
+        const secretFailure = await requireAdminActionSecret(c, bodyData.secret);
+        if (secretFailure) return secretFailure;
+
+        const updateBody = omitAdminSecret(bodyData);
         let result: Awaited<ReturnType<typeof bootstrap.discountsService.updateDiscount>>;
         try {
           result = await bootstrap.discountsService.updateDiscount({
             id: discountId,
-            code: bodyData.code,
-            type: bodyData.type,
-            value: bodyData.value,
-            startDate: bodyData.startDate,
-            endDate: bodyData.endDate,
-            maxUses: bodyData.maxUses,
-            status: bodyData.status,
+            code: updateBody.code,
+            type: updateBody.type,
+            value: updateBody.value,
+            startDate: updateBody.startDate,
+            endDate: updateBody.endDate,
+            maxUses: updateBody.maxUses,
+            status: updateBody.status,
           });
         } catch (error) {
           await recordMutationAudit(c, {
@@ -1362,6 +1307,14 @@ export function createAdminRouter() {
 
   router.delete("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
+      const parsedBody = parseJsonBody(adminSecretOnlySchema, await c.req.json().catch(() => null));
+      if (!parsedBody.success) {
+        return validationError(c, "Invalid discount delete payload");
+      }
+
+      const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+      if (secretFailure) return secretFailure;
+
       let result: Awaited<ReturnType<typeof bootstrap.discountsService.deleteDiscount>>;
       try {
         result = await bootstrap.discountsService.deleteDiscount(discountId);
@@ -1439,15 +1392,20 @@ export function createAdminRouter() {
 
   router.post("/vouchers", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsedBody = parseJsonBody(createVoucherSchema, body);
+    const parsedBody = parseJsonBody(createVoucherWithSecretSchema, body);
 
     if (!parsedBody.success) {
       return validationError(c, "Invalid voucher payload");
     }
 
+    const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+    if (secretFailure) return secretFailure;
+
+    const voucherBody = omitAdminSecret(parsedBody.data);
+
     let result: Awaited<ReturnType<typeof bootstrap.vouchersService.createVoucher>>;
     try {
-      result = await bootstrap.vouchersService.createVoucher(parsedBody.data);
+      result = await bootstrap.vouchersService.createVoucher(voucherBody);
     } catch (error) {
       await recordMutationAudit(c, {
         action: "voucher.create",
@@ -1479,12 +1437,16 @@ export function createAdminRouter() {
 
   router.patch("/vouchers/:voucherId", async (c) => {
     return withVoucherIdParam(c, async (voucherId) => {
-      return withJsonBody(c, updateVoucherSchema, "Invalid voucher update payload", async (bodyData) => {
+      return withJsonBody(c, updateVoucherWithSecretSchema, "Invalid voucher update payload", async (bodyData) => {
+        const secretFailure = await requireAdminActionSecret(c, bodyData.secret);
+        if (secretFailure) return secretFailure;
+
+        const updateBody = omitAdminSecret(bodyData);
         let result: Awaited<ReturnType<typeof bootstrap.vouchersService.updateVoucher>>;
         try {
           result = await bootstrap.vouchersService.updateVoucher({
             id: voucherId,
-            ...bodyData,
+            ...updateBody,
           });
         } catch (error) {
           await recordMutationAudit(c, {
@@ -1594,14 +1556,19 @@ export function createAdminRouter() {
 
   router.post("/notifications/send-all", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsedBody = parseJsonBody(sendNotificationBaseSchema, body);
+    const parsedBody = parseJsonBody(sendNotificationBaseWithSecretSchema, body);
 
     if (!parsedBody.success) {
       return validationError(c, "Invalid notification payload");
     }
 
+    const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+    if (secretFailure) return secretFailure;
+
+    const notificationBody = omitAdminSecret(parsedBody.data);
+
     const result = await bootstrap.notificationsService.sendNotificationToAllUsers({
-      ...parsedBody.data,
+      ...notificationBody,
     }) as NotificationSendResultWithBatch;
     const publicResult = publicNotificationSendResult(result);
 
@@ -1613,11 +1580,11 @@ export function createAdminRouter() {
       targetId: result.batchId ?? null,
       after: {
         scope: "all",
-        title: parsedBody.data.title,
-        message: parsedBody.data.message,
-        type: parsedBody.data.type ?? "info",
-        category: parsedBody.data.category ?? "system",
-        showAsBanner: parsedBody.data.showAsBanner ?? false,
+        title: notificationBody.title,
+        message: notificationBody.message,
+        type: notificationBody.type ?? "info",
+        category: notificationBody.category ?? "system",
+        showAsBanner: notificationBody.showAsBanner ?? false,
       },
       metadata: publicResult,
     });
@@ -1627,14 +1594,19 @@ export function createAdminRouter() {
 
   router.post("/notifications/send-users", async (c) => {
     const body = await c.req.json().catch(() => null);
-    const parsedBody = parseJsonBody(sendNotificationToUsersSchema, body);
+    const parsedBody = parseJsonBody(sendNotificationToUsersWithSecretSchema, body);
 
     if (!parsedBody.success) {
       return validationError(c, "Invalid notification payload");
     }
 
+    const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+    if (secretFailure) return secretFailure;
+
+    const notificationBody = omitAdminSecret(parsedBody.data);
+
     const result = await bootstrap.notificationsService.sendNotificationToUsers({
-      ...parsedBody.data,
+      ...notificationBody,
     }) as NotificationSendResultWithBatch;
     const publicResult = publicNotificationSendResult(result);
 
@@ -1646,15 +1618,15 @@ export function createAdminRouter() {
       targetId: result.batchId ?? null,
       after: {
         scope: "selected",
-        title: parsedBody.data.title,
-        message: parsedBody.data.message,
-        type: parsedBody.data.type ?? "info",
-        category: parsedBody.data.category ?? "system",
-        showAsBanner: parsedBody.data.showAsBanner ?? false,
+        title: notificationBody.title,
+        message: notificationBody.message,
+        type: notificationBody.type ?? "info",
+        category: notificationBody.category ?? "system",
+        showAsBanner: notificationBody.showAsBanner ?? false,
       },
       metadata: {
         ...publicResult,
-        requestedRecipientCount: parsedBody.data.userIds.length,
+        requestedRecipientCount: notificationBody.userIds.length,
       },
     });
 

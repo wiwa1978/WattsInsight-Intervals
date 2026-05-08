@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Loader2, Send, CalendarIcon } from "lucide-react";
@@ -51,8 +52,13 @@ import {
 } from "@/lib/services/notifications";
 import {
   sendNotificationSchema,
-  type SendNotificationInput,
 } from "@/schemas/notification";
+
+const sendNotificationFormSchema = sendNotificationSchema.extend({
+  secret: z.string().trim().min(1, "Admin secret is required"),
+});
+
+type SendNotificationFormInput = z.infer<typeof sendNotificationFormSchema>;
 
 export function SendNotificationForm() {
   const t = useTranslations("admin.notifications.sendToAll");
@@ -62,8 +68,8 @@ export function SendNotificationForm() {
   const [recipientMode, setRecipientMode] = React.useState<"all" | "selected">("all");
   const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
 
-  const form = useForm<SendNotificationInput>({
-    resolver: zodResolver(sendNotificationSchema),
+  const form = useForm<SendNotificationFormInput>({
+    resolver: zodResolver(sendNotificationFormSchema),
     mode: "onChange",
     defaultValues: {
       titleEn: "",
@@ -76,10 +82,11 @@ export function SendNotificationForm() {
       category: "system",
       showAsBanner: false,
       bannerExpiresAt: undefined,
+      secret: "",
     },
   });
 
-  async function onSubmit(values: SendNotificationInput) {
+  async function onSubmit(values: SendNotificationFormInput) {
     setIsSubmitting(true);
     try {
       if (recipientMode === "selected" && selectedUserIds.length === 0) {
@@ -107,6 +114,7 @@ export function SendNotificationForm() {
         category: values.category,
         showAsBanner: values.showAsBanner,
         bannerExpiresAt: bannerExpiresDate,
+        secret: values.secret.trim(),
         data: {
           translations: {
             en: { title: values.titleEn, message: values.messageEn },
@@ -468,9 +476,24 @@ export function SendNotificationForm() {
               />
             </div>
 
+            <FormField
+              control={form.control}
+              name="secret"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("form.secret")}</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder={t("form.secretPlaceholder")} {...field} />
+                  </FormControl>
+                  <FormDescription>{t("form.secretDescription")}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <Button
               type="submit"
-              disabled={isSubmitting || !form.formState.isValid}
+              disabled={isSubmitting || !form.formState.isValid || !form.watch("secret").trim()}
             >
               {isSubmitting ? (
                 <>

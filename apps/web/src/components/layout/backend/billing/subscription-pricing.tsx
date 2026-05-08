@@ -21,7 +21,7 @@ export function SubscriptionPricing() {
   const t = useTranslations("billing.subscription");
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className={cn("grid gap-6", subscriptionPlans.length === 3 ? "lg:grid-cols-3" : "lg:grid-cols-2")}>
       {subscriptionPlans.map((plan) => {
         const isPopular = "popular" in plan && plan.popular;
         const price = plan.price / 100;

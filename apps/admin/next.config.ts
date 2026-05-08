@@ -3,6 +3,10 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+const connectSrc = ["'self'", process.env.NEXT_PUBLIC_API_URL]
+  .filter((value): value is string => Boolean(value))
+  .map((value) => value.replace(/\/$/, ""));
+
 const securityHeaders = [
   {
     key: "Content-Security-Policy",
@@ -15,7 +19,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://lh3.googleusercontent.com https://avatars.githubusercontent.com",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      `connect-src ${connectSrc.join(" ")}`,
       "form-action 'self'",
     ].join("; "),
   },
@@ -26,7 +30,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.1.223", "localhost"],
+  allowedDevOrigins: ["192.168.1.213", "192.168.1.223", "localhost"],
   poweredByHeader: false,
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

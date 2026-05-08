@@ -7,26 +7,26 @@ afterEach(() => {
 });
 
 describe("createAdminService", () => {
-  // Verifies whitespace-only ban secret input is rejected before comparison.
+  // Verifies whitespace-only admin secret input is rejected before comparison.
   it("rejects empty secret input", async () => {
     const service = createAdminService({
       db: {},
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
-    const result = await service.verifyAdminBanSecret("   ");
+    const result = await service.verifyAdminSecret("   ");
 
     expect(result).toEqual({ success: false, error: "Secret key is required." });
   });
 
-  // Verifies incorrect ban secret values are rejected with a deterministic error.
+  // Verifies incorrect admin secret values are rejected with a deterministic error.
   it("rejects invalid secret input", async () => {
     const service = createAdminService({
       db: {},
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
-    const result = await service.verifyAdminBanSecret("wrong1");
+    const result = await service.verifyAdminSecret("wrong1");
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("Invalid secret key provided.");
@@ -36,22 +36,10 @@ describe("createAdminService", () => {
   it("accepts valid secret input", async () => {
     const service = createAdminService({
       db: {},
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
-    const result = await service.verifyAdminBanSecret("secret");
-
-    expect(result).toEqual({ success: true, error: undefined });
-  });
-
-  // Verifies admin step-up secret checks can be reused for admin login hardening.
-  it("verifies admin login secret using existing secret validator", async () => {
-    const service = createAdminService({
-      db: {},
-      adminBanSecret: "secret",
-    });
-
-    const result = await service.verifyAdminLoginSecret("secret");
+    const result = await service.verifyAdminSecret("secret");
 
     expect(result).toEqual({ success: true, error: undefined });
   });
@@ -62,11 +50,11 @@ describe("createAdminService", () => {
       db: {},
     });
 
-    const result = await service.verifyAdminBanSecret("anything");
+    const result = await service.verifyAdminSecret("anything");
 
     expect(result).toEqual({
       success: false,
-      error: "Admin ban secret is not configured.",
+      error: "Admin secret is not configured.",
     });
   });
 
@@ -85,7 +73,7 @@ describe("createAdminService", () => {
 
     const service = createAdminService({
       db: { select } as any,
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
     const result = await service.getUserStats();
@@ -105,7 +93,7 @@ describe("createAdminService", () => {
           }),
         }),
       },
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     } as any);
 
     const result = await service.getUserById("missing-user");
@@ -124,7 +112,7 @@ describe("createAdminService", () => {
 
     const service = createAdminService({
       db,
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
     const stats = await service.getBillingStats();
@@ -161,7 +149,7 @@ describe("createAdminService", () => {
 
     const service = createAdminService({
       db: { select } as any,
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
     const result = await service.getAllTransactions(2, 0);
@@ -188,7 +176,7 @@ describe("createAdminService", () => {
 
     const service = createAdminService({
       db: { select } as any,
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
     await service.getAllTransactions(999, -50, "  john@example.com  ");
@@ -211,7 +199,7 @@ describe("createAdminService", () => {
 
     const service = createAdminService({
       db: { select } as any,
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
     await service.getUsers();
@@ -238,7 +226,7 @@ describe("createAdminService", () => {
 
     const service = createAdminService({
       db: { select } as any,
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
     const result = await service.getUsers(20, 0, "  alice  ");
@@ -268,7 +256,7 @@ describe("createAdminService", () => {
 
     const service = createAdminService({
       db: { select } as any,
-      adminBanSecret: "secret",
+      adminSecret: "secret",
     });
 
     const result = await service.getUsers(20, 0, undefined, "admin");

@@ -17,7 +17,7 @@ describe("buildDodoCheckoutUrl", () => {
         baseUrl,
         productId,
         userId: "user-123",
-        packageKey: "silver",
+        packageKey: "advanced",
         referenceId: "checkout-ref-123",
         customerEmail: "buyer@example.com",
         successUrl: "https://app.example.com/billing?success=true",
@@ -28,7 +28,7 @@ describe("buildDodoCheckoutUrl", () => {
     expect(url.origin + url.pathname).toBe(`${baseUrl}/buy/${productId}`);
     expect(url.searchParams.get("metadata_userId")).toBe("user-123");
     expect(url.searchParams.get("metadata_productId")).toBe(productId);
-    expect(url.searchParams.get("metadata_packageKey")).toBe("silver");
+    expect(url.searchParams.get("metadata_packageKey")).toBe("advanced");
     expect(url.searchParams.get("metadata_referenceId")).toBe("checkout-ref-123");
     expect(url.searchParams.get("metadata_checkoutReferenceId")).toBe("checkout-ref-123");
     expect(url.searchParams.get("customer_email")).toBe("buyer@example.com");
@@ -44,7 +44,7 @@ describe("buildDodoCheckoutUrl", () => {
         baseUrl,
         productId,
         userId: "user-123",
-        packageKey: "silver",
+        packageKey: "advanced",
       }),
     );
 
@@ -60,7 +60,7 @@ describe("buildDodoCheckoutUrl", () => {
         baseUrl,
         productId,
         userId: "victim&metadata_userId=attacker",
-        packageKey: "silver",
+        packageKey: "advanced",
       }),
     );
 

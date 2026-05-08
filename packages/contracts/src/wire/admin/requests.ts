@@ -3,7 +3,7 @@ import { z } from "zod";
 import { paginationQuerySchema } from "../common/pagination";
 import { optionalLimitQuerySchema, timeRangeSchema } from "../common/query";
 
-export const verifyBanSecretSchema = z.object({
+export const verifyAdminSecretSchema = z.object({
   secret: z.string().trim().min(1).max(255),
 });
 
@@ -12,15 +12,18 @@ export const setRoleSchema = z.object({
   role: z.enum(["user", "admin"]),
   reason: z.string().trim().max(1000).optional(),
   confirmed: z.boolean().optional(),
+  secret: z.string().trim().min(1).max(255),
 });
 
 export const userOnlySchema = z.object({
   userId: z.string().uuid(),
+  secret: z.string().trim().min(1).max(255),
 });
 
 export const setUserPasswordSchema = z.object({
   userId: z.string().uuid(),
   newPassword: z.string().min(8).max(128),
+  secret: z.string().trim().min(1).max(255),
 });
 
 export const banUserSchema = z.strictObject({
@@ -41,6 +44,11 @@ export const billingListQuerySchema = paginationQuerySchema.extend({
 export const createSubscriptionRefundSchema = z.object({
   paymentId: z.string().trim().min(1, "Payment ID is required").max(255),
   reason: z.string().trim().max(3000, "Reason must be 3000 characters or fewer").optional(),
+  secret: z.string().trim().min(1).max(255),
+});
+
+export const adminSecretOnlySchema = z.object({
+  secret: z.string().trim().min(1).max(255),
 });
 
 export const webhookEventStatusSchema = z.enum(["processing", "processed", "failed"]);

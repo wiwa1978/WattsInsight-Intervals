@@ -66,7 +66,6 @@ export type AuthenticatedUser = {
 export type AuthContextVariables = {
   authUser?: AuthenticatedUser;
   authSession?: unknown;
-  adminStepUpVerified?: boolean;
 };
 
 export type AuthFailure = {

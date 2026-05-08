@@ -72,8 +72,13 @@ export function DiscountsSection() {
       return;
     }
 
+    const secret = window.prompt("Enter admin secret to delete this discount.")?.trim();
+    if (!secret) {
+      return;
+    }
+
     try {
-      const result = await deleteDiscount(discount.id);
+      const result = await deleteDiscount(discount.id, secret);
       if (result.success) {
         toast.success(`Discount "${discount.code}" deleted successfully`);
         await fetchDiscounts();

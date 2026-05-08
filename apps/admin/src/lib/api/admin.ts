@@ -32,32 +32,18 @@ import type {
 } from "@platform/contracts";
 import { apiRoutes } from "@platform/contracts/ts";
 
-export async function verifyAdminBanSecretApi(secret: string) {
-  return apiRequest<{ success: boolean; error?: string }>("/admin/verify-ban-secret", {
+export async function verifyAdminSecretApi(secret: string) {
+  return apiRequest<{ success: boolean; error?: string }>("/admin/verify-admin-secret", {
     method: "POST",
     body: JSON.stringify({ secret }),
   });
 }
 
-export async function getAdminStepUpStatusApi() {
+export async function getAdminStatusApi() {
   return apiRequest<{
     success: boolean;
-    data: { stepUpRequired: boolean; totpRequired: boolean; twoFactorEnabled: boolean; canEnrollTotp: boolean };
-  }>("/admin/step-up/status");
-}
-
-export async function prepareAdminTotpEnrollmentApi(payload: { secret: string }) {
-  return apiRequest<{ success: boolean; data: { canEnrollTotp: boolean } }>("/admin/step-up/totp-enrollment", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function completeAdminStepUpApi(payload: { secret: string; totpCode?: string }) {
-  return apiRequest<{ success: boolean; data: { verified: boolean } }>("/admin/step-up/complete", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+    data: { message: string; totpRequired: boolean; twoFactorEnabled: boolean; canEnrollTotp: boolean };
+  }>("/admin/status");
 }
 
 export async function getAdminDashboardStatsApi() {
@@ -91,7 +77,7 @@ export async function getAdminUsersApi(limit = 20, offset = 0, search?: string, 
 export async function setAdminUserRoleApi(
   userId: string,
   role: "user" | "admin",
-  options: { reason?: string; confirmed?: boolean } = {},
+  options: { reason?: string; confirmed?: boolean; secret: string },
 ) {
   return apiRequest<{ user?: unknown; error?: { message?: string } | string }>("/admin/users/set-role", {
     method: "POST",
@@ -99,10 +85,10 @@ export async function setAdminUserRoleApi(
   });
 }
 
-export async function unbanAdminUserApi(userId: string) {
+export async function unbanAdminUserApi(userId: string, secret: string) {
   return apiRequest<{ user?: unknown; error?: { message?: string } | string }>("/admin/users/unban", {
     method: "POST",
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({ userId, secret }),
   });
 }
 
@@ -113,12 +99,12 @@ export async function banAdminUserApi(payload: { userId: string; secret: string;
   });
 }
 
-export async function impersonateAdminUserApi(userId: string) {
+export async function impersonateAdminUserApi(userId: string, secret: string) {
   return apiRequest<{ session?: unknown; user?: unknown; error?: { message?: string } | string }>(
     "/admin/users/impersonate",
     {
       method: "POST",
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret }),
     },
   );
 }
@@ -133,20 +119,20 @@ export async function stopAdminImpersonationApi() {
   );
 }
 
-export async function revokeAdminUserSessionsApi(userId: string) {
+export async function revokeAdminUserSessionsApi(userId: string, secret: string) {
   return apiRequest<{ success?: boolean; error?: { message?: string } | string }>(
     "/admin/users/revoke-sessions",
     {
       method: "POST",
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret }),
     },
   );
 }
 
-export async function setAdminUserPasswordApi(userId: string, newPassword: string) {
+export async function setAdminUserPasswordApi(userId: string, newPassword: string, secret: string) {
   return apiRequest<{ status?: boolean; error?: { message?: string } | string }>("/admin/users/set-password", {
     method: "POST",
-    body: JSON.stringify({ userId, newPassword }),
+    body: JSON.stringify({ userId, newPassword, secret }),
   });
 }
 
@@ -364,9 +350,10 @@ export async function updateDiscountApi(payload: AdminUpdateDiscountInput) {
   });
 }
 
-export async function deleteDiscountApi(id: string) {
+export async function deleteDiscountApi(id: string, secret: string) {
   return apiRequest<{ success: boolean; error?: string }>(`/admin/discounts/${id}`, {
     method: "DELETE",
+    body: JSON.stringify({ secret }),
   });
 }
 
@@ -393,6 +380,7 @@ export async function createVoucherApi(payload: {
   maxRedemptions?: number;
   userIds: string[];
   expiresAt?: Date | null;
+  secret: string;
 }) {
   return apiRequest<{ success: boolean; voucher?: unknown; error?: string }>("/admin/vouchers", {
     method: "POST",
@@ -412,6 +400,7 @@ export async function updateVoucherApi(payload: {
   maxRedemptions?: number;
   userIds?: string[];
   expiresAt?: Date | null;
+  secret: string;
 }) {
   return apiRequest<{ success: boolean; voucher?: unknown; error?: string }>(`/admin/vouchers/${payload.id}`, {
     method: "PATCH",
@@ -469,6 +458,7 @@ export async function sendNotificationToAllUsersApi(payload: {
   data?: Record<string, unknown>;
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
+  secret: string;
 }) {
   return apiRequest<{ success: boolean; data: NotificationSendResult }>("/admin/notifications/send-all", {
     method: "POST",
@@ -488,6 +478,7 @@ export async function sendNotificationToUsersApi(payload: {
   data?: Record<string, unknown>;
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
+  secret: string;
 }) {
   return apiRequest<{ success: boolean; data: NotificationSendResult }>("/admin/notifications/send-users", {
     method: "POST",

@@ -89,6 +89,7 @@ export async function createNotification({
       data,
       showAsBanner,
       bannerExpiresAt,
+      secret: "",
     });
 
     if (result.data.sentCount !== 1 || result.data.invalidRecipientCount > 0) {
@@ -118,6 +119,7 @@ export async function sendNotificationToAllUsers({
   data,
   showAsBanner = false,
   bannerExpiresAt,
+  secret,
 }: {
   title: string;
   message: string;
@@ -126,6 +128,7 @@ export async function sendNotificationToAllUsers({
   data?: Record<string, unknown>;
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
+  secret: string;
 }) {
   try {
     const result = await sendNotificationToAllUsersApi({
@@ -136,6 +139,7 @@ export async function sendNotificationToAllUsers({
       data,
       showAsBanner,
       bannerExpiresAt,
+      secret,
     });
 
     return { success: true as const, ...result.data };
@@ -153,6 +157,7 @@ export async function sendNotificationToUsers({
   data,
   showAsBanner = false,
   bannerExpiresAt,
+  secret,
 }: {
   userIds: string[];
   title: string;
@@ -162,6 +167,7 @@ export async function sendNotificationToUsers({
   data?: Record<string, unknown>;
   showAsBanner?: boolean;
   bannerExpiresAt?: Date;
+  secret: string;
 }) {
   try {
     const result = await sendNotificationToUsersApi({
@@ -173,6 +179,7 @@ export async function sendNotificationToUsers({
       data,
       showAsBanner,
       bannerExpiresAt,
+      secret,
     });
 
     return { success: true as const, ...result.data };

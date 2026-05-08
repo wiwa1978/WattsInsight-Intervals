@@ -192,11 +192,8 @@
       "emailPlaceholder": "jij@voorbeeld.nl",
       "password": "Wachtwoord",
       "passwordPlaceholder": "••••••••",
-      "adminSecret": "Admingeheim",
-      "adminSecretPlaceholder": "Voer admingeheim in",
       "totpCode": "Authenticatiecode",
       "totpCodePlaceholder": "000000",
-      "stepUpRequired": "Extra admin-verificatie is vereist om dit portaal te openen.",
       "rememberMe": "Onthoud mij",
       "forgotPassword": "Wachtwoord vergeten?",
       "submit": "Inloggen",
@@ -721,9 +718,9 @@
         "expiryLabel": "Vervaldatum blokkering (optioneel)",
         "expiryPlaceholder": "Kies een datum",
         "timeLabel": "Vervaltijd",
-        "secretLabel": "Beheerdersgeheime sleutel",
-        "secretPlaceholder": "Voer de geheime ban-sleutel in",
-        "secretHint": "Dit voorkomt onbedoelde blokkeringen. Deel de sleutel alleen met vertrouwde beheerders.",
+        "secretLabel": "Admingeheim",
+        "secretPlaceholder": "Voer het admingeheim in",
+        "secretHint": "Vereist voor gevoelige adminacties. Deel dit geheim alleen met vertrouwde beheerders.",
         "cancel": "Annuleren",
         "banUser": "Gebruiker blokkeren",
         "banning": "Blokkeren..."
@@ -757,7 +754,7 @@
       "unbanFailed": "Kan gebruiker niet deblokkeren.",
       "impersonateFailed": "Kan gebruiker niet nabootsen.",
       "revokeSessionsFailed": "Kan gebruikerssessies niet intrekken.",
-      "invalidBanSecret": "Ongeldige beheerderssleutel."
+      "invalidBanSecret": "Ongeldig admingeheim."
     },
     "notifications": {
       "title": "Meldingen",
@@ -813,6 +810,10 @@
           "bannerExpiresAtPlaceholder": "Kies een datum",
           "bannerExpiresAtDescription": "Banner wordt verborgen na deze datum en tijd",
           "bannerTime": "Vervaltijd",
+          "secret": "Admingeheim",
+          "secretPlaceholder": "Voer het admingeheim in",
+          "secretDescription": "Vereist om meldingen vanuit het adminpaneel te verzenden.",
+          "secretRequired": "Admingeheim is vereist",
           "submit": "Naar Alle Gebruikers Sturen",
           "submitSelected": "Naar Geselecteerde Gebruikers Sturen",
           "sending": "Verzenden..."
@@ -1182,7 +1183,11 @@
         "maxRedemptionsAllDescription": "Stel in hoeveel gebruikers deze voucher in totaal mogen inwisselen.",
         "expiresAt": "Verloopt op",
         "expiresAtPlaceholder": "Kies een vervaldatum",
-        "expiresAtDescription": "Laat leeg om de voucher geldig te houden totdat deze wordt ingewisseld of handmatig wordt gedeactiveerd."
+        "expiresAtDescription": "Laat leeg om de voucher geldig te houden totdat deze wordt ingewisseld of handmatig wordt gedeactiveerd.",
+        "secret": "Admingeheim",
+        "secretPlaceholder": "Voer het admingeheim in",
+        "secretDescription": "Vereist om vouchers aan te maken of bij te werken.",
+        "secretRequired": "Admingeheim is vereist"
       },
       "success": {
         "created": "Voucher succesvol aangemaakt.",
@@ -1327,20 +1332,20 @@
     "description": "Kies het tegoedpakket dat bij je behoeften past. Tegoed verloopt nooit.",
     "mostPopular": "Meest Populair",
     "packages": {
-      "bronze": {
-        "name": "Brons",
+      "starter": {
+        "name": "Starter",
         "description": "Perfect om te beginnen met ons platform.",
-        "cta": "Koop Brons"
+        "cta": "Koop Starter"
       },
-      "silver": {
-        "name": "Zilver",
+      "advanced": {
+        "name": "Advanced",
         "description": "Beste waarde met bonustegoed inbegrepen.",
-        "cta": "Koop Zilver"
+        "cta": "Koop Advanced"
       },
-      "gold": {
-        "name": "Goud",
+      "pro": {
+        "name": "Pro",
         "description": "Maximaal tegoed met de grootste bonus.",
-        "cta": "Koop Goud"
+        "cta": "Koop Pro"
       }
     },
     "features": {
@@ -1443,6 +1448,7 @@
     "purchase": "Aankoop",
     "chat": "Chat",
     "admin": "Admin",
+    "admins": "Admins",
     "users": "Gebruikers",
     "notifications": "Meldingen",
     "projects": "Projecten",

@@ -48,7 +48,7 @@ export const apiRoutes = {
   },
   admin: {
     session: "/admin/session",
-    verifyBanSecret: "/admin/verify-ban-secret",
+    verifyAdminSecret: "/admin/verify-admin-secret",
     dashboardStats: "/admin/dashboard/stats",
     users: (limit = 20, offset = 0) => withQuery("/admin/users", { limit, offset }),
     usersStats: "/admin/users/stats",

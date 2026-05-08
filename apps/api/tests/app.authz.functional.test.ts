@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => {
     allowAuth: false,
     allowAdmin: false,
     allowAdminAccess: false,
-    allowAdminStepUp: false,
     twoFactorEnabled: true,
   };
 
@@ -24,8 +23,7 @@ const mocks = vi.hoisted(() => {
     getAllPurchases: vi.fn(),
     getTransactionData: vi.fn(),
     getCreditsConsumedData: vi.fn(),
-    verifyAdminBanSecret: vi.fn(),
-    verifyAdminLoginSecret: vi.fn(),
+    verifyAdminSecret: vi.fn(),
   };
 
   const billingService = {
@@ -102,12 +100,6 @@ vi.mock("@platform/auth-core", () => {
         }
         await next();
       },
-      requireAdminStepUp: async (c: any, next: any) => {
-        if (!mocks.authState.allowAdminStepUp) {
-          return c.json({ success: false, error: "Admin step-up required" }, 403);
-        }
-        await next();
-      },
       auth: {
         api: {
           getSession: async () => ({ user: { twoFactorEnabled: mocks.authState.twoFactorEnabled } }),
@@ -164,7 +156,6 @@ describe("authz contract", () => {
     mocks.authState.allowAuth = false;
     mocks.authState.allowAdmin = false;
     mocks.authState.allowAdminAccess = false;
-    mocks.authState.allowAdminStepUp = false;
     mocks.authState.twoFactorEnabled = true;
     vi.clearAllMocks();
   });
@@ -201,7 +192,6 @@ describe("authz contract", () => {
       success: true,
       data: {
         message: "Admin access granted.",
-        stepUpRequired: true,
         totpRequired: true,
         twoFactorEnabled: true,
         canEnrollTotp: true,
@@ -221,39 +211,15 @@ describe("authz contract", () => {
     expect(stillForbidden.status).toBe(403);
 
     mocks.authState.allowAdminAccess = true;
-    mocks.authState.allowAdminStepUp = true;
     const ok = await app.request("/admin/dashboard/stats");
     expect(ok.status).toBe(200);
     await expect(ok.json()).resolves.toEqual({ success: true, data: { totalUsers: 10 } });
   });
 
-  // Ensures admin routes also enforce successful admin step-up verification.
-  it("rejects /admin routes when step-up is missing", async () => {
+  // Ensures raw Better Auth admin plugin endpoints remain available to allowlisted admins.
+  it("allows /auth/admin routes for allowlisted admins", async () => {
     mocks.authState.allowAuth = true;
     mocks.authState.allowAdminAccess = true;
-    mocks.authState.allowAdminStepUp = false;
-
-    const res = await app.request("/admin/dashboard/stats");
-
-    expect(res.status).toBe(403);
-  });
-
-  // Ensures raw Better Auth admin plugin endpoints cannot bypass custom admin step-up.
-  it("rejects /auth/admin routes when step-up is missing", async () => {
-    mocks.authState.allowAuth = true;
-    mocks.authState.allowAdminAccess = true;
-    mocks.authState.allowAdminStepUp = false;
-
-    const res = await app.request("/auth/admin/set-role", { method: "POST" });
-
-    expect(res.status).toBe(403);
-  });
-
-  // Ensures raw Better Auth admin plugin endpoints remain available after step-up.
-  it("allows /auth/admin routes after admin step-up", async () => {
-    mocks.authState.allowAuth = true;
-    mocks.authState.allowAdminAccess = true;
-    mocks.authState.allowAdminStepUp = true;
 
     const res = await app.request("/auth/admin/set-role", { method: "POST" });
 
@@ -274,7 +240,7 @@ describe("authz contract", () => {
   });
 
   it("blocks cross-site cookie-authenticated unsafe requests", async () => {
-    const res = await app.request("/admin/verify-ban-secret", {
+    const res = await app.request("/admin/verify-admin-secret", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -295,10 +261,9 @@ describe("authz contract", () => {
   it("allows same-admin-origin cookie-authenticated unsafe requests", async () => {
     mocks.authState.allowAuth = true;
     mocks.authState.allowAdminAccess = true;
-    mocks.authState.allowAdminStepUp = true;
-    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminService.verifyAdminSecret.mockResolvedValueOnce({ success: true });
 
-    const res = await app.request("/admin/verify-ban-secret", {
+    const res = await app.request("/admin/verify-admin-secret", {
       method: "POST",
       headers: {
         "content-type": "application/json",

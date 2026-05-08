@@ -35,6 +35,7 @@ import type { DiscountFormData } from "@/types/discounts";
 const discountFormSchema = createDiscountSchema.extend({
   startDate: z.date(),
   endDate: z.date(),
+  secret: z.string().trim().min(1, "Admin secret is required"),
 });
 
 type DiscountFormValues = z.infer<typeof discountFormSchema>;
@@ -71,6 +72,7 @@ export function DiscountForm({
       startDate: initialData?.startDate || new Date(),
       endDate: initialData?.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
       maxUses: initialData?.maxUses || null,
+      secret: "",
     },
   });
 
@@ -386,6 +388,28 @@ export function DiscountForm({
               </FormControl>
               <FormDescription className="text-sm">
                 Leave empty for unlimited uses. Minimum 1 use if specified.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="secret"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Admin Secret</FormLabel>
+              <FormControl>
+                <Input
+                  type="password"
+                  placeholder="Enter admin secret"
+                  {...field}
+                  disabled={isSubmitting}
+                />
+              </FormControl>
+              <FormDescription className="text-sm">
+                Required to create or update discount codes.
               </FormDescription>
               <FormMessage />
             </FormItem>

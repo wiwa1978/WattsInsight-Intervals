@@ -7,14 +7,14 @@ import { routing } from "./i18n/routing";
 import { getPathLocale } from "./i18n/path-locale";
 import { getSessionCookie } from "better-auth/cookies";
 
-function getMainAppLoginUrl(locale: string) {
-  const base = process.env.NEXT_PUBLIC_MAIN_APP_URL;
-  if (!base) return `/${locale}/login?reason=forbidden-admin`;
-  return `${base.replace(/\/$/, "")}/${locale}/login?reason=forbidden-admin`;
-}
-
 const intlMiddleware = createMiddleware(routing);
 const ADMIN_ONLY = ["/admin", "/dashboard", "/settings", "/billing"];
+
+function adminLoginUrl(request: NextRequest, locale: string, reason?: string) {
+  const loginUrl = new URL(`/${locale}/login`, request.url);
+  if (reason) loginUrl.searchParams.set("reason", reason);
+  return loginUrl;
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -38,9 +38,9 @@ export async function proxy(request: NextRequest) {
     const headers = new Headers();
     headers.set("cookie", request.headers.get("cookie") || "");
 
-    const apiBaseUrl = process.env.API_URL;
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!apiBaseUrl) {
-      return NextResponse.redirect(getMainAppLoginUrl(activeLocale));
+      return NextResponse.redirect(adminLoginUrl(request, activeLocale, "admin-unavailable"));
     }
 
     const sessionUrl = `${apiBaseUrl.replace(/\/$/, "")}/admin/status`;
@@ -50,17 +50,9 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL(`/${activeLocale}/login`, request.url));
       }
 
-      const status = await res.json().catch(() => null) as { data?: { stepUpRequired?: boolean } } | null;
-      if (status?.data?.stepUpRequired) {
-        const loginUrl = new URL(`/${activeLocale}/login`, request.url);
-        loginUrl.searchParams.set("reason", "admin-step-up");
-        loginUrl.searchParams.set("callbackUrl", pathname + (search ?? ""));
-        return NextResponse.redirect(loginUrl);
-      }
-
       return intlMiddleware(request as unknown as Parameters<typeof intlMiddleware>[0]);
     } catch {
-      return NextResponse.redirect(getMainAppLoginUrl(activeLocale));
+      return NextResponse.redirect(adminLoginUrl(request, activeLocale, "admin-unavailable"));
     }
   }
 

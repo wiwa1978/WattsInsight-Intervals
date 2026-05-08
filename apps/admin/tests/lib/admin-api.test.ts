@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  completeAdminStepUpApi,
-  getAdminStepUpStatusApi,
-  prepareAdminTotpEnrollmentApi,
   getAdminAllPurchasesApi,
   getAdminAllTransactionsApi,
   getAdminBillingSubscriptionFinanceSummaryApi,
@@ -11,8 +8,10 @@ import {
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
+  getAdminStatusApi,
   getAdminUsersApi,
   stopAdminImpersonationApi,
+  verifyAdminSecretApi,
 } from "../../src/lib/api/admin";
 import { apiRequest } from "../../src/lib/api/client";
 
@@ -96,39 +95,29 @@ describe("admin API", () => {
     );
   });
 
-  it("calls admin step-up endpoints", async () => {
-    await getAdminStepUpStatusApi();
-    await prepareAdminTotpEnrollmentApi({ secret: "secret" });
-    await completeAdminStepUpApi({ secret: "secret", totpCode: "123456" });
-    await completeAdminStepUpApi({ secret: "secret" });
+  it("calls admin status and secret verification endpoints", async () => {
+    await getAdminStatusApi();
+    await verifyAdminSecretApi("secret");
 
-    expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/admin/step-up/status");
-    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/step-up/totp-enrollment", {
-      method: "POST",
-      body: JSON.stringify({ secret: "secret" }),
-    });
-    expect(apiRequestMock).toHaveBeenNthCalledWith(3, "/admin/step-up/complete", {
-      method: "POST",
-      body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
-    });
-    expect(apiRequestMock).toHaveBeenNthCalledWith(4, "/admin/step-up/complete", {
+    expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/admin/status");
+    expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/verify-admin-secret", {
       method: "POST",
       body: JSON.stringify({ secret: "secret" }),
     });
   });
 
-  it("types step-up status to include allowlisted enrollment capability", async () => {
+  it("types admin status to include allowlisted enrollment capability", async () => {
     apiRequestMock.mockResolvedValueOnce({
       success: true,
       data: {
-        stepUpRequired: true,
+        message: "Admin access granted.",
         totpRequired: true,
         twoFactorEnabled: false,
         canEnrollTotp: true,
       },
     });
 
-    const response = await getAdminStepUpStatusApi();
+    const response = await getAdminStatusApi();
 
     expect(response.data.canEnrollTotp).toBe(true);
   });

@@ -11,7 +11,6 @@ export type AppEnv = {
     requestId?: string;
     authUser?: AuthUser;
     authSession?: unknown;
-    adminStepUpVerified?: boolean;
     clientLogRemaining?: number;
   };
 };

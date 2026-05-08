@@ -733,7 +733,7 @@
         "expiryPlaceholder": "Pick a date",
         "timeLabel": "Expiry Time",
         "secretLabel": "Admin Secret Key",
-        "secretPlaceholder": "Enter the admin ban secret",
+        "secretPlaceholder": "Enter admin secret",
         "secretHint": "This safeguards against accidental bans. Share this key only with trusted admins.",
         "cancel": "Cancel",
         "banUser": "Ban User",
@@ -768,7 +768,7 @@
       "unbanFailed": "Failed to unban user.",
       "impersonateFailed": "Failed to impersonate user.",
       "revokeSessionsFailed": "Failed to revoke user sessions.",
-      "invalidBanSecret": "Invalid admin secret key."
+      "invalidBanSecret": "Invalid admin secret."
     },
     "notifications": {
       "title": "Notifications",
@@ -1125,20 +1125,20 @@
     "description": "Choose the credit package that fits your needs. Credits never expire.",
     "mostPopular": "Most Popular",
     "packages": {
-      "bronze": {
-        "name": "Bronze",
+      "starter": {
+        "name": "Starter",
         "description": "Perfect for getting started with our platform.",
-        "cta": "Buy Bronze"
+        "cta": "Buy Starter"
       },
-      "silver": {
-        "name": "Silver",
+      "advanced": {
+        "name": "Advanced",
         "description": "Best value with bonus credits included.",
-        "cta": "Buy Silver"
+        "cta": "Buy Advanced"
       },
-      "gold": {
-        "name": "Gold",
+      "pro": {
+        "name": "Pro",
         "description": "Maximum credits with the biggest bonus.",
-        "cta": "Buy Gold"
+        "cta": "Buy Pro"
       }
     },
     "features": {
@@ -1340,7 +1340,6 @@
   },
   "subscriptionProgressBar": {
     "label": "Subscription",
-    "starter": "Starter",
     "upgrade": "Upgrade"
   }
 }

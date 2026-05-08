@@ -1,6 +1,6 @@
 import { createCreditsApi } from "@platform/frontend-shared/credits";
 
-import { billingConfig } from "@/config/billing";
+import { creditBillingConfig } from "@/config/billing";
 import { apiRequest } from "@/lib/api/client";
 import { redeemMyVoucher } from "@/lib/api/me";
 
@@ -29,15 +29,15 @@ export async function redeemVoucher(code: string) {
   return redeemMyVoucher(code);
 }
 
-export async function canUseFeature(feature: keyof typeof billingConfig.features) {
+export async function canUseFeature(feature: keyof typeof creditBillingConfig.features) {
   const balance = await getCreditBalance();
-  return balance.balance >= billingConfig.features[feature];
+  return balance.balance >= creditBillingConfig.features[feature];
 }
 
-export async function requireCredits(feature: keyof typeof billingConfig.features) {
+export async function requireCredits(feature: keyof typeof creditBillingConfig.features) {
   const canUse = await canUseFeature(feature);
   if (!canUse) {
-    const cost = billingConfig.features[feature];
+    const cost = creditBillingConfig.features[feature];
     const { balance } = await getCreditBalance();
     throw new Error(`Insufficient credits. Required: ${cost}, Available: ${balance}`);
   }

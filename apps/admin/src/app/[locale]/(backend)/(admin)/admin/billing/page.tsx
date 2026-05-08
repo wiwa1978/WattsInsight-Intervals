@@ -10,6 +10,9 @@ import { SubscriptionStatsGrid } from "@/components/layout/backend/admin/billing
 import { SubscriptionEventsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
 import { AdminTransactionHistoryTable } from "@/components/layout/backend/admin/shared/transaction-history-table";
 import { AdminPurchaseHistoryTable } from "@/components/layout/backend/admin/shared/purchase-history-table";
+import { AdminBillingTabs, type AdminBillingTab } from "@/components/layout/backend/admin/billing/admin-billing-tabs";
+import { DiscountsSection } from "@/components/layout/backend/admin/billing/discounts-section";
+import { VouchersSection } from "@/components/layout/backend/admin/billing/vouchers-section";
 import { getMyApplicationConfig } from "@/lib/api/me";
 import {
   getAdminAllPurchases,
@@ -26,13 +29,58 @@ import {
 } from "@/lib/services/admin";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default async function AdminBillingPage() {
+type AdminBillingPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function billingTab(value: string | undefined): AdminBillingTab {
+  if (value === "discounts" || value === "vouchers") {
+    return value;
+  }
+
+  return "overview";
+}
+
+export default async function AdminBillingPage({ searchParams }: AdminBillingPageProps) {
   const applicationConfig = await getMyApplicationConfig();
 
   if (!applicationConfig.billing.enabled) {
     return null;
   }
 
+  const params = (await searchParams) ?? {};
+  const activeTab = billingTab(first(params.tab));
+  const t = await getTranslations("admin.billing");
+
+  return (
+    <Container className="py-6">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2">{t("description")}</p>
+      </div>
+
+      <AdminBillingTabs activeTab={activeTab}>
+        {activeTab === "discounts" ? (
+          <DiscountsSection />
+        ) : activeTab === "vouchers" ? (
+          <VouchersSection />
+        ) : (
+          <AdminBillingOverview applicationConfig={applicationConfig} />
+        )}
+      </AdminBillingTabs>
+    </Container>
+  );
+}
+
+async function AdminBillingOverview({
+  applicationConfig,
+}: {
+  applicationConfig: Awaited<ReturnType<typeof getMyApplicationConfig>>;
+}) {
   if (applicationConfig.billing.mode === "subscriptions" && applicationConfig.billing.subscriptionSurfacesEnabled) {
     return <AdminSubscriptionBillingPage />;
   }
@@ -41,7 +89,6 @@ export default async function AdminBillingPage() {
     return null;
   }
 
-  const t = await getTranslations("admin.billing");
   const statsT = await getTranslations("admin.billing.stats");
 
   // Fetch billing stats
@@ -101,12 +148,7 @@ export default async function AdminBillingPage() {
   ];
 
   return (
-    <Container className="py-6">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">{t("title")}</h1>
-        <p className="text-muted-foreground mt-2">{t("description")}</p>
-      </div>
-
+    <>
       {/* Stats Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
         {billingStats.map((stat) => (
@@ -141,7 +183,7 @@ export default async function AdminBillingPage() {
           <PurchaseHistoryTableWrapper initialData={initialPurchases} />
         </Suspense>
       </div>
-    </Container>
+    </>
   );
 }
 
@@ -156,7 +198,7 @@ async function AdminSubscriptionBillingPage() {
   ]);
 
   return (
-    <Container className="py-6">
+    <>
       <div className="mb-8">
         <h1 className="text-3xl font-bold">{t("title")}</h1>
         <p className="text-muted-foreground mt-2">{t("description")}</p>
@@ -178,7 +220,7 @@ async function AdminSubscriptionBillingPage() {
         <SubscriptionTable subscriptions={subscriptions.subscriptions} />
         <SubscriptionEventsTable events={events} />
       </div>
-    </Container>
+    </>
   );
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { BadgeCheck, Sparkles } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { BadgeCheck, Loader2, Sparkles } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import { getMyApplicationConfig, getMySubscription } from "@/lib/api/me";
@@ -11,8 +11,19 @@ import { webQueryKeys } from "@/lib/query/keys";
 
 export function SubscriptionProgressBar() {
   const t = useTranslations("subscriptionProgressBar");
+  const locale = useLocale();
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const noSubscriptionLabel = locale === "nl"
+    ? "Geen abonnement"
+    : locale === "fr"
+      ? "Aucun abonnement"
+      : "No subscription";
+  const loadingLabel = locale === "nl"
+    ? "Laden..."
+    : locale === "fr"
+      ? "Chargement..."
+      : "Loading...";
   const applicationConfigQuery = useQuery({
     queryKey: webQueryKeys.applicationConfig,
     queryFn: getMyApplicationConfig,
@@ -29,17 +40,26 @@ export function SubscriptionProgressBar() {
     return null;
   }
 
-  const plan = subscriptionQuery.data?.planKey ?? t("starter");
+  const plan = subscriptionQuery.isLoading
+    ? loadingLabel
+    : subscriptionQuery.data?.planKey ?? noSubscriptionLabel;
+  const planClassName = subscriptionQuery.data
+    ? "text-emerald-700 dark:text-emerald-400"
+    : "text-muted-foreground";
 
   return (
     <div className="px-3 pb-1">
       <div className={`rounded-lg p-2 ${isCollapsed ? "flex flex-col items-center gap-1.5" : "flex items-center justify-between gap-2"}`}>
         <div className={`flex items-center ${isCollapsed ? "flex-col gap-0.5" : "gap-1.5"}`}>
-          <BadgeCheck className="h-3.5 w-3.5 text-emerald-500" />
+          {subscriptionQuery.isLoading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          ) : (
+            <BadgeCheck className={`h-3.5 w-3.5 ${subscriptionQuery.data ? "text-emerald-500" : "text-muted-foreground"}`} />
+          )}
           {!isCollapsed ? (
             <div className="leading-tight">
               <p className="text-xs text-muted-foreground">{t("label")}</p>
-              <p className="text-sm font-medium capitalize text-emerald-700 dark:text-emerald-400">{plan}</p>
+              <p className={`text-sm font-medium capitalize ${planClassName}`}>{plan}</p>
             </div>
           ) : null}
         </div>

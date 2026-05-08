@@ -69,6 +69,7 @@ type VoucherFormValues = {
   userIds: string[];
   maxRedemptions?: number;
   expiresAt?: Date | null;
+  secret: string;
 };
 
 const DEFAULT_ALL_USER_VOUCHER_MAX_REDEMPTIONS = 100_000;
@@ -96,6 +97,7 @@ export function VouchersSection() {
       userIds: [],
       maxRedemptions: 1,
       expiresAt: undefined,
+      secret: "",
     },
   });
 
@@ -111,6 +113,7 @@ export function VouchersSection() {
       userIds: [],
       maxRedemptions: 1,
       expiresAt: undefined,
+      secret: "",
     });
   }, [form]);
 
@@ -123,6 +126,7 @@ export function VouchersSection() {
         userIds: voucher.assignedUsers?.map((assignedUser) => assignedUser.id) ?? [],
         maxRedemptions: voucher.maxRedemptions,
         expiresAt: voucher.expiresAt ? new Date(voucher.expiresAt) : null,
+        secret: "",
       });
     },
     [form],
@@ -180,6 +184,11 @@ export function VouchersSection() {
   }
 
   async function onSubmit(values: VoucherFormValues) {
+    if (!values.secret.trim()) {
+      form.setError("secret", { message: t("form.secretRequired") });
+      return;
+    }
+
     const parsed = createVoucherSchema.safeParse({
       ...values,
       expiresAt: values.expiresAt ?? undefined,
@@ -199,9 +208,11 @@ export function VouchersSection() {
       ? await updateVoucher({
           id: editingVoucher.id,
           ...parsed.data,
+          secret: values.secret.trim(),
         })
       : await createVoucher({
           ...parsed.data,
+          secret: values.secret.trim(),
         });
 
     if (!result.success) {
@@ -220,9 +231,15 @@ export function VouchersSection() {
       return;
     }
 
+    const secret = window.prompt("Enter admin secret to update this voucher.")?.trim();
+    if (!secret) {
+      return;
+    }
+
     const result = await updateVoucherStatus({
       id: voucher.id,
       status: voucher.status === "inactive" ? "active" : "inactive",
+      secret,
     });
 
     if (!result.success) {
@@ -505,6 +522,22 @@ export function VouchersSection() {
                       </PopoverContent>
                     </Popover>
                     <FormDescription>{t("form.expiresAtDescription")}</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="secret"
+                rules={{ required: t("form.secretRequired") }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("form.secret")}</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder={t("form.secretPlaceholder")} {...field} />
+                    </FormControl>
+                    <FormDescription>{t("form.secretDescription")}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

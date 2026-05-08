@@ -29,7 +29,7 @@ const envSchema = z.object({
   BETTER_AUTH_ALLOWED_ORIGINS: z.string().optional(),
   ADMIN_ALLOWLIST: z.string().optional(),
   ADMIN_APP_URL: z.string().url().optional(),
-  ADMIN_BAN_SECRET: z.string().optional(),
+  ADMIN_SECRET: z.string().optional(),
   TRUST_PROXY: z.coerce.boolean().default(false),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

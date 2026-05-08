@@ -6,6 +6,13 @@ import { BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } f
 import { getPathSegments } from "@/lib/utils";
 import Link from "next/link";
 
+function formatSegment(segment: string) {
+  return segment
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export default function BreadcrumbPageClient() {
   const path = usePathname();
   const t = useTranslations('breadcrumb');
@@ -31,7 +38,7 @@ export default function BreadcrumbPageClient() {
         // Check if segment is a UUID (skip translation for UUIDs)
         const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment);
         
-        const translated = isUUID ? 'user' : t(segment);
+        const translated = isUUID ? 'user' : t(segment, { fallback: formatSegment(segment) });
         const capitalized = translated.charAt(0).toUpperCase() + translated.slice(1);
         
         // Build the path for this segment

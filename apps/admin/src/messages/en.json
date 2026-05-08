@@ -192,11 +192,8 @@
       "emailPlaceholder": "you@example.com",
       "password": "Password",
       "passwordPlaceholder": "••••••••",
-      "adminSecret": "Admin Secret",
-      "adminSecretPlaceholder": "Enter admin secret",
       "totpCode": "Authentication Code",
       "totpCodePlaceholder": "000000",
-      "stepUpRequired": "Additional admin verification is required to access this portal.",
       "rememberMe": "Remember me",
       "forgotPassword": "Forgot password?",
       "submit": "Sign in",
@@ -753,9 +750,9 @@
         "expiryLabel": "Ban Expiry Date (optional)",
         "expiryPlaceholder": "Pick a date",
         "timeLabel": "Expiry Time",
-        "secretLabel": "Admin Secret Key",
-        "secretPlaceholder": "Enter the admin ban secret",
-        "secretHint": "This safeguards against accidental bans. Share this key only with trusted admins.",
+        "secretLabel": "Admin Secret",
+        "secretPlaceholder": "Enter admin secret",
+        "secretHint": "Required for sensitive admin actions. Share this key only with trusted admins.",
         "cancel": "Cancel",
         "banUser": "Ban User",
         "banning": "Banning..."
@@ -789,7 +786,7 @@
       "unbanFailed": "Failed to unban user.",
       "impersonateFailed": "Failed to impersonate user.",
       "revokeSessionsFailed": "Failed to revoke user sessions.",
-      "invalidBanSecret": "Invalid admin secret key."
+      "invalidBanSecret": "Invalid admin secret."
     },
     "notifications": {
       "title": "Notifications",
@@ -845,6 +842,10 @@
           "bannerExpiresAtPlaceholder": "Pick a date",
           "bannerExpiresAtDescription": "Banner will be hidden after this date and time",
           "bannerTime": "Expiry Time",
+          "secret": "Admin Secret",
+          "secretPlaceholder": "Enter admin secret",
+          "secretDescription": "Required to send notifications from the admin panel.",
+          "secretRequired": "Admin secret is required",
           "submit": "Send to All Users",
           "submitSelected": "Send to Selected Users",
           "sending": "Sending..."
@@ -1182,7 +1183,11 @@
         "maxRedemptionsAllDescription": "Set how many total users can redeem this voucher.",
         "expiresAt": "Expires At",
         "expiresAtPlaceholder": "Pick an expiration date",
-        "expiresAtDescription": "Leave empty to keep the voucher valid until it is redeemed or manually deactivated."
+        "expiresAtDescription": "Leave empty to keep the voucher valid until it is redeemed or manually deactivated.",
+        "secret": "Admin Secret",
+        "secretPlaceholder": "Enter admin secret",
+        "secretDescription": "Required to create or update vouchers.",
+        "secretRequired": "Admin secret is required"
       },
       "success": {
         "created": "Voucher created successfully.",
@@ -1327,20 +1332,20 @@
     "description": "Choose the credit package that fits your needs. Credits never expire.",
     "mostPopular": "Most Popular",
     "packages": {
-      "bronze": {
-        "name": "Bronze",
+      "starter": {
+        "name": "Starter",
         "description": "Perfect for getting started with our platform.",
-        "cta": "Buy Bronze"
+        "cta": "Buy Starter"
       },
-      "silver": {
-        "name": "Silver",
+      "advanced": {
+        "name": "Advanced",
         "description": "Best value with bonus credits included.",
-        "cta": "Buy Silver"
+        "cta": "Buy Advanced"
       },
-      "gold": {
-        "name": "Gold",
+      "pro": {
+        "name": "Pro",
         "description": "Maximum credits with the biggest bonus.",
-        "cta": "Buy Gold"
+        "cta": "Buy Pro"
       }
     },
     "features": {
@@ -1443,6 +1448,7 @@
     "purchase": "Purchase",
     "chat": "Chat",
     "admin": "Admin",
+    "admins": "Admins",
     "users": "Users",
     "notifications": "Notifications",
     "projects": "Projects",

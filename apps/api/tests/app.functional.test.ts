@@ -40,8 +40,7 @@ const mocks = vi.hoisted(() => {
   };
 
   const adminService = {
-    verifyAdminBanSecret: vi.fn(),
-    verifyAdminLoginSecret: vi.fn(),
+    verifyAdminSecret: vi.fn(),
     getDashboardStats: vi.fn(),
     getUsers: vi.fn(),
     getUserStats: vi.fn(),
@@ -311,7 +310,6 @@ vi.mock("@platform/auth-core", () => ({
       requireAuth: passThrough,
       requireAdmin: passThrough,
       requireAdminAccess: passThrough,
-      requireAdminStepUp: passThrough,
     };
   },
 }));
@@ -400,8 +398,6 @@ const [
   import("../src/config/application"),
 ]);
 
-const issueAdminStepUpCookie = (await import("../src/middleware/admin-step-up")).issueAdminStepUpCookie;
-
 function setBillingModeForTest(mode: "credits" | "subscriptions") {
   (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = mode;
 }
@@ -438,7 +434,7 @@ function extractRouterRoutes(fileName: string, prefix = "") {
   const source = readRouteSource(fileName);
   const routes: RouteSignature[] = [];
   const directRoutePattern = /router\.(get|post|patch|put|delete)\("([^"]+)"/g;
-  const adminAuthActionPattern = /registerAdminAuth(?:Json|Response)Action\(\s*"([^"]+)"/g;
+  const adminAuthActionPattern = /registerAdminAuth(?:Secret)?(?:Json|Response)Action\(\s*"([^"]+)"/g;
 
   for (const match of source.matchAll(directRoutePattern)) {
     const [, method, path] = match;
@@ -474,7 +470,7 @@ describe("API functional routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setBillingModeForTest("credits");
-    mocks.adminService.verifyAdminLoginSecret.mockResolvedValue({ success: true });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
     mocks.adminAuthApi.verifyTotp.mockResolvedValue(null);
     mocks.adminAuthApi.getSession.mockResolvedValue({ user: { twoFactorEnabled: true } });
     mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
@@ -762,7 +758,7 @@ describe("API functional routes", () => {
     const res = await app.request("/payments/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ packageKey: "silver" }),
+      body: JSON.stringify({ packageKey: "advanced" }),
     });
 
     expect(res.status).toBe(200);
@@ -770,10 +766,10 @@ describe("API functional routes", () => {
     expect(payload.success).toBe(true);
     const url = new URL(payload.data.checkoutUrl);
     expect(url.origin + url.pathname).toBe(
-      "https://test.checkout.dodopayments.com/buy/pdt_0NUzkvLtA4UmSIekBVTcX",
+      "https://test.checkout.dodopayments.com/buy/pdt_0NeNLCAY7sLmCDqKfD2wK",
     );
     expect(url.searchParams.get("metadata_userId")).toBe("auth-user");
-    expect(url.searchParams.get("metadata_packageKey")).toBe("silver");
+    expect(url.searchParams.get("metadata_packageKey")).toBe("advanced");
     expect(url.searchParams.get("metadata_referenceId")).toBe("checkout-ref-functional");
     expect(url.searchParams.get("metadata_checkoutReferenceId")).toBe("checkout-ref-functional");
     expect(url.searchParams.get("redirect_url")).toBe("http://localhost:3100/billing?success=true");
@@ -781,9 +777,9 @@ describe("API functional routes", () => {
     expect(mocks.checkoutIntentsService.create).toHaveBeenCalledWith({
       userId: "auth-user",
       billingMode: "credits",
-      packageKey: "silver",
+      packageKey: "advanced",
       planKey: undefined,
-      productId: "pdt_0NUzkvLtA4UmSIekBVTcX",
+      productId: "pdt_0NeNLCAY7sLmCDqKfD2wK",
       discountCode: undefined,
       metadata: expect.objectContaining({ source: "payments.checkout" }),
     });
@@ -795,7 +791,7 @@ describe("API functional routes", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        packageKey: "silver",
+        packageKey: "advanced",
         successUrl: "https://evil.example/capture",
         cancelUrl: "https://evil.example/cancel",
       }),
@@ -1129,7 +1125,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/billing/subscription-refunds", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ paymentId: " pay_1 ", reason: "Customer request" }),
+      body: JSON.stringify({ paymentId: " pay_1 ", reason: "Customer request", secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(200);
@@ -1264,17 +1260,17 @@ describe("API functional routes", () => {
     await expectValidationError(res, "Invalid user id");
   });
 
-  // Verifies verify-ban-secret maps service success/failure to HTTP status.
-  it("handles verify-ban-secret success and failure status codes", async () => {
-    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
-    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: false, error: "Invalid secret key provided." });
+  // Verifies verify-admin-secret maps service success/failure to HTTP status.
+  it("handles verify-admin-secret success and failure status codes", async () => {
+    mocks.adminService.verifyAdminSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminService.verifyAdminSecret.mockResolvedValueOnce({ success: false, error: "Invalid secret key provided." });
 
-    const okRes = await app.request("/admin/verify-ban-secret", {
+    const okRes = await app.request("/admin/verify-admin-secret", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ secret: "good" }),
     });
-    const failRes = await app.request("/admin/verify-ban-secret", {
+    const failRes = await app.request("/admin/verify-admin-secret", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ secret: "bad" }),
@@ -1284,9 +1280,8 @@ describe("API functional routes", () => {
     expect(failRes.status).toBe(400);
   });
 
-  // Verifies admin step-up status endpoint reports missing step-up state.
-  it("returns step-up required when marker is missing", async () => {
-    const res = await app.request("/admin/step-up/status", {
+  it("returns admin status without requiring an admin secret", async () => {
+    const res = await app.request("/admin/status", {
       method: "GET",
       headers: {
         cookie: "better-auth.session_token=session-token",
@@ -1297,7 +1292,7 @@ describe("API functional routes", () => {
     await expect(res.json()).resolves.toEqual({
       success: true,
       data: {
-        stepUpRequired: true,
+        message: "Admin access granted.",
         totpRequired: true,
         twoFactorEnabled: true,
         canEnrollTotp: true,
@@ -1305,132 +1300,9 @@ describe("API functional routes", () => {
     });
   });
 
-  // Verifies admin step-up status endpoint reports verified state when marker is valid.
-  it("returns step-up complete when marker is valid", async () => {
-    const stepUpCookie = issueAdminStepUpCookie("auth-user", "session-token").split(";")[0] ?? "";
-    const res = await app.request("/admin/step-up/status", {
-      method: "GET",
-      headers: {
-        cookie: `better-auth.session_token=session-token; ${stepUpCookie}`,
-      },
-    });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      success: true,
-      data: {
-        stepUpRequired: false,
-        totpRequired: true,
-        twoFactorEnabled: true,
-        canEnrollTotp: true,
-      },
-    });
-  });
-
-  it("rejects admin step-up completion when enrollment is not allowlisted", async () => {
-    mocks.adminAuthApi.getSession.mockResolvedValueOnce({ user: { twoFactorEnabled: false } });
-
-    const res = await app.request("/admin/step-up/complete", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: "better-auth.session_token=session-token",
-        "x-test-auth-user-email": "outsider@example.com",
-      },
-      body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
-    });
-
-    expect(res.status).toBe(403);
-    await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "FORBIDDEN",
-    });
-    expect(mocks.adminAuthApi.verifyTotp).not.toHaveBeenCalled();
-  });
-
-  it("requires admin secret before allowing first-time TOTP enrollment", async () => {
-    mocks.adminService.verifyAdminLoginSecret = vi.fn().mockResolvedValueOnce({ success: true });
-    mocks.adminAuthApi.getSession.mockResolvedValueOnce({ user: { twoFactorEnabled: false } });
-
-    const res = await app.request("/admin/step-up/totp-enrollment", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: "better-auth.session_token=session-token",
-        origin: "http://localhost:3100",
-      },
-      body: JSON.stringify({ secret: "secret" }),
-    });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true, data: { canEnrollTotp: true } });
-  });
-
-  it("rejects first-time TOTP enrollment when admin secret is invalid", async () => {
-    mocks.adminService.verifyAdminLoginSecret = vi.fn().mockResolvedValueOnce({ success: false });
-
-    const res = await app.request("/admin/step-up/totp-enrollment", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: "better-auth.session_token=session-token",
-        origin: "http://localhost:3100",
-      },
-      body: JSON.stringify({ secret: "wrong" }),
-    });
-
-    expect(res.status).toBe(403);
-    expect(mocks.adminAuthApi.getSession).not.toHaveBeenCalled();
-  });
-
-  // Verifies admin step-up completion validates secret and TOTP and returns cookie marker.
-  it("completes admin step-up and sets marker cookie", async () => {
-    mocks.adminService.verifyAdminLoginSecret = vi.fn().mockResolvedValueOnce({ success: true });
-    mocks.adminAuthApi.verifyTotp.mockResolvedValueOnce(null);
-
-    const res = await app.request("/admin/step-up/complete", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: "better-auth.session_token=session-token",
-        origin: "http://localhost:3100",
-      },
-      body: JSON.stringify({ secret: "secret", totpCode: "123456" }),
-    });
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true, data: { verified: true } });
-    expect(res.headers.get("set-cookie")).toContain("admin_step_up=");
-    expect(res.headers.get("set-cookie")).toContain("SameSite=Lax");
-  });
-
-  // Verifies admin step-up can skip TOTP verification when adminPortalTotpRequired is disabled.
-  it("completes admin step-up without TOTP when TOTP is disabled in config", async () => {
-    mocks.adminAuthApi.getSession.mockResolvedValueOnce({ user: { twoFactorEnabled: false } });
-
-    const authSharedConfig = await import("@platform/auth-shared");
-    const previous = authSharedConfig.authConfig.adminPortalTotpRequired;
-    (authSharedConfig.authConfig as { adminPortalTotpRequired: boolean }).adminPortalTotpRequired = false;
-
-    const res = await app.request("/admin/step-up/complete", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: "better-auth.session_token=session-token",
-        origin: "http://localhost:3100",
-      },
-      body: JSON.stringify({ secret: "secret" }),
-    });
-
-    expect(res.status).toBe(200);
-    expect(mocks.adminAuthApi.verifyTotp).not.toHaveBeenCalled();
-
-    (authSharedConfig.authConfig as { adminPortalTotpRequired: boolean }).adminPortalTotpRequired = previous;
-  });
-
-  // Verifies verify-ban-secret rejects malformed payloads.
-  it("validates verify-ban-secret payload", async () => {
-    const res = await app.request("/admin/verify-ban-secret", {
+  // Verifies verify-admin-secret rejects malformed payloads.
+  it("validates verify-admin-secret payload", async () => {
+    const res = await app.request("/admin/verify-admin-secret", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ secret: "" }),
@@ -1440,9 +1312,9 @@ describe("API functional routes", () => {
     await expectValidationError(res, "Invalid secret payload");
   });
 
-  // Verifies direct ban API calls cannot bypass the admin ban secret step-up.
-  it("requires a valid ban secret on the admin ban mutation", async () => {
-    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: false, error: "Invalid secret key provided." });
+  // Verifies direct ban API calls cannot bypass the admin secret.
+  it("requires a valid admin secret on the admin ban mutation", async () => {
+    mocks.adminService.verifyAdminSecret.mockResolvedValueOnce({ success: false, error: "Invalid secret key provided." });
 
     const res = await app.request("/admin/users/ban", {
       method: "POST",
@@ -1464,17 +1336,18 @@ describe("API functional routes", () => {
   it("blocks admins from changing their own role while allowing unchanged self role sets", async () => {
     const authUserId = "11111111-1111-4111-8111-111111111111";
     mocks.adminService.getUserById.mockResolvedValue({ id: authUserId, role: "admin", banned: false });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
     mocks.adminAuthApi.setRole.mockResolvedValue({ success: true });
 
     const demoteRes = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json", "x-test-auth-user-id": authUserId },
-      body: JSON.stringify({ userId: authUserId, role: "user", reason: "self demotion", confirmed: true }),
+      body: JSON.stringify({ userId: authUserId, role: "user", reason: "self demotion", confirmed: true, secret: "admin-secret-value" }),
     });
     const unchangedRes = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json", "x-test-auth-user-id": authUserId },
-      body: JSON.stringify({ userId: authUserId, role: "admin" }),
+      body: JSON.stringify({ userId: authUserId, role: "admin", secret: "admin-secret-value" }),
     });
 
     expect(demoteRes.status).toBe(403);
@@ -1493,11 +1366,12 @@ describe("API functional routes", () => {
     const userId = "22222222-2222-4222-8222-222222222222";
     mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "admin", banned: false });
     mocks.adminService.countActiveAdmins.mockResolvedValue(1);
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const res = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "user", reason: "offboarding", confirmed: true }),
+      body: JSON.stringify({ userId, role: "user", reason: "offboarding", confirmed: true, secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(403);
@@ -1513,16 +1387,17 @@ describe("API functional routes", () => {
     const userId = "22222222-2222-4222-8222-222222222222";
     mocks.adminService.getUserById.mockResolvedValueOnce({ id: userId, role: "user", banned: false });
     mocks.adminService.getUserById.mockResolvedValueOnce({ id: userId, role: "admin", banned: false });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const missingReasonRes = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "admin" }),
+      body: JSON.stringify({ userId, role: "admin", secret: "admin-secret-value" }),
     });
     const missingConfirmationRes = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "user", reason: "offboarding" }),
+      body: JSON.stringify({ userId, role: "user", reason: "offboarding", secret: "admin-secret-value" }),
     });
 
     expect(missingReasonRes.status).toBe(403);
@@ -1543,13 +1418,14 @@ describe("API functional routes", () => {
   it("revokes target sessions after a successful role change", async () => {
     const userId = "22222222-2222-4222-8222-222222222222";
     mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "user", banned: false });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
     mocks.adminAuthApi.setRole.mockResolvedValueOnce({ success: true });
     mocks.adminAuthApi.revokeUserSessions.mockResolvedValueOnce({ success: true });
 
     const res = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "admin", reason: "support coverage" }),
+      body: JSON.stringify({ userId, role: "admin", reason: "support coverage", secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(200);
@@ -1563,7 +1439,7 @@ describe("API functional routes", () => {
 
   it("blocks banning the last active admin", async () => {
     const userId = "22222222-2222-4222-8222-222222222222";
-    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminService.verifyAdminSecret.mockResolvedValueOnce({ success: true });
     mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "admin", banned: false });
     mocks.adminService.countActiveAdmins.mockResolvedValue(1);
 
@@ -1588,11 +1464,12 @@ describe("API functional routes", () => {
   it("blocks impersonating administrator accounts", async () => {
     const userId = "22222222-2222-4222-8222-222222222222";
     mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "admin", banned: false });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const res = await app.request("/admin/users/impersonate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(403);
@@ -1608,16 +1485,17 @@ describe("API functional routes", () => {
     const bannedUserId = "22222222-2222-4222-8222-222222222222";
     mocks.adminService.getUserById.mockResolvedValueOnce({ id: selfId, role: "user", banned: false });
     mocks.adminService.getUserById.mockResolvedValueOnce({ id: bannedUserId, role: "user", banned: true });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const selfRes = await app.request("/admin/users/impersonate", {
       method: "POST",
       headers: { "content-type": "application/json", "x-test-auth-user-id": selfId },
-      body: JSON.stringify({ userId: selfId }),
+      body: JSON.stringify({ userId: selfId, secret: "admin-secret-value" }),
     });
     const bannedRes = await app.request("/admin/users/impersonate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId: bannedUserId }),
+      body: JSON.stringify({ userId: bannedUserId, secret: "admin-secret-value" }),
     });
 
     expect(selfRes.status).toBe(403);
@@ -1627,13 +1505,14 @@ describe("API functional routes", () => {
 
   it("fails closed when critical admin auth audit recording fails", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
     mocks.adminAuthApi.revokeUserSessions.mockResolvedValue({ success: true });
     mocks.auditService.recordAuditEntry.mockResolvedValueOnce({ success: false, error: "Failed to record audit entry" });
 
     const res = await app.request("/admin/users/revoke-sessions", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(503);
@@ -1649,7 +1528,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/users/revoke-sessions", {
       method: "POST",
       headers: { "content-type": "application/json", "x-test-impersonated-by": "admin-origin" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(403);
@@ -1663,7 +1542,7 @@ describe("API functional routes", () => {
 
   it("records audit entries for admin auth mutations", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
-    mocks.adminService.verifyAdminBanSecret.mockResolvedValueOnce({ success: true });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
     mocks.adminService.getUserById.mockResolvedValue({ id: userId, role: "user", banned: false });
     mocks.adminAuthApi.setRole.mockResolvedValueOnce({ success: true });
     mocks.adminAuthApi.revokeUserSessions.mockResolvedValue({ success: true });
@@ -1675,7 +1554,7 @@ describe("API functional routes", () => {
     const setRoleRes = await app.request("/admin/users/set-role", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, role: "admin", reason: "security coverage" }),
+      body: JSON.stringify({ userId, role: "admin", reason: "security coverage", secret: "admin-secret-value" }),
     });
     const banRes = await app.request("/admin/users/ban", {
       method: "POST",
@@ -1690,17 +1569,17 @@ describe("API functional routes", () => {
     const unbanRes = await app.request("/admin/users/unban", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret: "admin-secret-value" }),
     });
     const impersonateRes = await app.request("/admin/users/impersonate", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret: "admin-secret-value" }),
     });
     const setPasswordRes = await app.request("/admin/users/set-password", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId, newPassword: "correct horse battery staple" }),
+      body: JSON.stringify({ userId, newPassword: "correct horse battery staple", secret: "admin-secret-value" }),
     });
 
     expect(setRoleRes.status).toBe(200);
@@ -1763,12 +1642,13 @@ describe("API functional routes", () => {
 
   it("records a safe audit entry when revoking user sessions", async () => {
     const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
     mocks.adminAuthApi.revokeUserSessions.mockResolvedValue({ success: true });
 
     const res = await app.request("/admin/users/revoke-sessions", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer raw-admin-token" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(200);
@@ -1788,7 +1668,7 @@ describe("API functional routes", () => {
     const auditFailureRes = await app.request("/admin/users/revoke-sessions", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId }),
+      body: JSON.stringify({ userId, secret: "admin-secret-value" }),
     });
 
     expect(auditFailureRes.status).toBe(503);
@@ -1810,7 +1690,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(400);
     await expectValidationError(res, "Invalid ban payload");
-    expect(mocks.adminService.verifyAdminBanSecret).not.toHaveBeenCalled();
+    expect(mocks.adminService.verifyAdminSecret).not.toHaveBeenCalled();
     expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
     expect(mocks.auditService.recordAuditEntry).not.toHaveBeenCalled();
   });
@@ -1867,6 +1747,7 @@ describe("API functional routes", () => {
     mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: true, data: { id: "d1" } });
     mocks.discountsService.updateDiscount.mockResolvedValueOnce({ success: true, data: { id: "d1" } });
     mocks.discountsService.deleteDiscount.mockResolvedValueOnce({ success: true });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const createRes = await app.request("/admin/discounts", {
       method: "POST",
@@ -1877,6 +1758,7 @@ describe("API functional routes", () => {
         value: 10,
         startDate: "2026-01-01T00:00:00.000Z",
         endDate: "2026-12-31T00:00:00.000Z",
+        secret: "admin-secret-value",
       }),
     });
 
@@ -1889,7 +1771,7 @@ describe("API functional routes", () => {
     const patchRes = await app.request(`/admin/discounts/${discountId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: 20 }),
+      body: JSON.stringify({ value: 20, secret: "admin-secret-value" }),
     });
 
     const assignRes = await app.request(`/admin/discounts/${discountId}/assign`, {
@@ -1904,7 +1786,11 @@ describe("API functional routes", () => {
       body: JSON.stringify({ userIds: [userIds[0]] }),
     });
 
-    const deleteRes = await app.request(`/admin/discounts/${discountId}`, { method: "DELETE" });
+    const deleteRes = await app.request(`/admin/discounts/${discountId}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: "admin-secret-value" }),
+    });
 
     expect(createRes.status).toBe(200);
     expect(patchRes.status).toBe(200);
@@ -1951,6 +1837,7 @@ describe("API functional routes", () => {
     mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: true, discount: createdDiscount });
     mocks.discountsService.updateDiscount.mockResolvedValueOnce({ success: true, discount: updatedDiscount, previousDiscount });
     mocks.discountsService.deleteDiscount.mockResolvedValueOnce({ success: true, previousDiscount });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const createRes = await app.request("/admin/discounts", {
       method: "POST",
@@ -1961,14 +1848,19 @@ describe("API functional routes", () => {
         value: 10,
         startDate: "2026-01-01T00:00:00.000Z",
         endDate: "2026-12-31T00:00:00.000Z",
+        secret: "admin-secret-value",
       }),
     });
     const patchRes = await app.request(`/admin/discounts/${discountId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: 20 }),
+      body: JSON.stringify({ value: 20, secret: "admin-secret-value" }),
     });
-    const deleteRes = await app.request(`/admin/discounts/${discountId}`, { method: "DELETE" });
+    const deleteRes = await app.request(`/admin/discounts/${discountId}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: "admin-secret-value" }),
+    });
 
     expect(createRes.status).toBe(200);
     expect(patchRes.status).toBe(200);
@@ -2010,6 +1902,7 @@ describe("API functional routes", () => {
 
   it("records discount mutation failures without changing response envelopes", async () => {
     mocks.discountsService.createDiscount.mockResolvedValueOnce({ success: false, error: "Discount code already exists" });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const res = await app.request("/admin/discounts", {
       method: "POST",
@@ -2020,6 +1913,7 @@ describe("API functional routes", () => {
         value: 10,
         startDate: "2026-01-01T00:00:00.000Z",
         endDate: "2026-12-31T00:00:00.000Z",
+        secret: "admin-secret-value",
       }),
     });
 
@@ -2041,6 +1935,7 @@ describe("API functional routes", () => {
     mocks.discountsService.createDiscount.mockRejectedValueOnce(new Error("Discount provider request failed"));
     mocks.discountsService.updateDiscount.mockRejectedValueOnce(new Error("Discount provider request failed"));
     mocks.discountsService.deleteDiscount.mockRejectedValueOnce(new Error("Discount provider request failed"));
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const createRes = await app.request("/admin/discounts", {
       method: "POST",
@@ -2051,14 +1946,19 @@ describe("API functional routes", () => {
         value: 10,
         startDate: "2026-01-01T00:00:00.000Z",
         endDate: "2026-12-31T00:00:00.000Z",
+        secret: "admin-secret-value",
       }),
     });
     const patchRes = await app.request(`/admin/discounts/${discountId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ value: 20 }),
+      body: JSON.stringify({ value: 20, secret: "admin-secret-value" }),
     });
-    const deleteRes = await app.request(`/admin/discounts/${discountId}`, { method: "DELETE" });
+    const deleteRes = await app.request(`/admin/discounts/${discountId}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ secret: "admin-secret-value" }),
+    });
 
     expect(createRes.status).toBe(500);
     expect(patchRes.status).toBe(500);
@@ -2129,6 +2029,7 @@ describe("API functional routes", () => {
     mocks.vouchersService.createVoucher.mockResolvedValueOnce({ success: true, voucher: { id: "v1" } });
     mocks.vouchersService.getVoucherById.mockResolvedValueOnce({ success: true, voucher: { id: "v1" } });
     mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: true, voucher: { id: "v1" } });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const voucherId = "77777777-7777-4777-8777-777777777777";
     const createRes = await app.request("/admin/vouchers", {
@@ -2140,13 +2041,14 @@ describe("API functional routes", () => {
         assignmentScope: "selected",
         userIds: ["11111111-1111-4111-8111-111111111111"],
         expiresAt: "2026-12-31T00:00:00.000Z",
+        secret: "admin-secret-value",
       }),
     });
     const getRes = await app.request(`/admin/vouchers/${voucherId}`);
     const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: "inactive" }),
+      body: JSON.stringify({ status: "inactive", secret: "admin-secret-value" }),
     });
 
     expect(createRes.status).toBe(200);
@@ -2191,6 +2093,7 @@ describe("API functional routes", () => {
 
     mocks.vouchersService.createVoucher.mockResolvedValueOnce({ success: true, voucher: createdVoucher });
     mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: true, voucher: updatedVoucher, previousVoucher });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const createRes = await app.request("/admin/vouchers", {
       method: "POST",
@@ -2201,12 +2104,13 @@ describe("API functional routes", () => {
         assignmentScope: "selected",
         userIds: ["11111111-1111-4111-8111-111111111111"],
         expiresAt: "2026-12-31T00:00:00.000Z",
+        secret: "admin-secret-value",
       }),
     });
     const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ creditAmount: 25, status: "inactive" }),
+      body: JSON.stringify({ creditAmount: 25, status: "inactive", secret: "admin-secret-value" }),
     });
 
     expect(createRes.status).toBe(200);
@@ -2238,12 +2142,13 @@ describe("API functional routes", () => {
 
   it("records voucher mutation failures without changing response envelopes", async () => {
     mocks.vouchersService.updateVoucher.mockResolvedValueOnce({ success: false, error: "Voucher not found" });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const voucherId = "77777777-7777-4777-8777-777777777777";
     const res = await app.request(`/admin/vouchers/${voucherId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: "inactive" }),
+      body: JSON.stringify({ status: "inactive", secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(400);
@@ -2263,6 +2168,7 @@ describe("API functional routes", () => {
     const voucherId = "77777777-7777-4777-8777-777777777777";
     mocks.vouchersService.createVoucher.mockRejectedValueOnce(new Error("Voucher provider request failed"));
     mocks.vouchersService.updateVoucher.mockRejectedValueOnce(new Error("Voucher provider request failed"));
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const createRes = await app.request("/admin/vouchers", {
       method: "POST",
@@ -2273,12 +2179,13 @@ describe("API functional routes", () => {
         assignmentScope: "selected",
         userIds: ["11111111-1111-4111-8111-111111111111"],
         expiresAt: "2026-12-31T00:00:00.000Z",
+        secret: "admin-secret-value",
       }),
     });
     const patchRes = await app.request(`/admin/vouchers/${voucherId}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: "inactive" }),
+      body: JSON.stringify({ status: "inactive", secret: "admin-secret-value" }),
     });
 
     expect(createRes.status).toBe(500);
@@ -2387,12 +2294,13 @@ describe("API functional routes", () => {
       invalidRecipientCount: 1,
       invalidRecipientIds: ["77777777-7777-4777-8777-777777777777"],
     });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const listRes = await app.request("/admin/notifications?limit=10");
     const sendAllRes = await app.request("/admin/notifications/send-all", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: "T", message: "M" }),
+      body: JSON.stringify({ title: "T", message: "M", secret: "admin-secret-value" }),
     });
     const sendUsersRes = await app.request("/admin/notifications/send-users", {
       method: "POST",
@@ -2401,6 +2309,7 @@ describe("API functional routes", () => {
         userIds: ["66666666-6666-4666-8666-666666666666"],
         title: "T",
         message: "M",
+        secret: "admin-secret-value",
       }),
     });
 
@@ -2436,11 +2345,12 @@ describe("API functional routes", () => {
       invalidRecipientIds: [],
       batchId: "11111111-1111-4111-8111-111111111111",
     });
+    mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
 
     const res = await app.request("/admin/notifications/send-all", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: "Ops", message: "Maintenance" }),
+      body: JSON.stringify({ title: "Ops", message: "Maintenance", secret: "admin-secret-value" }),
     });
 
     expect(res.status).toBe(200);

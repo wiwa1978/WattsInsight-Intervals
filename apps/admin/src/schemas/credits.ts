@@ -1,16 +1,16 @@
 import { z } from "zod";
 
-import { billingConfig, creditPackages } from "@/config/billing";
+import { creditBillingConfig, creditPackages } from "@/config/billing";
 
-export { billingConfig, creditPackages };
+export { creditBillingConfig, creditPackages };
 export type { CreditBalance, CreditPurchase, CreditTransaction } from "@platform/contracts";
 
 export type CreditPackage = typeof creditPackages[number];
-export type BillingConfig = typeof billingConfig;
-export type FeatureType = keyof typeof billingConfig.features;
+export type BillingConfig = typeof creditBillingConfig;
+export type FeatureType = keyof typeof creditBillingConfig.features;
 
 export const creditUsageSchema = z.object({
-  feature: z.enum(Object.keys(billingConfig.features) as [string, ...string[]]),
+  feature: z.enum(Object.keys(creditBillingConfig.features) as [string, ...string[]]),
   description: z.string().optional(),
 });
 

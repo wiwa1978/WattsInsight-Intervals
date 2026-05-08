@@ -27,6 +27,7 @@ export function Navbar() {
   const pathname = usePathname();
   const locale = useLocale();
   const { data: session } = useSession();
+  const isLoginPage = pathname === "/login";
   const [isScrolled, setIsScrolled] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   const [activeHash, setActiveHash] = React.useState("");
@@ -98,7 +99,7 @@ export function Navbar() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <LanguageSelector />
-              {session?.user ? (
+              {isLoginPage ? null : session?.user ? (
                 <Button size="sm" asChild>
                   <a href={`/${locale}/dashboard`}>{t("dashboard")}</a>
                 </Button>
@@ -153,7 +154,7 @@ export function Navbar() {
 
                     {/* Auth buttons - under nav links with border */}
                     <div className="mt-4 space-y-2 border-t pt-4">
-                      {session?.user ? (
+                      {isLoginPage ? null : session?.user ? (
                         <Button className="w-full" asChild>
                           <a href={`/${locale}/dashboard`} onClick={() => setIsOpen(false)}>
                             {t("dashboard")}

@@ -36,7 +36,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { banAdminUser, verifyAdminBanSecret } from "@/lib/services/admin";
+import { banAdminUser, verifyAdminSecret } from "@/lib/services/admin";
 
 const banUserSchema = z.object({
   reason: z.string().optional(),
@@ -87,7 +87,7 @@ export function BanUserDialog({
     setSecretError(null);
     const debounce = setTimeout(() => {
       startVerify(async () => {
-        const result = await verifyAdminBanSecret(secretValue);
+        const result = await verifyAdminSecret(secretValue);
         if (result.success) {
           setIsSecretValid(true);
           setSecretError(null);

@@ -5,7 +5,6 @@ import { useMutation } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { creditPackages } from "@/config/billing";
 import { createCheckoutSession, createCustomerPortalSession } from "@/lib/api/me";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -45,13 +44,6 @@ export function BillingClientWrapper({ children, checkoutOutcome }: BillingClien
   const handlePurchase = async (packageKey: string) => {
     if (!session?.user) {
       toast.error("Please login to purchase credits");
-      return;
-    }
-
-    // Find package to get actual productId
-    const selectedPackage = creditPackages.find(pkg => pkg.key === packageKey);
-    if (!selectedPackage) {
-      toast.error("Package not found");
       return;
     }
 

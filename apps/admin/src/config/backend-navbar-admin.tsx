@@ -6,8 +6,6 @@ import {
   LayoutDashboard,
   LucideIcon,
   Logs,
-  Percent,
-  Ticket,
   Users,
   Webhook
 } from "lucide-react"
@@ -53,16 +51,6 @@ export const BackendNavAdminItems: BackendNavAdminItem[] = [
     title: "admin.nav.webhooks",
     url: "/admin/webhooks",
     icon: Webhook,
-  },
-  {
-    title: "admin.nav.discounts",
-    url: "/admin/discounts",
-    icon: Percent,
-  },
-  {
-    title: "admin.nav.vouchers",
-    url: "/admin/vouchers",
-    icon: Ticket,
   },
   {
     title: "admin.nav.notifications",

@@ -701,7 +701,7 @@
         "expiryPlaceholder": "Choisir une date",
         "timeLabel": "Heure d'expiration",
         "secretLabel": "Clé secrète administrateur",
-        "secretPlaceholder": "Saisissez la clé secrète de bannissement",
+        "secretPlaceholder": "Saisissez le secret administrateur",
         "secretHint": "Cela évite les bannissements accidentels. Partagez cette clé uniquement avec les administrateurs de confiance.",
         "cancel": "Annuler",
         "banUser": "Bannir l'utilisateur",
@@ -736,7 +736,7 @@
       "unbanFailed": "Échec du débannissement de l'utilisateur.",
       "impersonateFailed": "Échec de l'usurpation d'identité.",
       "revokeSessionsFailed": "Échec de la révocation des sessions.",
-      "invalidBanSecret": "Clé secrète administrateur invalide."
+      "invalidBanSecret": "Secret administrateur invalide."
     },
     "notifications": {
       "title": "Notifications",
@@ -1125,20 +1125,20 @@
     "description": "Choisissez le forfait de crédits qui correspond à vos besoins. Les crédits n'expirent jamais.",
     "mostPopular": "Le Plus Populaire",
     "packages": {
-      "bronze": {
-        "name": "Bronze",
+      "starter": {
+        "name": "Starter",
         "description": "Parfait pour débuter avec notre plateforme.",
-        "cta": "Acheter Bronze"
+        "cta": "Acheter Starter"
       },
-      "silver": {
-        "name": "Argent",
+      "advanced": {
+        "name": "Advanced",
         "description": "Meilleure valeur avec crédits bonus inclus.",
-        "cta": "Acheter Argent"
+        "cta": "Acheter Advanced"
       },
-      "gold": {
-        "name": "Or",
+      "pro": {
+        "name": "Pro",
         "description": "Maximum de crédits avec le plus gros bonus.",
-        "cta": "Acheter Or"
+        "cta": "Acheter Pro"
       }
     },
     "features": {
@@ -1340,7 +1340,6 @@
   },
   "subscriptionProgressBar": {
     "label": "Abonnement",
-    "starter": "Starter",
     "upgrade": "Ameliorer"
   }
 }

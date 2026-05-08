@@ -46,6 +46,7 @@ export interface VoucherFormData {
   maxRedemptions?: number;
   userIds: string[];
   expiresAt?: Date | null;
+  secret: string;
 }
 
 export async function getVouchers(limit = 20, offset = 0, search?: string, status?: VoucherStatus) {
@@ -72,7 +73,7 @@ export async function updateVoucher(input: VoucherFormData & { id: string }) {
   return updateVoucherApi(input) as Promise<{ success: boolean; voucher?: Voucher; error?: string }>;
 }
 
-export async function updateVoucherStatus(input: { id: string; status: VoucherStatus }) {
+export async function updateVoucherStatus(input: { id: string; status: VoucherStatus; secret: string }) {
   return updateVoucherApi(input) as Promise<{ success: boolean; voucher?: Voucher; error?: string }>;
 }
 

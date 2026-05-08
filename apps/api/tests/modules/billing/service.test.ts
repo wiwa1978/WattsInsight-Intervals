@@ -111,7 +111,7 @@ describe("createBillingService", () => {
                 {
                   id: "purchase-1",
                   userId: "u1",
-                  packageKey: "silver",
+                  packageKey: "advanced",
                   paymentStatus: "completed",
                 },
               ]),
@@ -138,7 +138,7 @@ describe("createBillingService", () => {
       notifications,
     });
 
-    const purchase = await service.processCreditPurchase("u1", "silver", "pay_1", "completed");
+    const purchase = await service.processCreditPurchase("u1", "advanced", "pay_1", "completed");
 
     expect(purchase).toMatchObject({ id: "purchase-1", paymentStatus: "completed" });
     expect(inserts[0]?.values).toMatchObject({ paymentStatus: "completed" });
@@ -146,9 +146,9 @@ describe("createBillingService", () => {
     expect(inserts[0]?.values).toMatchObject({
       paymentSnapshot: {
         provider: "dodo",
-        packageKey: "silver",
-        priceExclVat: 5000,
-        priceInclVat: 5000,
+        packageKey: "advanced",
+        priceExclVat: 2500,
+        priceInclVat: 2500,
         vatAmount: 0,
         currency: "EUR",
       },
@@ -194,7 +194,7 @@ describe("createBillingService", () => {
       notifications,
     });
 
-    const purchase = await service.processCreditPurchase("u1", "silver", "pay_2", "pending");
+    const purchase = await service.processCreditPurchase("u1", "advanced", "pay_2", "pending");
 
     expect(purchase).toMatchObject({ id: "purchase-pending", paymentStatus: "pending" });
     expect(purchaseValues).toHaveBeenCalledWith(expect.objectContaining({ creditsGrantedAt: null }));
@@ -234,7 +234,7 @@ describe("createBillingService", () => {
 
     await service.processCreditPurchase(
       "u1",
-      "silver",
+      "advanced",
       "pay_snapshot",
       "pending",
       "cus_snapshot",
@@ -255,7 +255,7 @@ describe("createBillingService", () => {
         paymentSnapshot: {
           provider: "dodo",
           customerId: "cus_snapshot",
-          packageKey: "silver",
+          packageKey: "advanced",
           priceExclVat: 4000,
           priceInclVat: 5000,
           vatAmount: 1000,
@@ -296,7 +296,7 @@ describe("createBillingService", () => {
       notifications,
     });
 
-    const result = await service.processCreditPurchase("u1", "silver", "pay_dup", "completed");
+    const result = await service.processCreditPurchase("u1", "advanced", "pay_dup", "completed");
 
     expect(result).toMatchObject({ id: "existing-purchase", paymentId: "pay_dup", creditsGrantedAt: alreadyGrantedAt });
     expect(tx.insert).not.toHaveBeenCalled();
@@ -337,7 +337,7 @@ describe("createBillingService", () => {
       notifications,
     });
 
-    const result = await service.processCreditPurchase("u1", "silver", "pay_completed", "failed");
+    const result = await service.processCreditPurchase("u1", "advanced", "pay_completed", "failed");
 
     expect(result).toBe(existingPurchase);
     expect(tx.insert).not.toHaveBeenCalled();
@@ -390,7 +390,7 @@ describe("createBillingService", () => {
       notifications,
     });
 
-    const result = await service.processCreditPurchase("u1", "silver", "pay_pending", "completed");
+    const result = await service.processCreditPurchase("u1", "advanced", "pay_pending", "completed");
 
     expect(result).toMatchObject({ id: "existing-pending", paymentStatus: "completed" });
     expect(result.creditsGrantedAt).toBeInstanceOf(Date);
@@ -415,7 +415,7 @@ describe("createBillingService", () => {
           findFirst: vi.fn().mockResolvedValueOnce({
             id: "purchase-refund",
             userId: "u1",
-            packageKey: "silver",
+            packageKey: "advanced",
             paymentId: "pay_refund",
             paymentStatus: "completed",
             credits: 100,
@@ -478,7 +478,7 @@ describe("createBillingService", () => {
     const existingPurchase = {
       id: "purchase-refunded",
       userId: "u1",
-      packageKey: "silver",
+      packageKey: "advanced",
       paymentId: "pay_refunded",
       paymentStatus: "refunded",
       credits: 100,
@@ -524,7 +524,7 @@ describe("createBillingService", () => {
           findFirst: vi.fn().mockResolvedValueOnce({
             id: "purchase-dispute",
             userId: "u1",
-            packageKey: "silver",
+            packageKey: "advanced",
             paymentId: "pay_dispute",
             paymentStatus: "completed",
             credits: 100,
@@ -575,7 +575,7 @@ describe("createBillingService", () => {
       userId: "u1",
       type: "admin_adjustment",
       amount: "-110.00",
-      description: "Dispute reversal: Silver",
+      description: "Dispute reversal: Advanced",
       referenceType: "payment",
       referenceId: "pay_dispute",
       balanceAfter: "40.00",

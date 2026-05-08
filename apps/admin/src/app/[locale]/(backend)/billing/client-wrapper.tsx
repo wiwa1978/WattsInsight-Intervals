@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
-import { creditPackages } from "@/config/billing";
 import { createCheckoutSession } from "@/lib/api/me";
 
 interface BillingClientWrapperProps {
@@ -57,13 +56,6 @@ export function BillingClientWrapper({ children }: BillingClientWrapperProps) {
   const handlePurchase = async (packageKey: string) => {
     if (!session?.user) {
       toast.error("Please login to purchase credits");
-      return;
-    }
-
-    // Find package to get actual productId
-    const selectedPackage = creditPackages.find(pkg => pkg.key === packageKey);
-    if (!selectedPackage) {
-      toast.error("Package not found");
       return;
     }
 
