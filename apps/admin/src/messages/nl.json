@@ -907,6 +907,50 @@
         "revenue": "Omzet",
         "purchases": "Aankopen"
       },
+      "creditsDashboard": {
+        "unknownUser": "Onbekend",
+        "search": "Zoeken",
+        "searchPlaceholder": "Zoek op e-mail van gebruiker...",
+        "transactionsDescription": "Recente creditactiviteit voor alle gebruikers",
+        "stats": {
+          "receivedBreakdown": "{purchased} gekocht · {bonus} aankoopbonus · {vouchers} voucher · {adjustments} admin-aanpassingen"
+        },
+        "purchases": {
+          "title": "Creditaankopen",
+          "description": "Creditaankopen voor alle gebruikers"
+        },
+        "pagination": {
+          "page": "Pagina {current} van {total}",
+          "previous": "Vorige",
+          "next": "Volgende"
+        },
+        "refund": {
+          "title": "Terugbetaalbare aankopen",
+          "description": "Voltooide creditaankopen die via de betalingsprovider kunnen worden terugbetaald.",
+          "empty": "Geen terugbetaalbare aankopen gevonden.",
+          "action": "Terugbetalen",
+          "success": "Terugbetaling succesvol aangemaakt",
+          "error": "Terugbetaling aanmaken mislukt",
+          "missingPayment": "Betalings-ID ontbreekt",
+          "table": {
+            "user": "Gebruiker",
+            "package": "Pakket",
+            "amount": "Bedrag",
+            "payment": "Betaling",
+            "date": "Datum",
+            "actions": "Acties"
+          },
+          "dialog": {
+            "title": "Creditaankoop terugbetalen",
+            "description": "Maak een providerterugbetaling aan en draai de toegekende credits terug.",
+            "reason": "Reden",
+            "secret": "Admin secret",
+            "cancel": "Annuleren",
+            "submit": "Terugbetaling aanmaken",
+            "submitting": "Aanmaken..."
+          }
+        }
+      },
       "transactions": {
         "title": "Alle Transacties",
         "description": "Credittransacties voor alle gebruikers",

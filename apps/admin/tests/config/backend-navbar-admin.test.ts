@@ -13,8 +13,6 @@ describe("admin backend nav config", () => {
       "/admin/users",
       "/admin/billing",
       "/admin/webhooks",
-      "/admin/discounts",
-      "/admin/vouchers",
       "/admin/notifications",
       "/admin/logs",
     ]);

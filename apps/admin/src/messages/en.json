@@ -907,6 +907,50 @@
         "revenue": "Revenue",
         "purchases": "Purchases"
       },
+      "creditsDashboard": {
+        "unknownUser": "Unknown",
+        "search": "Search",
+        "searchPlaceholder": "Search by user email...",
+        "transactionsDescription": "Recent credit activity across all users",
+        "stats": {
+          "receivedBreakdown": "{purchased} purchased · {bonus} purchase bonus · {vouchers} voucher · {adjustments} admin adjustments"
+        },
+        "purchases": {
+          "title": "Credit purchases",
+          "description": "Credit purchases across all users"
+        },
+        "pagination": {
+          "page": "Page {current} of {total}",
+          "previous": "Previous",
+          "next": "Next"
+        },
+        "refund": {
+          "title": "Refundable purchases",
+          "description": "Completed credit purchases that can be refunded through the payment provider.",
+          "empty": "No refundable purchases found.",
+          "action": "Refund",
+          "success": "Refund created successfully",
+          "error": "Failed to create refund",
+          "missingPayment": "Missing payment ID",
+          "table": {
+            "user": "User",
+            "package": "Package",
+            "amount": "Amount",
+            "payment": "Payment",
+            "date": "Date",
+            "actions": "Actions"
+          },
+          "dialog": {
+            "title": "Refund credit purchase",
+            "description": "Create a provider refund and reverse the granted credits.",
+            "reason": "Reason",
+            "secret": "Admin secret",
+            "cancel": "Cancel",
+            "submit": "Create refund",
+            "submitting": "Creating..."
+          }
+        }
+      },
       "transactions": {
         "title": "All Transactions",
         "description": "Credit transactions across all users",
