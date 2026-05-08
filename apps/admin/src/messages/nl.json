@@ -1077,6 +1077,14 @@
           "title": "Abonnementsbetalingen",
           "empty": "Geen abonnementsbetalingen gevonden.",
           "unknownUser": "Onbekend",
+          "search": "Zoeken",
+          "searchPlaceholder": "Zoek op gebruikers-e-mail...",
+          "loading": "Abonnementsbetalingen laden...",
+          "pagination": {
+            "page": "Pagina {current} van {total}",
+            "previous": "Vorige",
+            "next": "Volgende"
+          },
           "table": {
             "user": "Gebruiker",
             "plan": "Plan",

@@ -222,7 +222,10 @@ describe("subscription service helpers", () => {
       },
       idempotencyKey: "subscription-refund:dodo:pay_1",
     });
-    expect(updateSet).toHaveBeenLastCalledWith(expect.objectContaining({ paymentStatus: "refunded" }));
+    expect(updateSet).toHaveBeenLastCalledWith(expect.objectContaining({
+      paymentStatus: "refunded",
+      refundStatus: "pending",
+    }));
   });
 
   it("rolls subscription payment status back when provider refund creation fails", async () => {

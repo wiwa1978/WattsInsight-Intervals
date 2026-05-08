@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { RefreshCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCcw, Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,11 +28,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { createAdminSubscriptionRefund } from "@/lib/services/admin";
+import { createAdminSubscriptionRefund, getAdminBillingSubscriptionPayments } from "@/lib/services/admin";
 import { formatDateTime } from "@/lib/utils";
-import type { AdminSubscriptionPaymentListItem, SubscriptionEvent, SubscriptionsList } from "@platform/contracts";
+import type { AdminSubscriptionPaymentListItem, SubscriptionEvent, SubscriptionPaymentsList, SubscriptionsList } from "@platform/contracts";
 
 type SubscriptionRow = SubscriptionsList["subscriptions"][number];
+const PAYMENTS_LIMIT = 20;
 
 function statusVariant(status: string) {
   if (status === "active" || status === "trialing") {
@@ -98,13 +99,26 @@ export function SubscriptionTable({ subscriptions }: { subscriptions: Subscripti
   );
 }
 
-export function SubscriptionPaymentsTable({ initialPayments }: { initialPayments: AdminSubscriptionPaymentListItem[] }) {
+export function SubscriptionPaymentsTable({ initialData }: { initialData: SubscriptionPaymentsList }) {
   const t = useTranslations("admin.billing.subscriptionsMode.payments");
   const queryClient = useQueryClient();
-  const [payments, setPayments] = React.useState(initialPayments);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [submittedSearchQuery, setSubmittedSearchQuery] = React.useState("");
+  const [currentPage, setCurrentPage] = React.useState(1);
   const [selectedPayment, setSelectedPayment] = React.useState<AdminSubscriptionPaymentListItem | null>(null);
   const [refundReason, setRefundReason] = React.useState("");
   const [adminSecret, setAdminSecret] = React.useState("");
+  const paymentsQuery = useQuery({
+    queryKey: ["admin-billing-subscription-payments", currentPage, submittedSearchQuery],
+    queryFn: () => getAdminBillingSubscriptionPayments(
+      PAYMENTS_LIMIT,
+      (currentPage - 1) * PAYMENTS_LIMIT,
+      submittedSearchQuery || undefined,
+    ),
+    initialData: currentPage === 1 && !submittedSearchQuery ? initialData : undefined,
+  });
+  const data = paymentsQuery.data ?? { payments: [], total: 0, hasMore: false };
+  const totalPages = Math.max(1, Math.ceil(data.total / PAYMENTS_LIMIT));
   const refundMutation = useMutation({
     mutationFn: () => {
       if (!selectedPayment?.paymentId) {
@@ -117,12 +131,7 @@ export function SubscriptionPaymentsTable({ initialPayments }: { initialPayments
         secret: adminSecret.trim(),
       });
     },
-    onSuccess: async (_result, _variables) => {
-      if (selectedPayment) {
-        setPayments((current) => current.map((payment) => (
-          payment.id === selectedPayment.id ? { ...payment, paymentStatus: "refunded" } : payment
-        )));
-      }
+    onSuccess: async () => {
       toast.success(t("refund.success"));
       setSelectedPayment(null);
       setRefundReason("");
@@ -134,13 +143,33 @@ export function SubscriptionPaymentsTable({ initialPayments }: { initialPayments
     },
   });
 
+  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmittedSearchQuery(searchQuery.trim());
+    setCurrentPage(1);
+  }
+
+  function handlePageChange(page: number) {
+    setCurrentPage(Math.min(Math.max(1, page), totalPages));
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t("title")}</CardTitle>
       </CardHeader>
-      <CardContent>
-        {payments.length === 0 ? (
+      <CardContent className="space-y-4">
+        <form className="flex gap-2" onSubmit={handleSearch}>
+          <Input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={t("searchPlaceholder")} />
+          <Button type="submit">
+            <Search className="mr-2 h-4 w-4" />
+            {t("search")}
+          </Button>
+        </form>
+
+        {paymentsQuery.isFetching ? (
+          <p className="text-sm text-muted-foreground">{t("loading")}</p>
+        ) : data.payments.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t("empty")}</p>
         ) : (
           <Table>
@@ -156,7 +185,7 @@ export function SubscriptionPaymentsTable({ initialPayments }: { initialPayments
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.map((payment) => (
+              {data.payments.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell>
                     <div className="flex flex-col">
@@ -180,6 +209,18 @@ export function SubscriptionPaymentsTable({ initialPayments }: { initialPayments
             </TableBody>
           </Table>
         )}
+
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => handlePageChange(currentPage - 1)}>
+            <ChevronLeft className="mr-1 h-4 w-4" />
+            {t("pagination.previous")}
+          </Button>
+          <span className="text-sm text-muted-foreground">{t("pagination.page", { current: currentPage, total: totalPages })}</span>
+          <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => handlePageChange(currentPage + 1)}>
+            {t("pagination.next")}
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
       </CardContent>
 
       <Dialog open={Boolean(selectedPayment)} onOpenChange={(open) => !open && setSelectedPayment(null)}>

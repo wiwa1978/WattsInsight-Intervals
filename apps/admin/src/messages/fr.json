@@ -1001,6 +1001,14 @@
           "title": "Paiements d'abonnement",
           "empty": "Aucun paiement d'abonnement trouvé.",
           "unknownUser": "Inconnu",
+          "search": "Rechercher",
+          "searchPlaceholder": "Rechercher par e-mail utilisateur...",
+          "loading": "Chargement des paiements d'abonnement...",
+          "pagination": {
+            "page": "Page {current} sur {total}",
+            "previous": "Précédent",
+            "next": "Suivant"
+          },
           "table": {
             "user": "Utilisateur",
             "plan": "Offre",

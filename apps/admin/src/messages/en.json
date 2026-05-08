@@ -1077,6 +1077,14 @@
           "title": "Subscription payments",
           "empty": "No subscription payments found.",
           "unknownUser": "Unknown",
+          "search": "Search",
+          "searchPlaceholder": "Search by user email...",
+          "loading": "Loading subscription payments...",
+          "pagination": {
+            "page": "Page {current} of {total}",
+            "previous": "Previous",
+            "next": "Next"
+          },
           "table": {
             "user": "User",
             "plan": "Plan",

@@ -5,6 +5,7 @@ import {
   getAdminAllTransactionsApi,
   getAdminBillingSubscriptionFinanceSummaryApi,
   getAdminBillingSubscriptionEventsApi,
+  getAdminBillingSubscriptionPaymentsApi,
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
@@ -63,6 +64,14 @@ describe("admin API", () => {
     );
   });
 
+  it("encodes search email when fetching admin billing subscription payments", async () => {
+    await getAdminBillingSubscriptionPaymentsApi(25, 50, "alice+admin@example.com");
+
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/admin/billing/subscription-payments?limit=25&offset=50&searchEmail=alice%2Badmin%40example.com",
+    );
+  });
+
   it("fetches admin subscription billing stats", async () => {
     await getAdminBillingSubscriptionStatsApi();
 
@@ -84,6 +93,7 @@ describe("admin API", () => {
     await getAdminBillingSubscriptionPlanDistributionApi();
     await getAdminBillingSubscriptionEventsApi(25);
     await getAdminBillingSubscriptionsApi(20, 40, "alice+admin@example.com");
+    await getAdminBillingSubscriptionPaymentsApi(20, 40, "alice+admin@example.com");
 
     expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/admin/billing/subscription-stats");
     expect(apiRequestMock).toHaveBeenNthCalledWith(2, "/admin/billing/subscription-finance-summary");
@@ -92,6 +102,10 @@ describe("admin API", () => {
     expect(apiRequestMock).toHaveBeenNthCalledWith(
       5,
       "/admin/billing/subscriptions?limit=20&offset=40&searchEmail=alice%2Badmin%40example.com",
+    );
+    expect(apiRequestMock).toHaveBeenNthCalledWith(
+      6,
+      "/admin/billing/subscription-payments?limit=20&offset=40&searchEmail=alice%2Badmin%40example.com",
     );
   });
 

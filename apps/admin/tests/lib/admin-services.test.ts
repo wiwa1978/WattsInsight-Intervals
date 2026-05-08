@@ -6,6 +6,7 @@ import {
   getAdminBillingStats,
   getAdminBillingSubscriptionEvents,
   getAdminBillingSubscriptionFinanceSummary,
+  getAdminBillingSubscriptionPayments,
   getAdminBillingSubscriptionPlanDistribution,
   getAdminBillingSubscriptionStats,
   getAdminBillingSubscriptions,
@@ -22,6 +23,7 @@ import {
   getAdminBillingStatsApi,
   getAdminBillingSubscriptionEventsApi,
   getAdminBillingSubscriptionFinanceSummaryApi,
+  getAdminBillingSubscriptionPaymentsApi,
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
@@ -40,6 +42,7 @@ vi.mock("../../src/lib/api/admin", () => ({
   getAdminBillingStatsApi: vi.fn(),
   getAdminBillingSubscriptionEventsApi: vi.fn(),
   getAdminBillingSubscriptionFinanceSummaryApi: vi.fn(),
+  getAdminBillingSubscriptionPaymentsApi: vi.fn(),
   getAdminBillingSubscriptionPlanDistributionApi: vi.fn(),
   getAdminBillingSubscriptionStatsApi: vi.fn(),
   getAdminBillingSubscriptionsApi: vi.fn(),
@@ -56,6 +59,7 @@ const getAdminAllTransactionsApiMock = vi.mocked(getAdminAllTransactionsApi);
 const getAdminBillingStatsApiMock = vi.mocked(getAdminBillingStatsApi);
 const getAdminBillingSubscriptionEventsApiMock = vi.mocked(getAdminBillingSubscriptionEventsApi);
 const getAdminBillingSubscriptionFinanceSummaryApiMock = vi.mocked(getAdminBillingSubscriptionFinanceSummaryApi);
+const getAdminBillingSubscriptionPaymentsApiMock = vi.mocked(getAdminBillingSubscriptionPaymentsApi);
 const getAdminBillingSubscriptionPlanDistributionApiMock = vi.mocked(getAdminBillingSubscriptionPlanDistributionApi);
 const getAdminBillingSubscriptionStatsApiMock = vi.mocked(getAdminBillingSubscriptionStatsApi);
 const getAdminBillingSubscriptionsApiMock = vi.mocked(getAdminBillingSubscriptionsApi);
@@ -117,6 +121,14 @@ describe("admin services", () => {
 
     await expect(getAdminBillingSubscriptions(25, 50, "alice@example.com")).resolves.toBe(subscriptions);
     expect(getAdminBillingSubscriptionsApiMock).toHaveBeenCalledWith(25, 50, "alice@example.com");
+  });
+
+  it("delegates subscription payment list queries to the admin API", async () => {
+    const payments = { payments: [], total: 0, hasMore: false };
+    getAdminBillingSubscriptionPaymentsApiMock.mockResolvedValue(payments);
+
+    await expect(getAdminBillingSubscriptionPayments(25, 50, "alice@example.com")).resolves.toBe(payments);
+    expect(getAdminBillingSubscriptionPaymentsApiMock).toHaveBeenCalledWith(25, 50, "alice@example.com");
   });
 
   it("delegates subscription finance summary to the admin API", async () => {

@@ -375,6 +375,7 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
         .update(subscriptionPayments)
         .set({
           paymentStatus: "refunded",
+          refundStatus: refund.status,
           paymentSnapshot,
           updatedAt: new Date(),
         })

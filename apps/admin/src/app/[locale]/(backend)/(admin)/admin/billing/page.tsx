@@ -115,7 +115,7 @@ async function AdminSubscriptionBillingPage() {
 
       <div className="grid gap-6 lg:grid-cols-1">
         <SubscriptionTable subscriptions={subscriptions.subscriptions} />
-        <SubscriptionPaymentsTable initialPayments={payments.payments} />
+        <SubscriptionPaymentsTable initialData={payments} />
         <SubscriptionEventsTable events={events} />
       </div>
     </>
