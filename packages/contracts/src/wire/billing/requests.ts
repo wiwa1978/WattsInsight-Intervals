@@ -9,3 +9,18 @@ export const consumeCreditsRequestSchema = z.object({
 });
 
 export type ConsumeCreditsRequest = z.infer<typeof consumeCreditsRequestSchema>;
+
+export const apiKeyScopeSchema = z.enum(["read:profile", "read:billing", "read:credits"]);
+
+export const createApiKeySchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  scopes: z.array(apiKeyScopeSchema).min(1).max(3),
+  expiresAt: z.string().datetime().optional(),
+});
+
+export const revokeApiKeyParamSchema = z.object({
+  keyId: z.string().uuid(),
+});
+
+export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
+export type CreateApiKeyRequest = z.infer<typeof createApiKeySchema>;

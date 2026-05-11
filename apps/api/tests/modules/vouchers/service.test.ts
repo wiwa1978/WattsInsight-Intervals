@@ -232,7 +232,9 @@ describe("createVouchersService", () => {
     }));
     const update = vi.fn().mockImplementation((table: unknown) => ({
       set: vi.fn(() => ({
-        where: vi.fn().mockResolvedValue(undefined),
+        where: vi.fn(() => ({
+          returning: vi.fn().mockResolvedValue(table === userCredits ? [{ balanceAfter: "15" }] : []),
+        })),
       })),
     }));
     const tx = {
@@ -355,7 +357,11 @@ describe("createVouchersService", () => {
         }),
       }));
       const update = vi.fn().mockImplementation(() => ({
-        set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })),
+        set: vi.fn(() => ({
+          where: vi.fn(() => ({
+            returning: vi.fn().mockResolvedValue([{ balanceAfter: "15" }]),
+          })),
+        })),
       }));
 
       return {

@@ -4,3 +4,6 @@ export * from "./notifications";
 export * from "./billing";
 export * from "./audit";
 export * from "./privacy";
+export * from "./jobs";
+export * from "./email-queue";
+export * from "./api-keys";

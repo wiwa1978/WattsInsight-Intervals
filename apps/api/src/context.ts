@@ -4,6 +4,7 @@ export type AuthUser = {
   id: string;
   role?: AuthRole | null;
   email?: string | null;
+  twoFactorEnabled?: boolean | null;
 };
 
 export type AppEnv = {

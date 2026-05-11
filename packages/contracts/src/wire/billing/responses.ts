@@ -237,6 +237,123 @@ export const subscriptionEventSchema = z.object({
   createdAt: z.string(),
 });
 
+const adminFinanceSeriesPointSchema = z.object({
+  period: z.string(),
+  amount: z.number(),
+  amountCents: z.number().int(),
+  count: z.number().int().nonnegative(),
+});
+
+const providerMoneySchema = z.object({ amount: z.number(), currency: z.string() }).nullable();
+const providerCustomerSchema = z.object({ id: z.string().nullable(), email: z.string().nullable(), name: z.string().nullable() }).nullable();
+const providerPaymentSchema = z.object({
+  provider: z.string(),
+  paymentId: z.string(),
+  subscriptionId: z.string().nullable(),
+  customer: providerCustomerSchema,
+  status: z.string().nullable().optional(),
+  amount: providerMoneySchema,
+  createdAt: z.string().nullable(),
+  invoiceUrl: z.string().nullable(),
+  refundStatus: z.string().nullable(),
+  disputeStatus: z.string().nullable(),
+  paymentMethod: z.string().nullable(),
+  paymentMethodType: z.string().nullable(),
+  errorCode: z.string().nullable(),
+  errorMessage: z.string().nullable(),
+  raw: z.unknown().optional(),
+});
+const providerSubscriptionSchema = z.object({
+  provider: z.string(),
+  subscriptionId: z.string(),
+  customer: providerCustomerSchema,
+  status: z.string().nullable().optional(),
+  productId: z.string().nullable(),
+  productName: z.string().nullable(),
+  amount: providerMoneySchema,
+  createdAt: z.string().nullable(),
+  nextBillingDate: z.string().nullable(),
+  previousBillingDate: z.string().nullable(),
+  canceledAt: z.string().nullable(),
+  cancelAtNextBillingDate: z.boolean().nullable(),
+  discountId: z.string().nullable(),
+  discountCyclesRemaining: z.number().nullable(),
+  raw: z.unknown().optional(),
+});
+const providerRefundSchema = z.object({ provider: z.string(), refundId: z.string(), paymentId: z.string(), status: z.string(), amount: providerMoneySchema, createdAt: z.string().nullable(), reason: z.string().nullable(), raw: z.unknown().optional() });
+const providerLedgerEntrySchema = z.object({ provider: z.string(), id: z.string(), eventType: z.string(), amount: providerMoneySchema, isCredit: z.boolean().nullable(), createdAt: z.string().nullable(), referenceObjectId: z.string().nullable(), description: z.string().nullable(), beforeBalance: z.number().nullable(), afterBalance: z.number().nullable(), raw: z.unknown().optional() });
+const providerDiscountSchema = z.object({ provider: z.string(), discountId: z.string(), code: z.string().nullable(), type: z.string().nullable(), amount: z.number().nullable(), timesUsed: z.number().nullable(), usageLimit: z.number().nullable(), subscriptionCycles: z.number().nullable(), expiresAt: z.string().nullable(), restrictedTo: z.array(z.string()), createdAt: z.string().nullable(), name: z.string().nullable(), raw: z.unknown().optional() });
+const providerProductSchema = z.object({ provider: z.string(), productId: z.string(), name: z.string().nullable(), description: z.string().nullable(), price: providerMoneySchema, isRecurring: z.boolean().nullable(), taxCategory: z.string().nullable(), createdAt: z.string().nullable(), updatedAt: z.string().nullable(), raw: z.unknown().optional() });
+const providerDisputeSchema = z.object({ provider: z.string(), disputeId: z.string(), paymentId: z.string().nullable(), amount: providerMoneySchema, status: z.string().nullable(), stage: z.string().nullable(), createdAt: z.string().nullable(), raw: z.unknown().optional() });
+const providerPayoutSchema = z.object({ provider: z.string(), payoutId: z.string(), amount: providerMoneySchema, status: z.string().nullable(), fee: z.number().nullable(), tax: z.number().nullable(), refunds: z.number().nullable(), chargebacks: z.number().nullable(), createdAt: z.string().nullable(), updatedAt: z.string().nullable(), documentUrl: z.string().nullable(), raw: z.unknown().optional() });
+
+export const adminSubscriptionFinanceDashboardSchema = z.object({
+  filters: z.object({
+    range: z.enum(["7d", "30d", "90d", "12m", "ytd"]),
+    startDate: z.string(),
+    endDate: z.string(),
+    grouping: z.enum(["day", "week", "month", "year"]),
+    currency: z.string().optional(),
+    planKey: z.string().optional(),
+    status: subscriptionStatusSchema.optional(),
+    search: z.string().optional(),
+    subscriptionsPage: z.number().int().positive(),
+    subscriptionsSearch: z.string().optional(),
+  }),
+  overview: z.object({
+    activeSubscriptions: z.number().int().nonnegative(),
+    trialingSubscriptions: z.number().int().nonnegative(),
+    pastDueSubscriptions: z.number().int().nonnegative(),
+    canceledSubscriptions: z.number().int().nonnegative(),
+    monthlyRecurringRevenue: z.number(),
+    annualRecurringRevenue: z.number(),
+    grossIncome: z.number(),
+    netIncome: z.number(),
+    refunds: z.number(),
+    discountsUsed: z.number().int().nonnegative(),
+    churnRate: z.number(),
+  }),
+  revenue: z.object({
+    grossSeries: z.array(adminFinanceSeriesPointSchema),
+    netSeries: z.array(adminFinanceSeriesPointSchema),
+    cumulativeGrossSeries: z.array(adminFinanceSeriesPointSchema),
+    cumulativeNetSeries: z.array(adminFinanceSeriesPointSchema),
+    newMrrSeries: z.array(adminFinanceSeriesPointSchema),
+  }),
+  subscriptions: z.object({
+    rows: z.array(userSubscriptionSchema.extend({
+      latestPaymentId: z.string().nullable(),
+      amount: z.number(),
+      currency: z.string(),
+      paymentMethod: z.string().nullable(),
+      paymentMethodType: z.string().nullable(),
+      providerEventAt: z.string().nullable(),
+    })),
+    pagination: adminBillingPaginationSchema,
+    providerRows: z.array(providerSubscriptionSchema),
+    planDistribution: z.array(subscriptionPlanDistributionPointSchema),
+    churn: z.object({ activeAtStart: z.number().int().nonnegative(), canceledInPeriod: z.number().int().nonnegative(), cancelAtPeriodEnd: z.number().int().nonnegative(), churnRate: z.number() }),
+  }),
+  transactions: z.object({
+    localPayments: z.array(adminSubscriptionPaymentListItemSchema),
+    providerPayments: z.array(providerPaymentSchema),
+    providerOnlyPayments: z.array(providerPaymentSchema),
+    paymentAttemptSeries: z.array(adminFinanceSeriesPointSchema.extend({ successful: z.number().int().nonnegative() })),
+    paymentAmountSeries: z.array(adminFinanceSeriesPointSchema),
+    events: z.array(subscriptionEventSchema),
+    ledgerRows: z.array(providerLedgerEntrySchema),
+  }),
+  successRate: z.object({ totalAttempts: z.number().int().nonnegative(), successfulPayments: z.number().int().nonnegative(), failedPayments: z.number().int().nonnegative(), rate: z.number(), series: z.array(z.object({ period: z.string(), total: z.number().int().nonnegative(), successful: z.number().int().nonnegative(), rate: z.number() })) }),
+  accounting: z.object({ ledgerRows: z.array(providerLedgerEntrySchema), reconciliation: z.object({ grossPayments: z.number(), refunds: z.number(), disputes: z.number(), fees: z.number(), tax: z.number(), payouts: z.number(), netIncome: z.number() }) }),
+  refunds: z.object({ rows: z.array(providerRefundSchema), localRefundedPayments: z.array(adminSubscriptionPaymentListItemSchema), totalAmount: z.number() }),
+  discounts: z.object({ rows: z.array(z.object({ id: z.string(), code: z.string(), type: z.string(), value: z.number(), status: z.string(), currentUses: z.number().int().nonnegative(), maxUses: z.number().int().nullable(), subscriptionCycles: z.number().int().nullable(), providerDiscountId: z.string().nullable(), dodoDiscountId: z.string().nullable(), providerDiscount: providerDiscountSchema.nullable() })), providerRows: z.array(providerDiscountSchema) }),
+  products: z.object({ rows: z.array(providerProductSchema), recurringCount: z.number().int().nonnegative() }),
+  disputes: z.object({ rows: z.array(providerDisputeSchema), openCount: z.number().int().nonnegative(), totalAmount: z.number() }),
+  payouts: z.object({ rows: z.array(providerPayoutSchema), totalAmount: z.number() }),
+  freshness: z.object({ localGeneratedAt: z.string(), providerLiveDataAvailable: z.boolean() }),
+  warnings: z.array(adminBillingWarningSchema),
+});
+
 export const transactionsListSchema = z.object({
   transactions: z.array(adminTransactionListItemSchema),
   total: z.number().int().nonnegative(),
@@ -275,6 +392,22 @@ export const applicationConfigSchema = z.object({
   }),
 });
 
+export const apiKeySummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  keyPrefix: z.string(),
+  scopes: z.array(z.enum(["read:profile", "read:billing", "read:credits"])),
+  lastUsedAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export const createApiKeyResponseDataSchema = z.object({
+  apiKey: apiKeySummarySchema,
+  plaintextKey: z.string(),
+});
+
 export const creditBalanceResponseSchema = successResultSchema(creditBalanceSchema);
 export const creditHistoryResponseSchema = successResultSchema(z.array(creditTransactionSchema));
 export const creditPurchasesResponseSchema = successResultSchema(z.array(creditPurchaseSchema));
@@ -290,12 +423,16 @@ export const subscriptionsListResponseSchema = successResultSchema(subscriptions
 export const subscriptionPaymentsListResponseSchema = successResultSchema(subscriptionPaymentsListSchema);
 export const subscriptionStatsResponseSchema = successResultSchema(subscriptionStatsSchema);
 export const subscriptionFinanceSummaryResponseSchema = successResultSchema(subscriptionFinanceSummarySchema);
+export const adminSubscriptionFinanceDashboardResponseSchema = successResultSchema(adminSubscriptionFinanceDashboardSchema);
 export const subscriptionPlanDistributionResponseSchema = successResultSchema(z.array(subscriptionPlanDistributionPointSchema));
 export const subscriptionEventsResponseSchema = successResultSchema(z.array(subscriptionEventSchema));
 export const applicationConfigResponseSchema = successResultSchema(applicationConfigSchema);
 export const adminCreditsDashboardResponseSchema = successResultSchema(adminCreditsDashboardSchema);
 export const adminCreditRefundResponseSchema = successResultSchema(adminCreditRefundResponseDataSchema);
 export const adminSubscriptionRefundResponseSchema = successResultSchema(adminSubscriptionRefundResponseDataSchema);
+export const apiKeysResponseSchema = successResultSchema(z.array(apiKeySummarySchema));
+export const createApiKeyResponseSchema = successResultSchema(createApiKeyResponseDataSchema);
+export const revokeApiKeyResponseSchema = successResultSchema(apiKeySummarySchema);
 
 export const consumeCreditsResponseSchema = z.object({
   transactionId: z.string(),
@@ -326,6 +463,7 @@ export type SubscriptionsList = z.infer<typeof subscriptionsListSchema>;
 export type SubscriptionPaymentsList = z.infer<typeof subscriptionPaymentsListSchema>;
 export type SubscriptionStats = z.infer<typeof subscriptionStatsSchema>;
 export type SubscriptionFinanceSummary = z.infer<typeof subscriptionFinanceSummarySchema>;
+export type AdminSubscriptionFinanceDashboard = z.infer<typeof adminSubscriptionFinanceDashboardSchema>;
 export type SubscriptionPlanDistributionPoint = z.infer<typeof subscriptionPlanDistributionPointSchema>;
 export type SubscriptionEvent = z.infer<typeof subscriptionEventSchema>;
 export type ApplicationConfig = z.infer<typeof applicationConfigSchema>;
@@ -335,3 +473,5 @@ export type AdminCreditsDashboard = z.infer<typeof adminCreditsDashboardSchema>;
 export type AdminRefund = z.infer<typeof adminRefundSchema>;
 export type AdminCreditRefundResponseData = z.infer<typeof adminCreditRefundResponseDataSchema>;
 export type AdminSubscriptionRefundResponseData = z.infer<typeof adminSubscriptionRefundResponseDataSchema>;
+export type ApiKeySummary = z.infer<typeof apiKeySummarySchema>;
+export type CreateApiKeyResponseData = z.infer<typeof createApiKeyResponseDataSchema>;

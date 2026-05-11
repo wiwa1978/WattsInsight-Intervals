@@ -2,11 +2,11 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import {
-  getAdminUser,
-  getAdminUserCreditBalance,
-  getAdminUserCreditHistory,
-  getAdminUserCreditPurchases,
-} from "@/lib/services/admin";
+  getAdminUserCreditBalanceServer,
+  getAdminUserCreditHistoryServer,
+  getAdminUserCreditPurchasesServer,
+  getAdminUserServer,
+} from "@/lib/api/admin.server";
 import { Container } from "@/components/ui/container";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -27,14 +27,14 @@ interface UserDetailPageProps {
   }>;
 }
 
-type AdminUserRecord = NonNullable<Awaited<ReturnType<typeof getAdminUser>>["data"]>;
+type AdminUserRecord = NonNullable<Awaited<ReturnType<typeof getAdminUserServer>>["data"]>;
 
 export default async function UserDetailPage({ params }: UserDetailPageProps) {
   const { userId } = await params;
   const t = await getTranslations("admin.userDetail");
 
   // Fetch user details
-  const userResponse = await getAdminUser(userId);
+  const userResponse = await getAdminUserServer(userId).catch(() => ({ data: null }));
 
   if (!userResponse.data) {
     notFound();
@@ -164,7 +164,7 @@ async function UserInfoHeader({ user }: { user: AdminUserRecord }) {
 }
 
 async function CreditCards({ userId }: { userId: string }) {
-  const balance = await getAdminUserCreditBalance(userId);
+  const balance = await getAdminUserCreditBalanceServer(userId);
   const t = await getTranslations("admin.billing.stats");
 
   // Calculate bonus credits (total received - purchased)
@@ -226,7 +226,7 @@ async function CreditCards({ userId }: { userId: string }) {
 
 async function UserTransactionHistory({ userId, userName }: { userId: string; userName: string }) {
   const t = await getTranslations("admin.billing.transactions");
-  const transactions = await getAdminUserCreditHistory(userId);
+  const transactions = await getAdminUserCreditHistoryServer(userId);
 
   // Calculate balanceBefore for each transaction
   const transactionsWithBalanceBefore = transactions.map((transaction) => {
@@ -252,7 +252,7 @@ async function UserTransactionHistory({ userId, userName }: { userId: string; us
 
 async function UserPurchaseHistory({ userId, userName }: { userId: string; userName: string }) {
   const t = await getTranslations("admin.billing.purchases");
-  const purchases = await getAdminUserCreditPurchases(userId);
+  const purchases = await getAdminUserCreditPurchasesServer(userId);
 
   return (
     <PurchaseHistoryTable

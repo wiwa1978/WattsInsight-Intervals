@@ -1,4 +1,6 @@
-import { errorResultSchema } from "@platform/contracts";
+import { errorCode, errorResultSchema } from "@platform/contracts";
+
+import { errorPayload } from "./http";
 
 type AdminAuthApi = {
   setRole: (args: { body: { userId: string; role: string }; headers: Headers; asResponse?: boolean }) => Promise<unknown>;
@@ -47,12 +49,12 @@ export function copySetCookieHeader(source: Response, target: Response) {
 }
 
 export async function createJsonResponseFromAuthResponse(response: Response, fallbackError: string) {
-  const rawPayload = await response.json().catch(() => ({ success: false, error: fallbackError }));
+  const rawPayload = await response.json().catch(() => errorPayload(errorCode.badRequest, fallbackError));
   const payload = errorResultSchema.safeParse(rawPayload).success
     ? rawPayload
     : response.ok
       ? { success: true, data: null }
-      : { success: false, error: fallbackError };
+      : errorPayload(errorCode.badRequest, fallbackError);
   const result = new Response(JSON.stringify(payload), {
     status: response.status,
     headers: {

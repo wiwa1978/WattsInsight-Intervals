@@ -347,10 +347,24 @@ export function createPrivacyService(deps: PrivacyServiceDeps) {
     return result;
   }
 
+  async function expireExports() {
+    const rows = await deps.db
+      .update(userDataExportRequests)
+      .set({ status: "expired", downloadTokenHash: null, exportData: null, updatedAt: now() })
+      .where(and(
+        inArray(userDataExportRequests.status, ["pending", "ready"]),
+        lt(userDataExportRequests.expiresAt, now()),
+      ))
+      .returning({ id: userDataExportRequests.id });
+
+    return { expired: rows.length };
+  }
+
   return {
     listExports,
     createExport,
     cancelExport,
     downloadExport,
+    expireExports,
   };
 }

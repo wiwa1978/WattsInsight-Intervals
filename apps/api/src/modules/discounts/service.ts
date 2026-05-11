@@ -4,29 +4,7 @@ import { and, desc, eq, gt, gte, like, lt, lte, sql } from "drizzle-orm";
 
 import { discounts } from "@platform/platform-db";
 
-import { isProviderTimeout, withProviderTimeout } from "../../lib/provider-fetch";
-
-type ProviderDiscountType = "percentage";
-
-type ProviderDiscount = {
-  discount_id: string;
-  code: string | null;
-  amount: number;
-  type: ProviderDiscountType;
-};
-
-type ProviderCreateDiscountRequest = {
-  amount: number;
-  type: ProviderDiscountType;
-  code: string | null;
-  expires_at: string | null;
-  name: string | null;
-  restricted_to: string[] | null;
-  subscription_cycles: number | null;
-  usage_limit: number | null;
-};
-
-type ProviderUpdateDiscountRequest = Partial<ProviderCreateDiscountRequest>;
+import type { PaymentProvider, ProviderCreateDiscountInput, ProviderUpdateDiscountInput } from "../payments/provider";
 
 type DiscountType = "fixed" | "percentage";
 type DiscountStatus = "active" | "inactive" | "expired";
@@ -53,10 +31,7 @@ type UpdateDiscountInput = {
 
 type DiscountsServiceDeps = {
   db: any;
-  env: {
-    DODO_PAYMENTS_API_KEY?: string;
-    DODO_PAYMENTS_ENVIRONMENT: "test_mode" | "live_mode";
-  };
+  paymentProvider: PaymentProvider;
 };
 
 function inferDiscountStatus(startDate: Date, endDate: Date, now = new Date()): DiscountStatus {
@@ -77,10 +52,6 @@ function discountFailure(error: string) {
 
 function discountSuccess(payload: Record<string, unknown>) {
   return { success: true as const, ...payload };
-}
-
-function getDodoApiBaseUrl(environment: "test_mode" | "live_mode") {
-  return environment === "live_mode" ? "https://live.dodopayments.com" : "https://test.dodopayments.com";
 }
 
 function withProviderDiscountId<T extends { providerDiscountId?: string | null; dodoDiscountId?: string | null }>(discount: T) {
@@ -124,68 +95,17 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
     return { ...discount, status: refreshedStatus };
   }
 
-  async function providerDiscountRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const apiKey = deps.env.DODO_PAYMENTS_API_KEY;
-    if (!apiKey) {
-      throw new Error("DODO_PAYMENTS_API_KEY is not configured");
+  function requireProviderDiscounts() {
+    if (!deps.paymentProvider.createDiscount || !deps.paymentProvider.updateDiscount || !deps.paymentProvider.deleteDiscount || !deps.paymentProvider.finance?.listDiscounts) {
+      throw new Error("Payment provider discount operations are not configured");
     }
 
-    const url = `${getDodoApiBaseUrl(deps.env.DODO_PAYMENTS_ENVIRONMENT)}${endpoint}`;
-    let response: Response;
-    try {
-      response = await fetch(
-        url,
-        withProviderTimeout({
-          ...options,
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            ...(options.headers ?? {}),
-          },
-        }),
-      );
-    } catch (error) {
-      throw new Error(isProviderTimeout(error) ? "Discount provider request timed out" : "Discount provider request failed");
-    }
-
-    if (!response.ok) {
-      throw new Error("Discount provider request failed");
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return response.json() as Promise<T>;
-  }
-
-  async function createProviderDiscount(data: ProviderCreateDiscountRequest): Promise<ProviderDiscount> {
-    return providerDiscountRequest<ProviderDiscount>("/discounts", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async function updateProviderDiscount(id: string, data: ProviderUpdateDiscountRequest): Promise<ProviderDiscount> {
-    return providerDiscountRequest<ProviderDiscount>(`/discounts/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
-  }
-
-  async function deleteProviderDiscount(id: string): Promise<void> {
-    await providerDiscountRequest<void>(`/discounts/${id}`, {
-      method: "DELETE",
-    });
-  }
-
-  async function listProviderDiscounts(): Promise<ProviderDiscount[]> {
-    return providerDiscountRequest<ProviderDiscount[]>("/discounts");
+    return deps.paymentProvider;
   }
 
   async function validateProviderDiscountCode(code: string): Promise<{ valid: boolean }> {
-    const list = await listProviderDiscounts();
-    const found = list.find((item) => item.code === code);
+    const list = await requireProviderDiscounts().finance?.listDiscounts?.();
+    const found = list?.items.find((item) => item.code === code);
     return { valid: !found };
   }
 
@@ -324,18 +244,18 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       return discountFailure(codeValidation.error || "Invalid discount code");
     }
 
-    const providerDiscountData: ProviderCreateDiscountRequest = {
+    const providerDiscountData: ProviderCreateDiscountInput = {
       amount: Math.round(input.value * 100),
       type: "percentage",
       code: normalizedCode,
-      expires_at: input.endDate.toISOString(),
+      expiresAt: input.endDate.toISOString(),
       name: null,
-      restricted_to: null,
-      subscription_cycles: null,
-      usage_limit: input.maxUses ?? null,
+      restrictedTo: null,
+      subscriptionCycles: null,
+      usageLimit: input.maxUses ?? null,
     };
 
-    const providerDiscount = await createProviderDiscount(providerDiscountData);
+    const providerDiscount = await requireProviderDiscounts().createDiscount!(providerDiscountData);
     const status = inferDiscountStatus(input.startDate, input.endDate);
 
     let created;
@@ -351,8 +271,8 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
             endDate: input.endDate,
             maxUses: input.maxUses,
             currentUses: 0,
-            providerDiscountId: providerDiscount.discount_id,
-            dodoDiscountId: providerDiscount.discount_id,
+            providerDiscountId: providerDiscount.discountId,
+            dodoDiscountId: providerDiscount.discountId,
             status,
           })
           .returning();
@@ -361,7 +281,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
       });
     } catch (error) {
       try {
-        await deleteProviderDiscount(providerDiscount.discount_id);
+        await requireProviderDiscounts().deleteDiscount!(providerDiscount.discountId);
       } catch {
         // Preserve the local persistence failure; reconciliation can retry provider cleanup separately.
       }
@@ -418,13 +338,13 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
     const existingProviderDiscountId = existing.providerDiscountId ?? existing.dodoDiscountId;
     if (existingProviderDiscountId) {
-      const providerUpdateData: ProviderUpdateDiscountRequest = {};
+      const providerUpdateData: ProviderUpdateDiscountInput = {};
       if (input.code !== undefined) providerUpdateData.code = input.code;
       if (input.value !== undefined) providerUpdateData.amount = Math.round(input.value * 100);
-      if (input.endDate !== undefined) providerUpdateData.expires_at = input.endDate.toISOString();
-      if (input.maxUses !== undefined) providerUpdateData.usage_limit = input.maxUses ?? null;
+      if (input.endDate !== undefined) providerUpdateData.expiresAt = input.endDate.toISOString();
+      if (input.maxUses !== undefined) providerUpdateData.usageLimit = input.maxUses ?? null;
       if (Object.keys(providerUpdateData).length > 0) {
-        await updateProviderDiscount(existingProviderDiscountId, providerUpdateData);
+        await requireProviderDiscounts().updateDiscount!(existingProviderDiscountId, providerUpdateData);
       }
     }
 
@@ -448,7 +368,7 @@ export function createDiscountsService(deps: DiscountsServiceDeps) {
 
     const existingProviderDiscountId = existing.providerDiscountId ?? existing.dodoDiscountId;
     if (existingProviderDiscountId) {
-      await deleteProviderDiscount(existingProviderDiscountId);
+      await requireProviderDiscounts().deleteDiscount!(existingProviderDiscountId);
     }
 
     await deps.db.delete(discounts).where(eq(discounts.id, id));

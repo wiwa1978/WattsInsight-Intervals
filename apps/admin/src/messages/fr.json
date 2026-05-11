@@ -619,6 +619,7 @@
       "users": "Utilisateurs",
       "billing": "Facturation",
       "webhooks": "Webhooks",
+      "operations": "Opérations",
       "notifications": "Notifications",
       "discounts": "Codes de réduction",
       "vouchers": "Bons",
@@ -1492,7 +1493,8 @@
     "webhooks": "Webhooks",
     "discounts": "Codes de réduction",
     "vouchers": "Bons",
-    "logs": "Journaux"
+    "logs": "Journaux",
+    "system": "Système"
   },
   "creditProgressBar": {
     "creditsOf": "{current} sur {total} crédits",

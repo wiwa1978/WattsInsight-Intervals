@@ -61,6 +61,7 @@ export type AuthenticatedUser = {
   id: string;
   role?: AuthRole | null;
   email?: string | null;
+  twoFactorEnabled?: boolean | null;
 };
 
 export type AuthContextVariables = {

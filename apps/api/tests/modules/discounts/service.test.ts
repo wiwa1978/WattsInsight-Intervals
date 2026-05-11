@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDiscountsService } from "../../../src/modules/discounts/service";
+import { createDodoPaymentProvider } from "../../../src/modules/payments/providers/dodo";
+
+function dodoProvider(apiKey?: string) {
+  return createDodoPaymentProvider({
+    apiKey,
+    environment: "test_mode",
+    appUrl: "http://localhost:3100",
+  });
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -16,7 +25,7 @@ describe("createDiscountsService", () => {
   it("rejects create discount when endDate is before startDate", async () => {
     const service = createDiscountsService({
       db: { query: { discounts: { findFirst: vi.fn() } } } as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      paymentProvider: dodoProvider(),
     });
 
     const result = await service.createDiscount({
@@ -34,7 +43,7 @@ describe("createDiscountsService", () => {
   it("rejects fixed discounts", async () => {
     const service = createDiscountsService({
       db: { query: { discounts: { findFirst: vi.fn() } } } as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      paymentProvider: dodoProvider(),
     });
 
     const result = await service.createDiscount({
@@ -84,7 +93,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: db as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
     const result = await service.createDiscount({
@@ -137,7 +146,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: db as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
     await expect(service.createDiscount({
@@ -188,7 +197,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: db as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
     await expect(service.createDiscount({
@@ -208,10 +217,10 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: { query: { discounts: { findFirst: vi.fn().mockResolvedValue(null) } } } as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
-    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Discount provider request failed");
+    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Payment provider request failed");
   });
 
   // Verifies provider response bodies are never leaked through errors.
@@ -224,7 +233,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: { query: { discounts: { findFirst: vi.fn().mockResolvedValue(null) } } } as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
     let error: unknown;
@@ -235,7 +244,7 @@ describe("createDiscountsService", () => {
     }
 
     expect(error).toBeInstanceOf(Error);
-    expect((error as Error).message).toBe("Discount provider request failed");
+    expect((error as Error).message).toBe("Payment provider request failed");
     expect((error as Error).message).not.toContain("provider secret details");
   });
 
@@ -245,10 +254,10 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: { query: { discounts: { findFirst: vi.fn().mockResolvedValue(null) } } } as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
-    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Discount provider request timed out");
+    await expect(service.validateDiscountCode("SAVE-ABC-1234")).rejects.toThrow("Payment provider discounts request timed out");
   });
 
   // Verifies remote provider deletion occurs before local discount deletion.
@@ -265,10 +274,10 @@ describe("createDiscountsService", () => {
         },
         delete: dbDelete,
       } as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
-    (fetch as any).mockResolvedValueOnce({ ok: true, status: 204, text: vi.fn().mockResolvedValue("") });
+    (fetch as any).mockResolvedValueOnce({ ok: true, status: 204, json: vi.fn().mockResolvedValue(undefined), text: vi.fn().mockResolvedValue("") });
 
     const result = await service.deleteDiscount("d1");
 
@@ -309,7 +318,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: db as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      paymentProvider: dodoProvider(),
     });
 
     const result = await service.updateDiscount({
@@ -365,7 +374,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: db as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode", DODO_PAYMENTS_API_KEY: "key" },
+      paymentProvider: dodoProvider("key"),
     });
 
     const result = await service.updateDiscount({
@@ -404,7 +413,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: db as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      paymentProvider: dodoProvider(),
     });
 
     const result = await service.getDiscountById("d1");
@@ -444,7 +453,7 @@ describe("createDiscountsService", () => {
 
     const service = createDiscountsService({
       db: db as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      paymentProvider: dodoProvider(),
     });
 
     const result = await service.getDiscounts(20, 0, undefined, "active");
@@ -468,7 +477,7 @@ describe("createDiscountsService", () => {
           discounts: { findFirst },
         },
       } as any,
-      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      paymentProvider: dodoProvider(),
     });
 
     const code = await service.generateDiscountCode("TEST");

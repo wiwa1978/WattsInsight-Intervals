@@ -10,7 +10,7 @@ export const creditPackages = (Object.keys(CREDIT_PLAN_DEFINITIONS) as CreditPla
     credits: plan.credits,
     price: plan.price,
     currency: plan.currency,
-    productId: plan.productId,
+    providerProductIds: plan.providerProductIds,
     bonus: plan.bonus ?? 0,
     popular: plan.popular ?? false,
   };

@@ -1,4 +1,4 @@
-CREATE TABLE "checkout_intents" (
+CREATE TABLE IF NOT EXISTS "checkout_intents" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "user_id" uuid NOT NULL,
   "billing_mode" text NOT NULL,
@@ -16,11 +16,15 @@ CREATE TABLE "checkout_intents" (
   "failed_at" timestamp with time zone
 );
 
-ALTER TABLE "checkout_intents"
-  ADD CONSTRAINT "checkout_intents_user_id_user_id_fk"
-  FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
+DO $$ BEGIN
+  ALTER TABLE "checkout_intents"
+    ADD CONSTRAINT "checkout_intents_user_id_user_id_fk"
+    FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
-CREATE INDEX "checkout_intents_user_id_idx" ON "checkout_intents" USING btree ("user_id");
-CREATE UNIQUE INDEX "checkout_intents_reference_id_idx" ON "checkout_intents" USING btree ("reference_id");
-CREATE INDEX "checkout_intents_payment_id_idx" ON "checkout_intents" USING btree ("payment_id");
-CREATE INDEX "checkout_intents_status_created_at_idx" ON "checkout_intents" USING btree ("status", "created_at");
+CREATE INDEX IF NOT EXISTS "checkout_intents_user_id_idx" ON "checkout_intents" USING btree ("user_id");
+CREATE UNIQUE INDEX IF NOT EXISTS "checkout_intents_reference_id_idx" ON "checkout_intents" USING btree ("reference_id");
+CREATE INDEX IF NOT EXISTS "checkout_intents_payment_id_idx" ON "checkout_intents" USING btree ("payment_id");
+CREATE INDEX IF NOT EXISTS "checkout_intents_status_created_at_idx" ON "checkout_intents" USING btree ("status", "created_at");

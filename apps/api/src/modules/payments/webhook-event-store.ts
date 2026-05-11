@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, lte, or } from "drizzle-orm";
 
 import type { WebhookEventStore } from "@platform/payments-core";
 import { paymentWebhookEvents } from "@platform/platform-db";
@@ -11,6 +11,7 @@ type PaymentWebhookEventStoreDeps = {
 
 const REDACTED = "[redacted]";
 const SENSITIVE_KEYS = /authorization|card|cvv|email|password|secret|signature|token/i;
+const STALE_PROCESSING_MS = 15 * 60 * 1000;
 
 function sanitizeJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sanitizeJson);
@@ -84,7 +85,9 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
         ),
       });
 
-      if (existing?.processingStatus === "failed") {
+      const staleProcessing = existing?.processingStatus === "processing" && existing.updatedAt <= new Date(Date.now() - STALE_PROCESSING_MS);
+
+      if (existing?.processingStatus === "failed" || staleProcessing) {
         const [claimed] = await deps.db
           .update(paymentWebhookEvents)
           .set({
@@ -98,13 +101,17 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
             processingStatus: "processing",
             errorDetails: null,
             failedAt: null,
+            nextAttemptAt: null,
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(paymentWebhookEvents.provider, event.provider),
               eq(paymentWebhookEvents.providerEventId, event.providerEventId),
-              eq(paymentWebhookEvents.processingStatus, "failed"),
+              or(
+                eq(paymentWebhookEvents.processingStatus, "failed"),
+                and(eq(paymentWebhookEvents.processingStatus, "processing"), lte(paymentWebhookEvents.updatedAt, new Date(Date.now() - STALE_PROCESSING_MS))),
+              ),
             ),
           )
           .returning({ id: paymentWebhookEvents.id });
@@ -122,6 +129,8 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
         .update(paymentWebhookEvents)
         .set({
           processingStatus: "processed",
+          nextAttemptAt: null,
+          deadLetteredAt: null,
           durationMs: event.durationMs ?? null,
           processedAt: new Date(),
           failedAt: null,
@@ -141,6 +150,7 @@ export function createPaymentWebhookEventStore(deps: PaymentWebhookEventStoreDep
         .update(paymentWebhookEvents)
         .set({
           processingStatus: "failed",
+          nextAttemptAt: new Date(Date.now() + 60_000),
           durationMs: event.durationMs ?? null,
           failedAt: new Date(),
           errorDetails: safeErrorDetails(event.error),

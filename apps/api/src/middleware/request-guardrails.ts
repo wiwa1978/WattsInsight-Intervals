@@ -80,7 +80,10 @@ function getClientIp(c: Parameters<MiddlewareHandler<AppEnv>>[0]) {
     return c.req.header("x-real-ip") ?? "unknown";
   }
 
-  return "unknown";
+  const forwardedFor = c.req.header("x-forwarded-for");
+  const realIp = c.req.header("x-real-ip");
+
+  return c.req.header("cf-connecting-ip") ?? realIp ?? forwardedFor?.split(",")[0]?.trim() ?? "direct-client";
 }
 
 function findGuardrail(method: string, path: string) {
@@ -112,8 +115,10 @@ function tooLarge(c: Parameters<MiddlewareHandler<AppEnv>>[0]) {
   return c.json(
     {
       success: false,
-      error: "Payload too large",
-      errorCode: errorCode.payloadTooLarge,
+      error: {
+        code: errorCode.payloadTooLarge,
+        message: "Payload too large",
+      },
     },
     413,
   );
@@ -124,8 +129,10 @@ function rateLimited(c: Parameters<MiddlewareHandler<AppEnv>>[0], retryAfterSeco
   return c.json(
     {
       success: false,
-      error: "Too many requests",
-      errorCode: errorCode.rateLimited,
+      error: {
+        code: errorCode.rateLimited,
+        message: "Too many requests",
+      },
     },
     429,
   );
@@ -170,14 +177,14 @@ export const requestGuardrails: MiddlewareHandler<AppEnv> = async (c, next) => {
   const method = c.req.method.toUpperCase();
   const contentType = c.req.header("content-type") ?? "";
   const guardrail = findGuardrail(method, c.req.path);
-  const maxBodyBytes = guardrail?.maxBodyBytes ?? (method === "POST" && contentType.includes("application/json") ? DEFAULT_JSON_BODY_BYTES : undefined);
+  const maxBodyBytes = guardrail?.maxBodyBytes ?? (JSON_BODY_METHODS.has(method) && contentType.includes("application/json") ? DEFAULT_JSON_BODY_BYTES : undefined);
 
   if (expectsJsonBody(method, c.req.path)) {
     const isWebhook = /^\/payments\/webhooks\/[^/]+$/.test(c.req.path);
     const hasJsonBody = contentType.includes("application/json");
 
     if (!isWebhook && !hasJsonBody) {
-      return c.json({ success: false, error: "Unsupported content type" }, 415);
+      return c.json({ success: false, error: { code: errorCode.badRequest, message: "Unsupported content type" } }, 415);
     }
   }
 

@@ -1,36 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Plus, Loader2 } from "lucide-react";
 import { getCreditBalance } from "@/lib/services/credits";
+import { webQueryKeys } from "@/lib/query/keys";
 
 interface CreditBalanceProps {
   className?: string;
 }
 
 export function CreditBalance({ className }: CreditBalanceProps) {
-  const [credits, setCredits] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useQuery({
+    queryKey: webQueryKeys.creditBalance,
+    queryFn: getCreditBalance,
+  });
   
-  useEffect(() => {
-    fetchCredits();
-  }, []);
-  
-  const fetchCredits = async () => {
-    try {
-      const data = await getCreditBalance();
-      setCredits(data.balance);
-    } catch (error) {
-      console.error("Failed to fetch credits:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  if (loading) {
+  if (isLoading) {
     return (
       <Card className={className}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -46,7 +34,7 @@ export function CreditBalance({ className }: CreditBalanceProps) {
     );
   }
   
-  const creditBalance = credits || 0;
+  const creditBalance = data?.balance || 0;
   const isLowCredits = creditBalance <= 10;
   
   return (

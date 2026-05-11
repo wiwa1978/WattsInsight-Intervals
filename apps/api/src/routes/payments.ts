@@ -6,13 +6,22 @@ import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { creditPackages, subscriptionPlans } from "../config/billing";
 import { env } from "../env";
-import { parseJsonBody, validationError } from "../lib/http";
+import { badRequest, unauthorized, parseJsonBody, validationError } from "../lib/http";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
 
 export { buildDodoCheckoutUrl } from "../lib/dodo-checkout";
 
 export function createPaymentsRouter() {
   const router = new Hono<AppEnv>();
+
+  function productIdForActiveProvider(product: { providerProductIds: Record<string, string>; key: string }) {
+    const productId = product.providerProductIds[bootstrap.paymentProviders.activeProvider.name];
+    if (!productId) {
+      throw new Error(`No provider product configured for ${bootstrap.paymentProviders.activeProvider.name}:${product.key}`);
+    }
+
+    return productId;
+  }
 
   router.route("/payments", bootstrap.paymentsModule.router);
 
@@ -38,7 +47,7 @@ export function createPaymentsRouter() {
     } catch (error) {
       const billingModeError = getBillingModeDisabledErrorMessage(error);
       if (billingModeError) {
-        return c.json({ success: false, error: billingModeError }, 400);
+        return badRequest(c, billingModeError);
       }
 
       throw error;
@@ -48,13 +57,20 @@ export function createPaymentsRouter() {
       ? creditPackages.find((pkg) => pkg.key === packageKey)
       : subscriptionPlans.find((plan) => plan.key === planKey);
     if (!selectedProduct) {
-      return c.json({ success: false, error: requestMode === "credits" ? "Unknown package" : "Unknown plan" }, 400);
+      return badRequest(c, requestMode === "credits" ? "Unknown package" : "Unknown plan");
+    }
+
+    let productId: string;
+    try {
+      productId = productIdForActiveProvider(selectedProduct);
+    } catch {
+      return badRequest(c, "Selected product is not configured for the active payment provider");
     }
 
     const authUser = c.get("authUser");
     if (!authUser) {
       // requireAuth middleware should have prevented this, but be defensive.
-      return c.json({ success: false, error: "Unauthenticated" }, 401);
+      return unauthorized(c, "Unauthenticated");
     }
 
     const checkoutIntent = await bootstrap.checkoutIntentsService.create({
@@ -62,7 +78,7 @@ export function createPaymentsRouter() {
       billingMode: requestMode,
       packageKey,
       planKey,
-      productId: selectedProduct.productId,
+      productId,
       discountCode,
       metadata: {
         source: "payments.checkout",
@@ -70,7 +86,7 @@ export function createPaymentsRouter() {
     });
 
     const checkoutUrl = await bootstrap.paymentProviders.activeProvider.createCheckoutUrl({
-      productId: selectedProduct.productId,
+      productId,
       userId: authUser.id,
       billingMode: requestMode,
       ...(requestMode === "credits" ? { packageKey } : { planKey }),
@@ -87,7 +103,7 @@ export function createPaymentsRouter() {
     const authorization = c.req.header("authorization");
 
     if (!secret || authorization !== `Bearer ${secret}`) {
-      return c.json({ success: false, error: "Unauthorized" }, 401);
+      return unauthorized(c, "Unauthorized");
     }
 
     const result = await bootstrap.billingReconciliationService.reconcileProviderBillingStateSafely();

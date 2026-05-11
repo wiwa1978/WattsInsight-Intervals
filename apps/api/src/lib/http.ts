@@ -27,6 +27,17 @@ export function buildErrorCode(requestId: string) {
   return `API-${requestId}`;
 }
 
+export function errorPayload(code: string, message: string, details?: unknown) {
+  return {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(details !== undefined ? { details } : {}),
+    },
+  };
+}
+
 export function schemaFromZod(schema: z.ZodTypeAny) {
   return z.toJSONSchema(schema, { target: "draft-7", unrepresentable: "any" });
 }
@@ -42,7 +53,9 @@ export function fail(
   extra?: Record<string, unknown> & { errorCode?: ErrorCode },
 ) {
   const requestId = c.get("requestId");
-  const response = c.json({ ...(extra ?? {}), success: false, error, ...(requestId ? { requestId } : {}) }, status);
+  const code = extra?.errorCode ?? errorCode.badRequest;
+  const { errorCode: _errorCode, details, ...rest } = extra ?? {};
+  const response = c.json({ ...errorPayload(code, error, details), ...rest, ...(requestId ? { requestId } : {}) }, status);
 
   if (requestId) {
     response.headers.set("x-request-id", requestId);

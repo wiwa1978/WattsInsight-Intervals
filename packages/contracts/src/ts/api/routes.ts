@@ -14,6 +14,40 @@ type AdminCreditsDashboardQuery = {
   range?: "7d" | "30d" | "90d" | "12m" | "ytd";
 };
 
+type AdminSubscriptionFinanceDashboardQuery = {
+  range?: "7d" | "30d" | "90d" | "12m" | "ytd";
+  startDate?: string;
+  endDate?: string;
+  grouping?: "day" | "week" | "month" | "year";
+  currency?: string;
+  planKey?: string;
+  status?: "active" | "trialing" | "past_due" | "canceled" | "expired" | "paused";
+  search?: string;
+  subscriptionsPage?: number;
+  subscriptionsSearch?: string;
+};
+
+type AdminJobsQuery = {
+  limit?: number;
+  offset?: number;
+  name?: string;
+  status?: "idle" | "running" | "disabled";
+};
+
+type AdminJobRunsQuery = {
+  limit?: number;
+  offset?: number;
+  jobName?: string;
+  status?: "success" | "failed";
+};
+
+type AdminPendingEmailsQuery = {
+  limit?: number;
+  offset?: number;
+  text?: string;
+  status?: "pending" | "sending" | "sent" | "failed";
+};
+
 function withQuery(path: string, params: Record<string, string | number | boolean | undefined>) {
   const searchParams = new URLSearchParams();
 
@@ -53,6 +87,8 @@ export const apiRoutes = {
     markNotificationRead: (notificationId: string) => `/me/notifications/${notificationId}/read`,
     markAllNotificationsRead: "/me/notifications/read-all",
     deleteNotification: (notificationId: string) => `/me/notifications/${notificationId}`,
+    apiKeys: "/me/api-keys",
+    apiKey: (keyId: string) => `/me/api-keys/${keyId}`,
   },
   admin: {
     session: "/admin/session",
@@ -91,6 +127,8 @@ export const apiRoutes = {
       withQuery("/admin/billing/subscription-payments", { limit, offset, searchEmail }),
     billingSubscriptionStats: "/admin/billing/subscription-stats",
     billingSubscriptionFinanceSummary: "/admin/billing/subscription-finance-summary",
+    billingSubscriptionFinanceDashboard: (query: AdminSubscriptionFinanceDashboardQuery = {}) =>
+      withQuery("/admin/billing/subscription-finance-dashboard", query),
     billingSubscriptionPlanDistribution: "/admin/billing/subscription-plan-distribution",
     billingSubscriptionEvents: (limit = 50) => withQuery("/admin/billing/subscription-events", { limit }),
     discounts: (limit = 20, offset = 0, search?: string, status?: DiscountStatus) =>
@@ -109,5 +147,9 @@ export const apiRoutes = {
     notificationSends: (limit = 50) => withQuery("/admin/notifications/sends", { limit }),
     sendNotificationToAllUsers: "/admin/notifications/send-all",
     sendNotificationToUsers: "/admin/notifications/send-users",
+    operationsStats: "/admin/operations/stats",
+    jobs: (query: AdminJobsQuery = {}) => withQuery("/admin/operations/jobs", query),
+    jobRuns: (query: AdminJobRunsQuery = {}) => withQuery("/admin/operations/job-runs", query),
+    pendingEmails: (query: AdminPendingEmailsQuery = {}) => withQuery("/admin/operations/pending-emails", query),
   },
 } as const;

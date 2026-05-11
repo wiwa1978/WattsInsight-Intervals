@@ -2,9 +2,11 @@ import { z } from "zod";
 
 export const errorResultSchema = z.object({
   success: z.literal(false),
-  error: z.string().min(1),
-  errorCode: z.string().min(1).optional(),
-  details: z.unknown().optional(),
+  error: z.object({
+    code: z.string().min(1),
+    message: z.string().min(1),
+    details: z.unknown().optional(),
+  }),
   requestId: z.string().min(1).optional(),
 });
 
@@ -28,9 +30,11 @@ export const countResultSchema = successResultSchema(
 export type SuccessResult<T> = { success: true; data: T };
 export type ErrorResult = {
   success: false;
-  error: string;
-  errorCode?: string;
-  details?: unknown;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
   requestId?: string;
 };
 export type ActionResult<T> = SuccessResult<T> | ErrorResult;

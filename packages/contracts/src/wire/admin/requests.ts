@@ -51,6 +51,19 @@ export const adminCreditsDashboardQuerySchema = z.object({
   range: adminBillingDashboardRangeSchema.default("30d"),
 });
 
+export const adminSubscriptionFinanceDashboardQuerySchema = z.object({
+  range: adminBillingDashboardRangeSchema.default("ytd"),
+  startDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  grouping: z.enum(["day", "week", "month", "year"]).default("day"),
+  currency: z.string().trim().min(1).max(10).optional(),
+  planKey: z.string().trim().min(1).max(100).optional(),
+  status: z.enum(["active", "trialing", "past_due", "canceled", "expired", "paused"]).optional(),
+  search: z.string().trim().min(1).max(255).optional(),
+  subscriptionsPage: z.coerce.number().int().min(1).default(1),
+  subscriptionsSearch: z.string().trim().min(1).max(255).optional(),
+});
+
 export const createCreditRefundSchema = z.object({
   paymentId: z.string().trim().min(1, "Payment ID is required").max(255),
   reason: z.string().trim().max(3000, "Reason must be 3000 characters or fewer").optional(),
@@ -81,6 +94,25 @@ export const webhookEventsQuerySchema = paginationQuerySchema.extend({
 
 export const webhookEventIdParamSchema = z.object({
   eventId: z.string().uuid(),
+});
+
+const adminJobStatusFilterSchema = z.enum(["idle", "running", "disabled"]);
+const adminJobRunStatusFilterSchema = z.enum(["success", "failed"]);
+const adminPendingEmailStatusFilterSchema = z.enum(["pending", "sending", "sent", "failed"]);
+
+export const adminJobsQuerySchema = paginationQuerySchema.extend({
+  name: z.string().trim().min(1).max(255).optional(),
+  status: adminJobStatusFilterSchema.optional(),
+});
+
+export const adminJobRunsQuerySchema = paginationQuerySchema.extend({
+  jobName: z.string().trim().min(1).max(255).optional(),
+  status: adminJobRunStatusFilterSchema.optional(),
+});
+
+export const adminPendingEmailsQuerySchema = paginationQuerySchema.extend({
+  status: adminPendingEmailStatusFilterSchema.optional(),
+  text: z.string().trim().min(1).max(255).optional(),
 });
 
 export const searchUsersQuerySchema = z.object({

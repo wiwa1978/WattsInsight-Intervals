@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { NormalizedPaymentEvent } from "@platform/payments-core";
 
 import { buildDodoCheckoutUrl } from "../../src/lib/dodo-checkout";
 import { createPaymentEventHandler } from "../../src/modules/billing/payment-event-handler";
 import { creditPackages } from "../../src/config/billing";
+import { applicationConfig } from "../../src/config/application";
 import { createDodoPaymentProvider } from "../../src/modules/payments/providers/dodo";
 
 describe("buildDodoCheckoutUrl", () => {
@@ -131,17 +132,22 @@ describe("createDodoPaymentProvider", () => {
 
 describe("createPaymentEventHandler", () => {
   const samplePackage = creditPackages[0];
+  const sampleProductId = samplePackage.providerProductIds.dodo;
+
+  beforeEach(() => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "credits";
+  });
 
   const validPaymentEvent = (overrides: Partial<NormalizedPaymentEvent> = {}): NormalizedPaymentEvent => ({
     provider: "dodo",
     eventType: "payment.succeeded",
     paymentId: "pay_valid",
-    productId: samplePackage.productId,
+    productId: sampleProductId,
     metadata: {
       userId: "real-user-id",
       billingMode: "credits",
       packageKey: samplePackage.key,
-      productId: samplePackage.productId,
+      productId: sampleProductId,
       checkoutReferenceId: "checkout-ref-valid",
     },
     currency: "EUR",
@@ -183,7 +189,7 @@ describe("createPaymentEventHandler", () => {
         billingMode: "credits" as const,
         packageKey: samplePackage.key,
         planKey: null,
-        productId: samplePackage.productId,
+        productId: sampleProductId,
         discountCode: null,
         referenceId: "checkout-ref-valid",
         paymentId: null,
@@ -225,7 +231,7 @@ describe("createPaymentEventHandler", () => {
         provider: "dodo",
         eventType: "payment.succeeded",
         paymentId: "pay_1",
-        productId: samplePackage.productId,
+        productId: sampleProductId,
         customerEmail: "victim@example.com",
         metadata: {},
         raw: {},
@@ -246,7 +252,7 @@ describe("createPaymentEventHandler", () => {
         provider: "dodo",
         eventType: "payment.succeeded",
         paymentId: "pay_2",
-        productId: samplePackage.productId,
+        productId: sampleProductId,
         metadata: { userId: "ghost-user" },
         raw: {},
       }),
@@ -262,7 +268,7 @@ describe("createPaymentEventHandler", () => {
       provider: "dodo",
       eventType: "payment.succeeded",
       paymentId: "pay_3",
-      productId: samplePackage.productId,
+      productId: sampleProductId,
       // attacker-controlled email pointing at a different account
       customerEmail: "attacker@example.com",
       customerId: "cus_abc",
@@ -270,7 +276,7 @@ describe("createPaymentEventHandler", () => {
         userId: "real-user-id",
         billingMode: "credits",
         packageKey: samplePackage.key,
-        productId: samplePackage.productId,
+        productId: sampleProductId,
         checkoutReferenceId: "checkout-ref-valid",
       },
       currency: "EUR",

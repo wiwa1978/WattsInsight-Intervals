@@ -6,5 +6,6 @@ export const webQueryKeys = {
   creditBalance: queryKeys.credits.balance,
   notifications: queryKeys.notifications.list,
   unreadNotifications: queryKeys.notifications.unreadCount,
+  dataExports: ["me", "dataExports"] as const,
   countries: (locale: string) => ["countries", locale] as const,
 };

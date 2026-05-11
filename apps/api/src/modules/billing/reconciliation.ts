@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { or, eq } from "drizzle-orm";
 
 import { creditPurchases, subscriptionPayments, userSubscriptions, type SubscriptionStatus } from "@platform/platform-db";
 
@@ -98,7 +98,10 @@ export function createBillingReconciliationService(deps: BillingReconciliationDe
 
     for (const subscription of providerSubscriptions.items) {
       const localSubscription = await deps.db.query.userSubscriptions.findFirst({
-        where: eq(userSubscriptions.dodoSubscriptionId, subscription.subscriptionId),
+        where: or(
+          eq(userSubscriptions.providerSubscriptionId, subscription.subscriptionId),
+          eq(userSubscriptions.dodoSubscriptionId, subscription.subscriptionId),
+        ),
       });
 
       if (!localSubscription) {

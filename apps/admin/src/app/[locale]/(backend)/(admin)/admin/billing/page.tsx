@@ -1,23 +1,16 @@
 import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/ui/container";
 import { CreditsDashboard } from "@/components/layout/backend/admin/billing/credits-dashboard";
-import { SubscriptionFinanceSummary } from "@/components/layout/backend/admin/billing/subscription-finance-summary";
-import { SubscriptionPlanDistribution } from "@/components/layout/backend/admin/billing/subscription-plan-distribution";
-import { SubscriptionStatsGrid } from "@/components/layout/backend/admin/billing/subscription-stats-grid";
-import { SubscriptionEventsTable, SubscriptionPaymentsTable, SubscriptionTable } from "@/components/layout/backend/admin/billing/subscription-tables";
+import { SubscriptionFinanceDashboard } from "@/components/layout/backend/admin/billing/subscription-finance-dashboard";
 import { AdminBillingTabs, type AdminBillingSection } from "@/components/layout/backend/admin/billing/admin-billing-tabs";
 import { DiscountsSection } from "@/components/layout/backend/admin/billing/discounts-section";
 import { VouchersSection } from "@/components/layout/backend/admin/billing/vouchers-section";
-import { getMyApplicationConfig } from "@/lib/api/me";
+import { getMyApplicationConfigServer } from "@/lib/api/me.server";
 import {
-  getAdminBillingSubscriptionEvents,
-  getAdminBillingSubscriptionFinanceSummary,
-  getAdminBillingSubscriptionPayments,
-  getAdminBillingSubscriptionPlanDistribution,
-  getAdminBillingSubscriptionStats,
-  getAdminBillingSubscriptions,
-  getAdminCreditsDashboard,
-} from "@/lib/services/admin";
+  getAdminBillingSubscriptionFinanceDashboardServer,
+  type AdminSubscriptionFinanceDashboardQuery,
+  getAdminCreditsDashboardServer,
+} from "@/lib/api/admin.server";
 
 type AdminBillingPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -36,7 +29,7 @@ function billingSection(value: string | undefined): AdminBillingSection {
 }
 
 export default async function AdminBillingPage({ searchParams }: AdminBillingPageProps) {
-  const applicationConfig = await getMyApplicationConfig();
+  const applicationConfig = await getMyApplicationConfigServer();
 
   if (!applicationConfig.billing.enabled) {
     return null;
@@ -44,6 +37,24 @@ export default async function AdminBillingPage({ searchParams }: AdminBillingPag
 
   const params = (await searchParams) ?? {};
   const activeSection = billingSection(first(params.section));
+
+  if (applicationConfig.billing.mode === "subscriptions" && applicationConfig.billing.subscriptionSurfacesEnabled && activeSection === "overview") {
+    return (
+      <Container className="py-6">
+        <AdminSubscriptionBillingPage searchParams={params} />
+      </Container>
+    );
+  }
+
+  if (applicationConfig.billing.mode === "credits" && applicationConfig.billing.creditSurfacesEnabled && activeSection === "overview") {
+    const dashboard = await getAdminCreditsDashboardServer();
+    return (
+      <Container className="py-6">
+        <CreditsDashboard initialDashboard={dashboard} />
+      </Container>
+    );
+  }
+
   const t = await getTranslations("admin.billing");
 
   return (
@@ -59,7 +70,7 @@ export default async function AdminBillingPage({ searchParams }: AdminBillingPag
         ) : activeSection === "vouchers" ? (
           <VouchersSection />
         ) : (
-          <AdminBillingOverview applicationConfig={applicationConfig} />
+          <AdminBillingOverview applicationConfig={applicationConfig} searchParams={params} />
         )}
       </AdminBillingTabs>
     </Container>
@@ -68,56 +79,59 @@ export default async function AdminBillingPage({ searchParams }: AdminBillingPag
 
 async function AdminBillingOverview({
   applicationConfig,
+  searchParams,
 }: {
-  applicationConfig: Awaited<ReturnType<typeof getMyApplicationConfig>>;
+  applicationConfig: Awaited<ReturnType<typeof getMyApplicationConfigServer>>;
+  searchParams: Record<string, string | string[] | undefined>;
 }) {
   if (applicationConfig.billing.mode === "subscriptions" && applicationConfig.billing.subscriptionSurfacesEnabled) {
-    return <AdminSubscriptionBillingPage />;
+    return <AdminSubscriptionBillingPage searchParams={searchParams} />;
   }
 
   if (!applicationConfig.billing.creditSurfacesEnabled) {
     return null;
   }
 
-  const dashboard = await getAdminCreditsDashboard();
+  const dashboard = await getAdminCreditsDashboardServer();
   return <CreditsDashboard initialDashboard={dashboard} />;
 }
 
-async function AdminSubscriptionBillingPage() {
-  const t = await getTranslations("admin.billing.subscriptionsMode");
-  const [stats, financeSummary, distribution, subscriptions, payments, events] = await Promise.all([
-    getAdminBillingSubscriptionStats(),
-    getAdminBillingSubscriptionFinanceSummary(),
-    getAdminBillingSubscriptionPlanDistribution(),
-    getAdminBillingSubscriptions(50, 0),
-    getAdminBillingSubscriptionPayments(50, 0),
-    getAdminBillingSubscriptionEvents(50),
-  ]);
+async function AdminSubscriptionBillingPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+  const financeDashboard = await getAdminBillingSubscriptionFinanceDashboardServer(financeQuery(searchParams));
 
   return (
-    <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">{t("title")}</h1>
-        <p className="text-muted-foreground mt-2">{t("description")}</p>
-      </div>
-
-      <div className="mb-8">
-        <SubscriptionStatsGrid stats={stats} />
-      </div>
-
-      <div className="mb-8">
-        <SubscriptionFinanceSummary summary={financeSummary} />
-      </div>
-
-      <div className="mb-8">
-        <SubscriptionPlanDistribution distribution={distribution} />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-1">
-        <SubscriptionTable subscriptions={subscriptions.subscriptions} />
-        <SubscriptionPaymentsTable initialData={payments} />
-        <SubscriptionEventsTable events={events} />
-      </div>
-    </>
+    <SubscriptionFinanceDashboard dashboard={financeDashboard} />
   );
+}
+
+function financeQuery(params: Record<string, string | string[] | undefined>): AdminSubscriptionFinanceDashboardQuery {
+  return {
+    range: rangeParam(first(params.range)),
+    startDate: first(params.startDate),
+    endDate: first(params.endDate),
+    grouping: groupingParam(first(params.grouping)),
+    currency: first(params.currency),
+    planKey: first(params.planKey),
+    status: statusParam(first(params.status)),
+    search: first(params.search),
+    subscriptionsPage: numberParam(first(params.subscriptionsPage)),
+    subscriptionsSearch: first(params.subscriptionsSearch),
+  };
+}
+
+function rangeParam(value: string | undefined) {
+  return value === "7d" || value === "30d" || value === "90d" || value === "12m" || value === "ytd" ? value : undefined;
+}
+
+function groupingParam(value: string | undefined) {
+  return value === "day" || value === "week" || value === "month" || value === "year" ? value : undefined;
+}
+
+function statusParam(value: string | undefined) {
+  return value === "active" || value === "trialing" || value === "past_due" || value === "canceled" || value === "expired" || value === "paused" ? value : undefined;
+}
+
+function numberParam(value: string | undefined) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }

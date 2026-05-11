@@ -2,7 +2,7 @@ export type SubscriptionPlanDefinition = {
   price: number;
   currency: string;
   interval: "month" | "year";
-  productId: string;
+  providerProductIds: Record<string, string>;
   popular?: boolean;
   features: readonly string[];
 };
@@ -14,21 +14,21 @@ export const SUBSCRIPTION_PLANS = {
     price: 1000,
     currency: "EUR",
     interval: "month",
-    productId: "pdt_0Ne6oYX9ZLK155nv6Q416",
+    providerProductIds: { dodo: "pdt_0Ne6oYX9ZLK155nv6Q416" },
     features: ["Core app access"],
   },
   Silver: {
     price: 2500,
     currency: "EUR",
     interval: "month",
-    productId: "pdt_0Ne6obyEV22bwoKD6vyG1",
+    providerProductIds: { dodo: "pdt_0Ne6obyEV22bwoKD6vyG1" },
     features: ["Core app access"],
   },
   Gold: {
     price: 5000,
     currency: "EUR",
     interval: "month",
-    productId: "pdt_0Ne6ofScB4Hiwef1kG9Wa",
+    providerProductIds: { dodo: "pdt_0Ne6ofScB4Hiwef1kG9Wa" },
     popular: true,
     features: ["Core app access", "Priority support"],
   },

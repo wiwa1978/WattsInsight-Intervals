@@ -64,6 +64,55 @@
       "when": 1777507200000,
       "tag": "0008_add_subscription_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777593600000,
+      "tag": "0009_add_checkout_intents",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777680000000,
+      "tag": "0010_add_user_data_exports",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777766400000,
+      "tag": "0011_webhook_observability",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777852800000,
+      "tag": "0012_auth_identity_uniqueness",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1777939200000,
+      "tag": "0013_provider_neutral_billing_identifiers",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778025600000,
+      "tag": "0014_admin_billing_dashboard_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778112000000,
+      "tag": "0015_add_voucher_tables",
+      "breakpoints": true
     }
   ]
 }

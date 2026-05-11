@@ -253,8 +253,10 @@ describe("authz contract", () => {
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({
       success: false,
-      error: "Forbidden origin",
-      errorCode: "FORBIDDEN",
+      error: {
+        code: "FORBIDDEN",
+        message: "Forbidden origin",
+      },
     });
   });
 

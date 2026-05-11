@@ -4,17 +4,25 @@ import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/ui/container";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { getAdminDashboardStats, getAdminSystemHealth, getAdminUserStats } from "@/lib/services/admin";
-import { getLogFiles } from "@/lib/services/logs";
+import { getAdminSystemHealth } from "@/lib/services/admin";
+import {
+  getAdminDashboardStatsServer,
+  getAdminLogFilesServer,
+  getAdminUserStatsServer,
+} from "@/lib/api/admin.server";
 
 export default async function AdminSystemPage() {
   const t = await getTranslations("admin.system");
   const [health, dashboardStats, userStats, appLogs, auditLogs] = await Promise.all([
     getAdminSystemHealth(),
-    getAdminDashboardStats(),
-    getAdminUserStats(),
-    getLogFiles("app").catch(() => ({ files: [], selectedFile: null })),
-    getLogFiles("audit").catch(() => ({ files: [], selectedFile: null })),
+    getAdminDashboardStatsServer(),
+    getAdminUserStatsServer().catch(() => ({
+      totalUsers: 0,
+      totalAdmins: 0,
+      totalBanned: 0,
+    })),
+    getAdminLogFilesServer("app").catch(() => ({ files: [], selectedFile: null })),
+    getAdminLogFilesServer("audit").catch(() => ({ files: [], selectedFile: null })),
   ]);
   const isHealthy = health.status === "ok";
 

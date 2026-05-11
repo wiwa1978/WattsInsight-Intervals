@@ -619,6 +619,7 @@
       "users": "Gebruikers",
       "billing": "Facturatie",
       "webhooks": "Webhooks",
+      "operations": "Operaties",
       "notifications": "Meldingen",
       "discounts": "Kortingscodes",
       "vouchers": "Vouchers",
@@ -912,6 +913,25 @@
         "search": "Zoeken",
         "searchPlaceholder": "Zoek op e-mail van gebruiker...",
         "transactionsDescription": "Recente creditactiviteit voor alle gebruikers",
+        "tabs": {
+          "overview": "Overzicht",
+          "revenue": "Omzet",
+          "purchases": "Aankopen",
+          "ledger": "Creditlogboek",
+          "consumption": "Verbruik",
+          "activity": "Activiteit",
+          "refunds": "Terugbetalingen & aanpassingen"
+        },
+        "consumptionChart": {
+          "title": "Totaal verbruikte credits",
+          "description": "Volg creditgebruik over tijd",
+          "label": "Verbruikte credits"
+        },
+        "activityChart": {
+          "title": "Creditactiviteit",
+          "description": "Volg creditlogboekactiviteit over tijd",
+          "label": "Transacties"
+        },
         "stats": {
           "receivedBreakdown": "{purchased} gekocht · {bonus} aankoopbonus · {vouchers} voucher · {adjustments} admin-aanpassingen"
         },
@@ -929,6 +949,15 @@
           "description": "Voltooide creditaankopen die via de betalingsprovider kunnen worden terugbetaald.",
           "empty": "Geen terugbetaalbare aankopen gevonden.",
           "action": "Terugbetalen",
+          "refundablePurchases": "Terugbetaalbare aankopen",
+          "refundablePurchasesDescription": "Voltooide aankopen die kunnen worden terugbetaald.",
+          "refundCredits": "Terugbetaalde credits",
+          "refundCreditsDescription": "Credits teruggedraaid door terugbetalingen.",
+          "adminAdjustments": "Admin-aanpassingen",
+          "adminAdjustmentsDescription": "Handmatige logboekaanpassingen.",
+          "refundedPurchases": "Terugbetaalde aankopen",
+          "refundedPurchasesDescription": "Creditaankopen die al zijn terugbetaald.",
+          "ledgerDescription": "Terugbetalingen en admin-aanpassingen voor alle gebruikers.",
           "success": "Terugbetaling succesvol aangemaakt",
           "error": "Terugbetaling aanmaken mislukt",
           "missingPayment": "Betalings-ID ontbreekt",
@@ -1536,7 +1565,8 @@
     "webhooks": "Webhooks",
     "discounts": "Kortingscodes",
     "vouchers": "Vouchers",
-    "logs": "Logs"
+    "logs": "Logs",
+    "system": "Systeem"
   },
   "creditProgressBar": {
     "creditsOf": "{current} van {total} tegoed",

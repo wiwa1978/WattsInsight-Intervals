@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
+import { serverError } from "../lib/http";
 import { getAuditRequestContext } from "../modules/audit/service";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -19,7 +20,7 @@ export function createAuthRouter() {
   router.post("/admin/stop-impersonating", async (c) => {
     const adminAuthApi = resolveAdminAuthApi(bootstrap.authModule);
     if (!adminAuthApi) {
-      return c.json({ success: false, error: "Better Auth admin API is unavailable" }, 500);
+      return serverError(c, "Better Auth admin API is unavailable");
     }
 
     const response = (await adminAuthApi.stopImpersonating({

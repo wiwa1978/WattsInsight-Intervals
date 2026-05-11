@@ -1,6 +1,7 @@
 import {
   Bell,
   CreditCard,
+  ListChecks,
   ServerCog,
   ShieldCheck,
   LayoutDashboard,
@@ -51,6 +52,11 @@ export const BackendNavAdminItems: BackendNavAdminItem[] = [
     title: "admin.nav.webhooks",
     url: "/admin/webhooks",
     icon: Webhook,
+  },
+  {
+    title: "admin.nav.operations",
+    url: "/admin/operations",
+    icon: ListChecks,
   },
   {
     title: "admin.nav.notifications",

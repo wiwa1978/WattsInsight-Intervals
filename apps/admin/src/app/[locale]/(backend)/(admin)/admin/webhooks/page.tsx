@@ -1,6 +1,6 @@
 import { Container } from "@/components/ui/container";
 import { WebhookEventsMonitor } from "@/components/layout/backend/admin/webhooks/webhook-events-monitor";
-import { getAdminWebhookEvents, getAdminWebhookStats } from "@/lib/services/admin";
+import { getAdminWebhookEventsServer, getAdminWebhookStatsServer } from "@/lib/api/admin.server";
 import type { AdminWebhookEventStatus } from "@platform/contracts";
 
 type AdminWebhooksPageProps = {
@@ -29,8 +29,8 @@ export default async function AdminWebhooksPage({ searchParams }: AdminWebhooksP
   };
 
   const [events, stats] = await Promise.all([
-    getAdminWebhookEvents({ limit, ...activeFilters, status: webhookStatus(activeFilters.status) }),
-    getAdminWebhookStats(),
+    getAdminWebhookEventsServer({ limit, ...activeFilters, status: webhookStatus(activeFilters.status) }).catch(() => ({ events: [], total: 0 })),
+    getAdminWebhookStatsServer().catch(() => ({ total: 0, processing: 0, processed: 0, failed: 0 })),
   ]);
 
   return (

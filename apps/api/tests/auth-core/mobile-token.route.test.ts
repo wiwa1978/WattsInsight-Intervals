@@ -69,6 +69,13 @@ const baseUser = {
   banExpires: null,
 };
 
+function expectApiErrorCode(code: string) {
+  return {
+    success: false,
+    error: expect.objectContaining({ code }),
+  };
+}
+
 describe("POST /auth/mobile/token gate", () => {
   beforeEach(() => {
     mocks.getSession.mockReset();
@@ -90,10 +97,7 @@ describe("POST /auth/mobile/token gate", () => {
     const { app, refreshTokens } = buildApp({ findById: () => baseUser });
     const res = await call(app);
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "INVALID_CREDENTIALS",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("INVALID_CREDENTIALS"));
     expect(refreshTokens.create).not.toHaveBeenCalled();
   });
 
@@ -103,10 +107,7 @@ describe("POST /auth/mobile/token gate", () => {
     });
     const res = await call(app);
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "EMAIL_NOT_VERIFIED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("EMAIL_NOT_VERIFIED"));
     // CRITICAL: no refresh token persisted for an ungated user
     expect(refreshTokens.create).not.toHaveBeenCalled();
   });
@@ -117,10 +118,7 @@ describe("POST /auth/mobile/token gate", () => {
     });
     const res = await call(app);
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "TWO_FACTOR_REQUIRED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("TWO_FACTOR_REQUIRED"));
     expect(refreshTokens.create).not.toHaveBeenCalled();
   });
 
@@ -130,10 +128,7 @@ describe("POST /auth/mobile/token gate", () => {
     });
     const res = await call(app);
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "ACCOUNT_BANNED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("ACCOUNT_BANNED"));
     expect(refreshTokens.create).not.toHaveBeenCalled();
   });
 
@@ -141,10 +136,7 @@ describe("POST /auth/mobile/token gate", () => {
     const { app, refreshTokens } = buildApp({ findById: () => null });
     const res = await call(app);
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "INVALID_CREDENTIALS",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("INVALID_CREDENTIALS"));
     expect(refreshTokens.create).not.toHaveBeenCalled();
   });
 
@@ -200,10 +192,7 @@ describe("bearer-token auth lifecycle gate", () => {
     const res = await callSession(app, "not-a-jwt");
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "UNAUTHORIZED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("UNAUTHORIZED"));
     expect(mocks.getSession).not.toHaveBeenCalled();
   });
 
@@ -214,10 +203,7 @@ describe("bearer-token auth lifecycle gate", () => {
     const res = await callSession(app, accessToken);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "UNAUTHORIZED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("UNAUTHORIZED"));
   });
 
   it("403 ACCOUNT_BANNED when bearer user was banned after token issuance", async () => {
@@ -227,10 +213,7 @@ describe("bearer-token auth lifecycle gate", () => {
     const res = await callSession(app, accessToken);
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "ACCOUNT_BANNED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("ACCOUNT_BANNED"));
   });
 });
 
@@ -274,10 +257,7 @@ describe("cookie-session auth lifecycle gate", () => {
     });
 
     expect(res.status).toBe(401);
-    await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "UNAUTHORIZED",
-    });
+    await expect(res.json()).resolves.toMatchObject(expectApiErrorCode("UNAUTHORIZED"));
   });
 });
 
@@ -303,10 +283,7 @@ describe("POST /auth/mobile/refresh lifecycle gate", () => {
     const res = await callRefresh(app);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "INVALID_REFRESH_TOKEN",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("INVALID_REFRESH_TOKEN"));
     expect(refreshTokens.rotate).not.toHaveBeenCalled();
   });
 
@@ -319,10 +296,7 @@ describe("POST /auth/mobile/refresh lifecycle gate", () => {
     const res = await callRefresh(app);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "INVALID_REFRESH_TOKEN",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("INVALID_REFRESH_TOKEN"));
     expect(refreshTokens.rotate).not.toHaveBeenCalled();
   });
 
@@ -335,10 +309,7 @@ describe("POST /auth/mobile/refresh lifecycle gate", () => {
     const res = await callRefresh(app);
 
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "ACCOUNT_BANNED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("ACCOUNT_BANNED"));
     expect(refreshTokens.rotate).not.toHaveBeenCalled();
   });
 
@@ -352,10 +323,7 @@ describe("POST /auth/mobile/refresh lifecycle gate", () => {
     const res = await callRefresh(app);
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toMatchObject({
-      success: false,
-      errorCode: "REFRESH_TOKEN_REUSED",
-    });
+    expect(await res.json()).toMatchObject(expectApiErrorCode("REFRESH_TOKEN_REUSED"));
   });
 
   it("200 rotates refresh token for eligible users", async () => {

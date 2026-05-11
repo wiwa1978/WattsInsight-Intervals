@@ -1,4 +1,5 @@
 import { normalizeAuthRole } from "@platform/auth-shared";
+import { errorCode } from "@platform/contracts/wire";
 
 import type { AuthFailure, AuthMiddleware } from "../types";
 
@@ -7,6 +8,7 @@ type SessionShape = {
     id?: string;
     role?: string | null;
     email?: string | null;
+    twoFactorEnabled?: boolean | null;
   };
   session?: unknown;
 };
@@ -15,6 +17,7 @@ type TokenUser = {
   id: string;
   role?: string | null;
   email?: string | null;
+  twoFactorEnabled?: boolean | null;
 };
 
 type GetAuthContext = (headers: Headers) => Promise<SessionShape | { user: TokenUser; session: null } | AuthFailure | null>;
@@ -31,21 +34,24 @@ export function createRequireAuth(getAuthContext: GetAuthContext): AuthMiddlewar
       return c.json(
         {
           success: false,
-          error: session.error,
-          ...(session.errorCode ? { errorCode: session.errorCode } : {}),
+          error: {
+            code: session.errorCode ?? errorCode.unauthorized,
+            message: session.error,
+          },
         },
         session.status,
       );
     }
 
     if (!session?.user?.id) {
-      return c.json({ success: false, error: "Unauthorized" }, 401);
+      return c.json({ success: false, error: { code: errorCode.unauthorized, message: "Unauthorized" } }, 401);
     }
 
     c.set("authUser", {
       id: session.user.id,
       role: normalizeAuthRole(session.user.role),
       email: session.user.email ?? null,
+      twoFactorEnabled: session.user.twoFactorEnabled ?? null,
     });
     c.set("authSession", session.session ?? null);
     await next();

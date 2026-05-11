@@ -5,6 +5,8 @@ import { createNotificationsApi } from "@platform/frontend-shared/notifications"
 import { apiRequest } from "./client";
 import type { Notification } from "@/schemas/notification";
 import type { ApplicationConfig, SubscriptionPayment, UserSubscription } from "@platform/contracts";
+import type { ApiKeySummary, CreateApiKeyResponseData, ApiKeyScope } from "@platform/contracts";
+import { apiRoutes } from "@platform/contracts/ts";
 
 export type { CountryRecord } from "@platform/frontend-shared/me-api";
 export type { CreateUserDataExportResponse, UserDataExportSummary } from "@platform/frontend-shared/me-api";
@@ -118,4 +120,24 @@ export async function cancelMyDataExport(exportId: string) {
 
 export function buildMyDataExportDownloadUrl(exportId: string, token: string) {
   return `/api/me/data-exports/${encodeURIComponent(exportId)}/download?token=${encodeURIComponent(token)}`;
+}
+
+export async function listMyApiKeys() {
+  const result = await apiRequest<{ success: boolean; data: ApiKeySummary[] }>(apiRoutes.me.apiKeys);
+  return result.data;
+}
+
+export async function createMyApiKey(payload: { name: string; scopes: ApiKeyScope[]; expiresAt?: string }) {
+  const result = await apiRequest<{ success: boolean; data: CreateApiKeyResponseData }>(apiRoutes.me.apiKeys, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return result.data;
+}
+
+export async function revokeMyApiKey(keyId: string) {
+  const result = await apiRequest<{ success: boolean; data: ApiKeySummary }>(apiRoutes.me.apiKey(keyId), {
+    method: "DELETE",
+  });
+  return result.data;
 }

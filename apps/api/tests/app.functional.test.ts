@@ -330,11 +330,11 @@ vi.mock("@platform/payments-core", () => ({
     const router = new Hono();
     router.post("/webhooks/:provider", async (c) => {
       if (c.req.param("provider") !== "dodo") {
-        return c.json({ success: false, error: "Unsupported payment provider" }, 404);
+        return c.json({ success: false, error: { code: "NOT_FOUND", message: "Unsupported payment provider" } }, 404);
       }
 
       if (c.req.header("x-dodo-signature") !== "valid") {
-        return c.json({ success: false, error: "Invalid signature" }, 401);
+        return c.json({ success: false, error: { code: "WEBHOOK_SIGNATURE_INVALID", message: "Invalid signature" } }, 401);
       }
       return c.json({ success: true, data: { processed: true } });
     });
@@ -431,10 +431,22 @@ function routeSignature(method: string, path: string): RouteSignature {
 async function expectValidationError(res: Response, error: string) {
   await expect(res.json()).resolves.toMatchObject({
     success: false,
-    error,
-    errorCode: "VALIDATION_FAILED",
+    error: {
+      code: "VALIDATION_FAILED",
+      message: error,
+    },
     requestId: expect.any(String),
   });
+}
+
+function expectApiError(message: string, code = "BAD_REQUEST") {
+  return {
+    success: false,
+    error: {
+      code,
+      message,
+    },
+  };
 }
 
 function readRouteSource(fileName: string) {
@@ -537,8 +549,10 @@ describe("API functional routes", () => {
     expect(res.headers.get("x-error-code")).toBe("VALIDATION_FAILED");
     await expect(res.json()).resolves.toMatchObject({
       success: false,
-      error: "Invalid countries query",
-      errorCode: "VALIDATION_FAILED",
+      error: {
+        code: "VALIDATION_FAILED",
+        message: "Invalid countries query",
+      },
       requestId: expect.any(String),
     });
   });
@@ -659,7 +673,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(404);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Unsupported payment provider" });
+    await expect(res.json()).resolves.toEqual(expectApiError("Unsupported payment provider", "NOT_FOUND"));
   });
 
   // Verifies checkout endpoint rejects requests without packageKey.
@@ -841,8 +855,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      error: "No billing customer found",
+      ...expectApiError("No billing customer found", "NOT_FOUND"),
     });
     expect(mocks.dodoCustomerPortal.create).not.toHaveBeenCalled();
   });
@@ -855,7 +868,7 @@ describe("API functional routes", () => {
     const res = await app.request(`/admin/users/${userId}`);
 
     expect(res.status).toBe(404);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "User not found" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("User not found", "NOT_FOUND"));
     expect(mocks.adminService.getUserById).toHaveBeenCalledWith(userId);
   });
 
@@ -1466,8 +1479,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "FORBIDDEN",
+      ...expectApiError("Invalid secret key provided.", "FORBIDDEN"),
     });
     expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
   });
@@ -1491,8 +1503,7 @@ describe("API functional routes", () => {
 
     expect(demoteRes.status).toBe(403);
     await expect(demoteRes.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "FORBIDDEN",
+      ...expectApiError("You cannot change your own role.", "FORBIDDEN"),
     });
     expect(unchangedRes.status).toBe(200);
     expect(mocks.adminAuthApi.setRole).toHaveBeenCalledTimes(1);
@@ -1515,8 +1526,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "FORBIDDEN",
+      ...expectApiError("Cannot demote the last active admin.", "FORBIDDEN"),
     });
     expect(mocks.adminAuthApi.setRole).not.toHaveBeenCalled();
     expect(mocks.adminAuthApi.revokeUserSessions).not.toHaveBeenCalled();
@@ -1541,15 +1551,11 @@ describe("API functional routes", () => {
 
     expect(missingReasonRes.status).toBe(403);
     await expect(missingReasonRes.json()).resolves.toMatchObject({
-      success: false,
-      error: "A reason is required for role changes.",
-      errorCode: "FORBIDDEN",
+      ...expectApiError("A reason is required for role changes.", "FORBIDDEN"),
     });
     expect(missingConfirmationRes.status).toBe(403);
     await expect(missingConfirmationRes.json()).resolves.toMatchObject({
-      success: false,
-      error: "Explicit confirmation is required to remove admin access.",
-      errorCode: "FORBIDDEN",
+      ...expectApiError("Explicit confirmation is required to remove admin access.", "FORBIDDEN"),
     });
     expect(mocks.adminAuthApi.setRole).not.toHaveBeenCalled();
   });
@@ -1594,8 +1600,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "FORBIDDEN",
+      ...expectApiError("Cannot ban the last active admin.", "FORBIDDEN"),
     });
     expect(mocks.adminAuthApi.banUser).not.toHaveBeenCalled();
   });
@@ -1613,8 +1618,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "FORBIDDEN",
+      ...expectApiError("Administrator accounts cannot be impersonated.", "FORBIDDEN"),
     });
     expect(mocks.adminAuthApi.impersonateUser).not.toHaveBeenCalled();
   });
@@ -1656,8 +1660,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(503);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      error: "Audit logging unavailable",
+      ...expectApiError("Audit logging unavailable", "BAD_REQUEST"),
     });
   });
 
@@ -1672,9 +1675,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      error: "Admin actions are blocked while impersonating another user.",
-      errorCode: "FORBIDDEN",
+      ...expectApiError("Admin actions are blocked while impersonating another user.", "FORBIDDEN"),
     });
     expect(mocks.adminAuthApi.revokeUserSessions).not.toHaveBeenCalled();
   });
@@ -2057,7 +2058,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Discount code already exists" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("Discount code already exists"));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "discount.create",
       outcome: "failure",
@@ -2102,9 +2103,9 @@ describe("API functional routes", () => {
     expect(createRes.status).toBe(500);
     expect(patchRes.status).toBe(500);
     expect(deleteRes.status).toBe(500);
-    await expect(createRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
-    await expect(patchRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
-    await expect(deleteRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(createRes.json()).resolves.toMatchObject(expectApiError("Internal server error", "INTERNAL_SERVER_ERROR"));
+    await expect(patchRes.json()).resolves.toMatchObject(expectApiError("Internal server error", "INTERNAL_SERVER_ERROR"));
+    await expect(deleteRes.json()).resolves.toMatchObject(expectApiError("Internal server error", "INTERNAL_SERVER_ERROR"));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "discount.create",
       outcome: "failure",
@@ -2291,7 +2292,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Voucher not found" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("Voucher not found"));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "voucher.update",
       outcome: "failure",
@@ -2329,8 +2330,8 @@ describe("API functional routes", () => {
 
     expect(createRes.status).toBe(500);
     expect(patchRes.status).toBe(500);
-    await expect(createRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
-    await expect(patchRes.json()).resolves.toMatchObject({ success: false, error: "Internal server error" });
+    await expect(createRes.json()).resolves.toMatchObject(expectApiError("Internal server error", "INTERNAL_SERVER_ERROR"));
+    await expect(patchRes.json()).resolves.toMatchObject(expectApiError("Internal server error", "INTERNAL_SERVER_ERROR"));
     expect(mocks.auditService.recordAuditEntry).toHaveBeenCalledWith(expect.objectContaining({
       action: "voucher.create",
       outcome: "failure",
@@ -2403,7 +2404,7 @@ describe("API functional routes", () => {
     expect(mocks.vouchersService.redeemVoucher).toHaveBeenNthCalledWith(1, "auth-user", "welcome10");
     expect(mocks.vouchersService.redeemVoucher).toHaveBeenNthCalledWith(2, "auth-user", "missing");
     await expect(redeemOkRes.json()).resolves.toEqual({ success: true, creditsAdded: 25, newBalance: 40 });
-    await expect(redeemFailRes.json()).resolves.toEqual({ success: false, error: "Voucher not found" });
+    await expect(redeemFailRes.json()).resolves.toMatchObject(expectApiError("Voucher not found"));
   });
 
   // Verifies voucher redeem payload validation happens before the service call.
@@ -2610,7 +2611,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Unauthorized" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("Unauthorized"));
     expect(mocks.billingService.downloadInvoice).toHaveBeenCalledWith("auth-user", "pay_1");
   });
 
@@ -2643,7 +2644,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Unknown package" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("Unknown package"));
   });
 
   // Verifies client log endpoint rejects malformed payloads.
@@ -2655,7 +2656,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid log payload" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("Invalid log payload", "VALIDATION_FAILED"));
   });
 
   // Verifies client log endpoint accepts minimal valid payloads.
@@ -2667,7 +2668,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true });
+    await expect(res.json()).resolves.toEqual({ success: true, data: { accepted: true } });
   });
 
   it("rejects invalid admin log entry file names with validation error", async () => {
@@ -2990,8 +2991,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(413);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "PAYLOAD_TOO_LARGE",
+      ...expectApiError("Payload too large", "PAYLOAD_TOO_LARGE"),
     });
   });
 
@@ -3010,8 +3010,7 @@ describe("API functional routes", () => {
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).toBeTruthy();
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      errorCode: "RATE_LIMITED",
+      ...expectApiError("Too many requests", "RATE_LIMITED"),
     });
   });
 
@@ -3026,7 +3025,7 @@ describe("API functional routes", () => {
     });
 
     expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toEqual({ success: false, error: "generator failed" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("generator failed"));
   });
 
   // Verifies discount code generation endpoint returns generated code on success.
@@ -3058,7 +3057,7 @@ describe("API functional routes", () => {
     const res = await app.request("/admin/discounts/11111111-1111-4111-8111-111111111111");
 
     expect(res.status).toBe(404);
-    await expect(res.json()).resolves.toEqual({ success: false, discount: null, error: "Discount not found" });
+    await expect(res.json()).resolves.toMatchObject(expectApiError("Discount not found", "NOT_FOUND"));
   });
 
   // Verifies discount validation endpoint passes excludeId and code to service.
@@ -3129,8 +3128,7 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
-      success: false,
-      error: "Insufficient credits",
+      ...expectApiError("Insufficient credits"),
     });
   });
 

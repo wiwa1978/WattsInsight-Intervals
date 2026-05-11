@@ -13,6 +13,7 @@ import {
   LinkedAccountsCard,
   DeleteAccountCard,
   DataExportCard,
+  ApiKeysCard,
 } from "@/components/layout/backend/settings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -79,6 +80,7 @@ export default function SettingsPage() {
 
         {/* Privacy Tab */}
         <TabsContent value="privacy" className="space-y-6">
+          <ApiKeysCard />
           <DataExportCard />
         </TabsContent>
       </Tabs>

@@ -3,11 +3,9 @@ import { Hono } from "hono";
 import { errorCode } from "@platform/contracts";
 
 import { mapDodoEvent } from "./providers/dodo/mapper";
-import {
-  type WebhookVerifyResult,
-  verifyDodoWebhookSignatureDetailed,
-} from "./providers/dodo/webhook-verify";
+import { verifyDodoWebhookSignatureDetailed } from "./providers/dodo/webhook-verify";
 import type { CreatePaymentsModuleOptions, PaymentWebhookProviderConfig, WebhookFailureAuditEvent } from "./types";
+import type { WebhookVerifyResult } from "./types";
 
 type SafeWebhookMetadata = Pick<WebhookFailureAuditEvent, "providerEventId" | "eventType" | "paymentId">;
 type PaymentWebhookDispatcher = Omit<PaymentWebhookProviderConfig, "verify"> & {
@@ -34,8 +32,10 @@ function failureToResponse(reason: Exclude<WebhookVerifyResult, { ok: true }>["r
         status: 401 as const,
         body: {
           success: false as const,
-          error: "Missing webhook signature header",
-          errorCode: errorCode.webhookSignatureMissing,
+          error: {
+            code: errorCode.webhookSignatureMissing,
+            message: "Missing webhook signature header",
+          },
         },
       };
     case "missing_secret":
@@ -45,8 +45,10 @@ function failureToResponse(reason: Exclude<WebhookVerifyResult, { ok: true }>["r
         status: 500 as const,
         body: {
           success: false as const,
-          error: "Webhook secret not configured",
-          errorCode: errorCode.webhookSignatureMissing,
+          error: {
+            code: errorCode.webhookSignatureMissing,
+            message: "Webhook secret not configured",
+          },
         },
       };
     case "timestamp_out_of_window":
@@ -54,8 +56,10 @@ function failureToResponse(reason: Exclude<WebhookVerifyResult, { ok: true }>["r
         status: 401 as const,
         body: {
           success: false as const,
-          error: "Webhook timestamp outside tolerance window",
-          errorCode: errorCode.webhookTimestampOutOfWindow,
+          error: {
+            code: errorCode.webhookTimestampOutOfWindow,
+            message: "Webhook timestamp outside tolerance window",
+          },
         },
       };
     case "malformed_header":
@@ -65,8 +69,10 @@ function failureToResponse(reason: Exclude<WebhookVerifyResult, { ok: true }>["r
         status: 401 as const,
         body: {
           success: false as const,
-          error: "Invalid webhook signature",
-          errorCode: errorCode.webhookSignatureInvalid,
+          error: {
+            code: errorCode.webhookSignatureInvalid,
+            message: "Invalid webhook signature",
+          },
         },
       };
   }
@@ -126,14 +132,13 @@ function paymentWebhookDispatcherForProvider(provider: string, options: CreatePa
 }
 
 async function verifyWebhookSignature(dispatcher: PaymentWebhookDispatcher, rawBody: string, signatureHeader: string | null): Promise<WebhookVerifyResult> {
+  if (!dispatcher.verify && dispatcher.provider !== "dodo") {
+    return { ok: false, reason: "missing_secret" };
+  }
+
   const result = dispatcher.verify
     ? await dispatcher.verify(rawBody, signatureHeader)
-    : verifyDodoWebhookSignatureDetailed(
-        rawBody,
-        signatureHeader,
-        dispatcher.secret,
-        { toleranceSeconds: dispatcher.toleranceSeconds },
-      );
+    : verifyDodoWebhookSignatureDetailed(rawBody, signatureHeader, dispatcher.secret, { toleranceSeconds: dispatcher.toleranceSeconds });
 
   // Allow boolean returns from custom verifiers for backward compat.
   if (typeof result === "boolean") {
@@ -173,7 +178,7 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
     const provider = c.req.param("provider");
     const dispatcher = paymentWebhookDispatcherForProvider(provider, options);
     if (!dispatcher) {
-      return c.json({ success: false, error: "Unsupported payment provider" }, 404);
+      return c.json({ success: false, error: { code: errorCode.notFound, message: "Unsupported payment provider" } }, 404);
     }
 
     const signatureHeader = c.req.header(dispatcher.signatureHeaderName) ?? null;
@@ -194,20 +199,20 @@ export function createPaymentsModule(options: CreatePaymentsModuleOptions) {
       payload = JSON.parse(rawBody);
     } catch {
       await recordWebhookFailure(options, dispatcher.provider, UNAUTHENTICATED_WEBHOOK_METADATA, "invalid_json");
-      return c.json({ success: false, error: "Invalid JSON payload" }, 400);
+      return c.json({ success: false, error: { code: errorCode.badRequest, message: "Invalid JSON payload" } }, 400);
     }
 
     const event = dispatcher.mapEvent(payload);
     if (!event) {
       await recordWebhookFailure(options, dispatcher.provider, extractSafeWebhookMetadata(payload), "unsupported_event");
-      return c.json({ success: false, error: "Unsupported webhook payload" }, 400);
+      return c.json({ success: false, error: { code: errorCode.badRequest, message: "Unsupported webhook payload" } }, 400);
     }
 
     if (options.webhookEventStore) {
       const providerEventId = event.providerEventId;
       if (!providerEventId) {
         await recordWebhookFailure(options, event.provider, event, "missing_event_id");
-        return c.json({ success: false, error: "Missing webhook event id" }, 400);
+        return c.json({ success: false, error: { code: errorCode.badRequest, message: "Missing webhook event id" } }, 400);
       }
 
       const claim = await options.webhookEventStore.claim({

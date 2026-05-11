@@ -71,8 +71,10 @@ export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
     return c.json(
       {
         success: false,
-        error: "Forbidden origin",
-        errorCode: errorCode.forbidden,
+        error: {
+          code: errorCode.forbidden,
+          message: "Forbidden origin",
+        },
       },
       403,
     );

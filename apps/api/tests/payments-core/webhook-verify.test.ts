@@ -136,7 +136,7 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       success: false,
-      errorCode: "WEBHOOK_SIGNATURE_MISSING",
+      error: { code: "WEBHOOK_SIGNATURE_MISSING" },
     });
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
@@ -149,7 +149,7 @@ describe("POST /webhooks/dodo response codes", () => {
     });
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ success: false, error: "Unsupported payment provider" });
+    expect(await res.json()).toEqual({ success: false, error: { code: "NOT_FOUND", message: "Unsupported payment provider" } });
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
 
@@ -203,7 +203,7 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       success: false,
-      errorCode: "WEBHOOK_SIGNATURE_INVALID",
+      error: { code: "WEBHOOK_SIGNATURE_INVALID" },
     });
     expect(onPaymentEvent).not.toHaveBeenCalled();
     expect(onWebhookFailure).toHaveBeenCalledWith({
@@ -231,7 +231,7 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       success: false,
-      errorCode: "WEBHOOK_SIGNATURE_INVALID",
+      error: { code: "WEBHOOK_SIGNATURE_INVALID" },
     });
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
@@ -248,7 +248,7 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       success: false,
-      errorCode: "WEBHOOK_TIMESTAMP_OUT_OF_WINDOW",
+      error: { code: "WEBHOOK_TIMESTAMP_OUT_OF_WINDOW" },
     });
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
@@ -266,7 +266,7 @@ describe("POST /webhooks/dodo response codes", () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toMatchObject({
       success: false,
-      errorCode: "WEBHOOK_SIGNATURE_INVALID",
+      error: { code: "WEBHOOK_SIGNATURE_INVALID" },
     });
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });
@@ -542,7 +542,7 @@ describe("POST /webhooks/dodo response codes", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ success: false, error: "Missing webhook event id" });
+    expect(await res.json()).toMatchObject({ success: false, error: { code: "BAD_REQUEST", message: "Missing webhook event id" } });
     expect(store.claim).not.toHaveBeenCalled();
     expect(onPaymentEvent).not.toHaveBeenCalled();
   });

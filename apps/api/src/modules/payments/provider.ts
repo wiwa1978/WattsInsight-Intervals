@@ -143,6 +143,19 @@ export type ProviderDiscount = {
   raw?: unknown;
 };
 
+export type ProviderCreateDiscountInput = {
+  amount: number;
+  type: "percentage";
+  code: string | null;
+  expiresAt: string | null;
+  name: string | null;
+  restrictedTo: string[] | null;
+  subscriptionCycles: number | null;
+  usageLimit: number | null;
+};
+
+export type ProviderUpdateDiscountInput = Partial<ProviderCreateDiscountInput>;
+
 export type ProviderProduct = {
   provider: PaymentProviderName;
   productId: string;
@@ -239,6 +252,9 @@ export type PaymentProvider = {
   createCustomerPortal?(input: CustomerPortalInput): Promise<CustomerPortalResult>;
   getInvoice?(paymentId: string): Promise<InvoiceResult>;
   createRefund?(input: CreateRefundInput): Promise<RefundResult>;
+  createDiscount?(input: ProviderCreateDiscountInput): Promise<ProviderDiscount>;
+  updateDiscount?(id: string, input: ProviderUpdateDiscountInput): Promise<ProviderDiscount>;
+  deleteDiscount?(id: string): Promise<void>;
   finance?: PaymentProviderFinance;
 };
 

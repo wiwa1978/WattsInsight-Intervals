@@ -7,3 +7,4 @@ export { ActiveSessionsCard } from "./active-sessions-card";
 export { LinkedAccountsCard } from "./linked-accounts-card";
 export { DeleteAccountCard } from "./delete-account-card";
 export { DataExportCard } from "./data-export-card";
+export { ApiKeysCard } from "./api-keys-card";

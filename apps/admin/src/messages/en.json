@@ -619,6 +619,7 @@
       "users": "Users",
       "billing": "Billing",
       "webhooks": "Webhooks",
+      "operations": "Operations",
       "notifications": "Notifications",
       "discounts": "Discounts",
       "vouchers": "Vouchers",
@@ -912,6 +913,25 @@
         "search": "Search",
         "searchPlaceholder": "Search by user email...",
         "transactionsDescription": "Recent credit activity across all users",
+        "tabs": {
+          "overview": "Overview",
+          "revenue": "Revenue",
+          "purchases": "Purchases",
+          "ledger": "Credit ledger",
+          "consumption": "Consumption",
+          "activity": "Activity",
+          "refunds": "Refunds & adjustments"
+        },
+        "consumptionChart": {
+          "title": "Total credits consumed",
+          "description": "Track credit usage over time",
+          "label": "Credits consumed"
+        },
+        "activityChart": {
+          "title": "Credit activity",
+          "description": "Track credit ledger activity over time",
+          "label": "Transactions"
+        },
         "stats": {
           "receivedBreakdown": "{purchased} purchased · {bonus} purchase bonus · {vouchers} voucher · {adjustments} admin adjustments"
         },
@@ -929,6 +949,15 @@
           "description": "Completed credit purchases that can be refunded through the payment provider.",
           "empty": "No refundable purchases found.",
           "action": "Refund",
+          "refundablePurchases": "Refundable purchases",
+          "refundablePurchasesDescription": "Completed purchases eligible for provider refund.",
+          "refundCredits": "Refund credits",
+          "refundCreditsDescription": "Credits reversed by refunds.",
+          "adminAdjustments": "Admin adjustments",
+          "adminAdjustmentsDescription": "Manual ledger adjustments.",
+          "refundedPurchases": "Refunded purchases",
+          "refundedPurchasesDescription": "Credit purchases already refunded.",
+          "ledgerDescription": "Refund and admin adjustment activity across all users.",
           "success": "Refund created successfully",
           "error": "Failed to create refund",
           "missingPayment": "Missing payment ID",
@@ -1536,7 +1565,8 @@
     "webhooks": "Webhooks",
     "discounts": "Discounts",
     "vouchers": "Vouchers",
-    "logs": "Logs"
+    "logs": "Logs",
+    "system": "System"
   },
   "creditProgressBar": {
     "creditsOf": "{current} of {total} credits",

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import {
   creditTransactions,
@@ -18,23 +18,15 @@ import type {
 import { creditBillingConfig } from "../../config/billing";
 
 type VoucherRecord = typeof vouchers.$inferSelect;
-type VoucherQueryRecord = VoucherRecord & {
-  assignments: Array<{
-    user: {
-      id: string;
-      name: string | null;
-      email: string;
-    };
-  }>;
-  redemptions: Array<{
-    id: string;
-    voucherId: string;
-    userId: string;
-    creditsGranted: number;
-    redeemedAt: Date;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
+type VoucherRedemptionRecord = typeof voucherRedemptions.$inferSelect;
+type VoucherUserSummary = {
+  id: string;
+  name: string | null;
+  email: string;
+};
+type VoucherWithRelations = VoucherRecord & {
+  assignedUsers: VoucherUserSummary[];
+  redemptions: VoucherRedemptionRecord[];
 };
 
 type VouchersServiceDeps = {
@@ -169,15 +161,6 @@ async function replaceVoucherAssignments(tx: DbTransaction, voucherId: string, u
   );
 }
 
-function mapVoucherWithRelations(voucher: VoucherQueryRecord) {
-  const { assignments, ...rest } = voucher;
-
-  return {
-    ...rest,
-    assignedUsers: assignments.map((assignment) => assignment.user),
-  };
-}
-
 function getRedeemableVoucherStatus(voucher: VoucherRecord) {
   return inferVoucherStatus({
     status: voucher.status,
@@ -185,6 +168,56 @@ function getRedeemableVoucherStatus(voucher: VoucherRecord) {
     maxRedemptions: voucher.maxRedemptions,
     expiresAt: voucher.expiresAt,
   });
+}
+
+async function loadVoucherRelations(
+  db: VouchersServiceDeps["db"],
+  voucherRows: VoucherRecord[],
+): Promise<VoucherWithRelations[]> {
+  if (voucherRows.length === 0) {
+    return [];
+  }
+
+  const voucherIds = voucherRows.map((voucher) => voucher.id);
+  const [assignmentRows, redemptionRows] = await Promise.all([
+    db
+      .select({
+        voucherId: voucherAssignments.voucherId,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+      })
+      .from(voucherAssignments)
+      .innerJoin(user, eq(voucherAssignments.userId, user.id))
+      .where(inArray(voucherAssignments.voucherId, voucherIds)),
+    db
+      .select()
+      .from(voucherRedemptions)
+      .where(inArray(voucherRedemptions.voucherId, voucherIds)),
+  ]);
+
+  const assignedUsersByVoucherId = new Map<string, VoucherUserSummary[]>();
+  const redemptionsByVoucherId = new Map<string, VoucherRedemptionRecord[]>();
+
+  for (const assignment of assignmentRows) {
+    const assignedUsers = assignedUsersByVoucherId.get(assignment.voucherId) ?? [];
+    assignedUsers.push(assignment.user);
+    assignedUsersByVoucherId.set(assignment.voucherId, assignedUsers);
+  }
+
+  for (const redemption of redemptionRows) {
+    const voucherRedemptionRows = redemptionsByVoucherId.get(redemption.voucherId) ?? [];
+    voucherRedemptionRows.push(redemption);
+    redemptionsByVoucherId.set(redemption.voucherId, voucherRedemptionRows);
+  }
+
+  return voucherRows.map((voucher) => ({
+    ...voucher,
+    assignedUsers: assignedUsersByVoucherId.get(voucher.id) ?? [],
+    redemptions: redemptionsByVoucherId.get(voucher.id) ?? [],
+  }));
 }
 
 async function lockVoucherByCode(tx: DbTransaction, code: string) {
@@ -466,24 +499,11 @@ export function createVouchersService(deps: VouchersServiceDeps) {
         orderBy: desc(vouchers.createdAt),
         limit: normalizedLimit,
         offset: normalizedOffset,
-        with: {
-          assignments: {
-            with: {
-              user: {
-                columns: {
-                  id: true,
-                  name: true,
-                  email: true,
-                },
-              },
-            },
-          },
-          redemptions: true,
-        },
       });
+      const vouchersWithRelations = await loadVoucherRelations(deps.db, vouchersList);
 
       return {
-        vouchers: vouchersList.map((voucher: unknown) => mapVoucherWithRelations(voucher as VoucherQueryRecord)),
+        vouchers: vouchersWithRelations,
         total: matchingVoucherIds.length,
         hasMore: normalizedOffset + normalizedLimit < matchingVoucherIds.length,
       };
@@ -494,21 +514,8 @@ export function createVouchersService(deps: VouchersServiceDeps) {
       orderBy: desc(vouchers.createdAt),
       limit: normalizedLimit,
       offset: normalizedOffset,
-      with: {
-        assignments: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-        redemptions: true,
-      },
     });
+    const vouchersWithRelations = await loadVoucherRelations(deps.db, vouchersList);
 
     const countRows = statusFilter
       ? await deps.db.select({ count: sql<number>`COUNT(*)` }).from(vouchers).where(statusFilter)
@@ -516,7 +523,7 @@ export function createVouchersService(deps: VouchersServiceDeps) {
     const [{ count }] = countRows;
 
     return {
-      vouchers: vouchersList.map((voucher: unknown) => mapVoucherWithRelations(voucher as VoucherQueryRecord)),
+      vouchers: vouchersWithRelations,
       total: count ?? 0,
       hasMore: normalizedOffset + normalizedLimit < (count ?? 0),
     };
@@ -525,27 +532,15 @@ export function createVouchersService(deps: VouchersServiceDeps) {
   async function getVoucherById(voucherId: string) {
     const voucher = await deps.db.query.vouchers.findFirst({
       where: eq(vouchers.id, voucherId),
-      with: {
-        assignments: {
-          with: {
-            user: {
-              columns: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-        redemptions: true,
-      },
     });
 
     if (!voucher) {
       return voucherFailure("Voucher not found");
     }
 
-    return voucherSuccess({ voucher: mapVoucherWithRelations(voucher as VoucherQueryRecord) });
+    const [voucherWithRelations] = await loadVoucherRelations(deps.db, [voucher]);
+
+    return voucherSuccess({ voucher: voucherWithRelations });
   }
 
   async function searchUsers(query: string, limit = 20) {

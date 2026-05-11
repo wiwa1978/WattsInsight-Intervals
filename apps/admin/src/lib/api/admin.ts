@@ -5,6 +5,7 @@ import type {
   AdminDashboardStats,
   AdminCreditRefundResponseData,
   AdminCreditsDashboard,
+  AdminSubscriptionFinanceDashboard,
   AdminSubscriptionRefundResponseData,
   AdminSearchUser,
   AdminUserDetail,
@@ -225,6 +226,19 @@ export type AdminCreditsDashboardQuery = {
   range?: "7d" | "30d" | "90d" | "12m" | "ytd";
 };
 
+export type AdminSubscriptionFinanceDashboardQuery = {
+  range?: "7d" | "30d" | "90d" | "12m" | "ytd";
+  startDate?: string;
+  endDate?: string;
+  grouping?: "day" | "week" | "month" | "year";
+  currency?: string;
+  planKey?: string;
+  status?: "active" | "trialing" | "past_due" | "canceled" | "expired" | "paused";
+  search?: string;
+  subscriptionsPage?: number;
+  subscriptionsSearch?: string;
+};
+
 export async function getAdminCreditsDashboardApi(query: AdminCreditsDashboardQuery = {}) {
   const result = await apiRequest<{ success: boolean; data: AdminCreditsDashboard }>(
     apiRoutes.admin.billingCreditsDashboard(query),
@@ -278,6 +292,13 @@ export async function getAdminBillingSubscriptionStatsApi() {
 export async function getAdminBillingSubscriptionFinanceSummaryApi() {
   const result = await apiRequest<{ success: boolean; data: SubscriptionFinanceSummary }>(
     apiRoutes.admin.billingSubscriptionFinanceSummary,
+  );
+  return result.data;
+}
+
+export async function getAdminBillingSubscriptionFinanceDashboardApi(query: AdminSubscriptionFinanceDashboardQuery = {}) {
+  const result = await apiRequest<{ success: boolean; data: AdminSubscriptionFinanceDashboard }>(
+    apiRoutes.admin.billingSubscriptionFinanceDashboard(query),
   );
   return result.data;
 }

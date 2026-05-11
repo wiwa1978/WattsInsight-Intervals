@@ -1,10 +1,12 @@
-import { hasAdminAccess, normalizeAuthEmail } from "@platform/auth-shared";
+import { authConfig, hasAdminAccess, normalizeAuthEmail } from "@platform/auth-shared";
+import { errorCode } from "@platform/contracts/wire";
 
 import type { AuthMiddleware } from "../types";
 
 type AuthUser = {
   role?: string | null;
   email?: string | null;
+  twoFactorEnabled?: boolean | null;
 };
 
 type RequireAdminAccessOptions = {
@@ -21,8 +23,10 @@ export function createRequireAdminAccess(options: RequireAdminAccessOptions): Au
       const response = c.json(
         {
           success: false,
-          error: "Forbidden",
-          code: "ADMIN_FORBIDDEN",
+          error: {
+            code: errorCode.forbidden,
+            message: "Forbidden",
+          },
           invalidateSession: true,
           redirectTo: "/login?reason=forbidden-admin",
         },
@@ -31,6 +35,20 @@ export function createRequireAdminAccess(options: RequireAdminAccessOptions): Au
 
       response.headers.set("x-auth-invalidate", "1");
       return response;
+    }
+
+    if (authConfig.adminPortalTotpRequired && user?.twoFactorEnabled !== true) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: errorCode.twoFactorRequired,
+            message: "Admin two-factor authentication is required.",
+          },
+          redirectTo: "/settings?reason=totp-required",
+        },
+        403,
+      );
     }
 
     await next();

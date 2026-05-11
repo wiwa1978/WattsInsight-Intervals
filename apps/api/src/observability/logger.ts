@@ -128,7 +128,7 @@ const logDirectory = resolveLogDirectory();
 let logDirReady = false;
 
 function shouldLog(level: LogLevel) {
-  return levelPriority[level] >= levelPriority[env.LOG_LEVEL];
+  return levelPriority[level] >= levelPriority[env.LOG_LEVEL ?? "info"];
 }
 
 function getLogFileName(stream: LogStream, date = new Date()) {

@@ -77,7 +77,7 @@ function getPlanKey(productId: string, metadata: Record<string, string> | null |
     return metadata.planKey;
   }
 
-  const plan = subscriptionPlans.find((entry) => entry.productId === productId);
+  const plan = subscriptionPlans.find((entry) => Object.values(entry.providerProductIds).includes(productId));
   return plan?.key ?? null;
 }
 

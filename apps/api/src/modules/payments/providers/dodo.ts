@@ -106,6 +106,8 @@ type DodoDiscountListItem = {
   name?: string | null;
 };
 
+type DodoDiscountResponse = DodoDiscountListItem;
+
 type DodoProductListItem = {
   product_id: string;
   created_at?: string | null;
@@ -200,6 +202,24 @@ function dodoCustomer(customer?: DodoCustomer | null) {
 
 function money(amount?: number | null, currency?: string | null) {
   return typeof amount === "number" && currency ? { amount, currency } : null;
+}
+
+function dodoDiscount(discount: DodoDiscountListItem) {
+  return {
+    provider: "dodo" as const,
+    discountId: discount.discount_id,
+    code: discount.code ?? null,
+    type: discount.type ?? null,
+    amount: discount.amount ?? null,
+    timesUsed: discount.times_used ?? null,
+    usageLimit: discount.usage_limit ?? null,
+    subscriptionCycles: discount.subscription_cycles ?? null,
+    expiresAt: discount.expires_at ?? null,
+    restrictedTo: discount.restricted_to ?? [],
+    createdAt: discount.created_at ?? null,
+    name: discount.name ?? null,
+    raw: discount,
+  };
 }
 
 async function dodoApiRequest<T>(
@@ -325,6 +345,44 @@ export function createDodoPaymentProvider(options: DodoPaymentProviderOptions): 
         raw: refund,
       };
     },
+    async createDiscount(input) {
+      const discount = await dodoApiRequest<DodoDiscountResponse>(options, "/discounts", "Discount provider request timed out", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: input.amount,
+          type: input.type,
+          code: input.code,
+          expires_at: input.expiresAt,
+          name: input.name,
+          restricted_to: input.restrictedTo,
+          subscription_cycles: input.subscriptionCycles,
+          usage_limit: input.usageLimit,
+        }),
+      });
+
+      return dodoDiscount(discount);
+    },
+    async updateDiscount(id, input) {
+      const body: Record<string, unknown> = {};
+      if (input.amount !== undefined) body.amount = input.amount;
+      if (input.type !== undefined) body.type = input.type;
+      if (input.code !== undefined) body.code = input.code;
+      if (input.expiresAt !== undefined) body.expires_at = input.expiresAt;
+      if (input.name !== undefined) body.name = input.name;
+      if (input.restrictedTo !== undefined) body.restricted_to = input.restrictedTo;
+      if (input.subscriptionCycles !== undefined) body.subscription_cycles = input.subscriptionCycles;
+      if (input.usageLimit !== undefined) body.usage_limit = input.usageLimit;
+
+      const discount = await dodoApiRequest<DodoDiscountResponse>(options, `/discounts/${id}`, "Discount provider request timed out", {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+
+      return dodoDiscount(discount);
+    },
+    async deleteDiscount(id) {
+      await dodoApiRequest<void>(options, `/discounts/${id}`, "Discount provider request timed out", { method: "DELETE" });
+    },
     finance: options.apiKey
       ? {
           async listPayments(params) {
@@ -431,21 +489,7 @@ export function createDodoPaymentProvider(options: DodoPaymentProviderOptions): 
               "Payment provider discounts request timed out",
             );
             return {
-              items: (data.items ?? []).map((discount) => ({
-                provider: "dodo",
-                discountId: discount.discount_id,
-                code: discount.code ?? null,
-                type: discount.type ?? null,
-                amount: discount.amount ?? null,
-                timesUsed: discount.times_used ?? null,
-                usageLimit: discount.usage_limit ?? null,
-                subscriptionCycles: discount.subscription_cycles ?? null,
-                expiresAt: discount.expires_at ?? null,
-                restrictedTo: discount.restricted_to ?? [],
-                createdAt: discount.created_at ?? null,
-                name: discount.name ?? null,
-                raw: discount,
-              })),
+              items: (data.items ?? []).map(dodoDiscount),
               nextCursor: data.next_cursor ?? data.nextCursor ?? null,
             };
           },

@@ -1,4 +1,9 @@
-import type { WebhookVerifyResult } from "./providers/dodo/webhook-verify";
+export type WebhookVerifyResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "missing_secret" | "missing_header" | "malformed_header" | "timestamp_out_of_window" | "signature_mismatch";
+    };
 
 export type NormalizedPaymentEvent = {
   provider: string;

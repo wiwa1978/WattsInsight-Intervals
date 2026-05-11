@@ -2,7 +2,7 @@ export type CreditPlanDefinition = {
   credits: number;
   price: number;
   currency: string;
-  productId: string;
+  providerProductIds: Record<string, string>;
   bonus?: number;
   popular?: boolean;
 };
@@ -21,13 +21,13 @@ export const CREDIT_PLANS = {
     credits: 10,
     price: 1000,
     currency: "EUR",
-    productId: "pdt_0NeNL8fjHXLCTIYfvSxYu",
+    providerProductIds: { dodo: "pdt_0NeNL8fjHXLCTIYfvSxYu" },
   },
   advanced: {
     credits: 25,
     price: 2500,
     currency: "EUR",
-    productId: "pdt_0NeNLCAY7sLmCDqKfD2wK",
+    providerProductIds: { dodo: "pdt_0NeNLCAY7sLmCDqKfD2wK" },
     bonus: 5,
     popular: true,
   },
@@ -35,7 +35,7 @@ export const CREDIT_PLANS = {
     credits: 50,
     price: 5000,
     currency: "EUR",
-    productId: "pdt_0NeNLF57Srgh8qy0lD1kG",
+    providerProductIds: { dodo: "pdt_0NeNLF57Srgh8qy0lD1kG" },
     bonus: 20,
   },
 } as const satisfies CreditPlanConfig;

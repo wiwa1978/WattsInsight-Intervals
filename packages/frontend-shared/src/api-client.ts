@@ -1,8 +1,28 @@
 type ApiErrorBody = {
-  error?: string;
+  error?: string | {
+    code?: string;
+    message?: string;
+  };
   errorCode?: string;
   requestId?: string;
 };
+
+function getApiErrorCode(body: ApiErrorBody | null, response: Response) {
+  const nestedCode = typeof body?.error === "object" && body.error !== null ? body.error.code : undefined;
+  return nestedCode ?? body?.errorCode ?? response.headers.get("x-error-code") ?? undefined;
+}
+
+function getApiErrorMessage(body: ApiErrorBody | null, rawBody: string, response: Response) {
+  if (typeof body?.error === "string") {
+    return body.error;
+  }
+
+  if (typeof body?.error === "object" && body.error !== null && typeof body.error.message === "string") {
+    return body.error.message;
+  }
+
+  return rawBody || response.statusText;
+}
 
 export class ApiRequestError extends Error {
   status: number;
@@ -82,8 +102,8 @@ export function createApiRequest(options: ApiRequestFactoryOptions) {
       }
 
       const requestId = parsedBody?.requestId ?? response.headers.get("x-request-id") ?? undefined;
-      const errorCode = parsedBody?.errorCode ?? response.headers.get("x-error-code") ?? undefined;
-      const errorMessage = parsedBody?.error ?? (rawBody || response.statusText);
+      const errorCode = getApiErrorCode(parsedBody, response);
+      const errorMessage = getApiErrorMessage(parsedBody, rawBody, response);
       const isProductionServerError = options.nodeEnv === "production" && response.status >= 500;
       const message = isProductionServerError
         ? `Something went wrong. Error code: ${errorCode ?? requestId ?? "UNKNOWN"}`

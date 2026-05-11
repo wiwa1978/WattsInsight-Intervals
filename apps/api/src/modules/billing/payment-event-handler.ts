@@ -7,8 +7,6 @@ import { isProviderSubscriptionWebhookEvent } from "./subscription-webhooks";
 
 type CreditPackage = (typeof CreditPackagesList)[number];
 
-const EXPECTED_PAYMENT_CURRENCY = "EUR";
-
 export type PaymentEventHandlerDeps = {
   creditPackages: ReadonlyArray<CreditPackage>;
   billing: {
@@ -54,6 +52,10 @@ export type PaymentEventHandlerDeps = {
     }) => Promise<unknown>;
   };
 };
+
+function productIdForProvider(product: { providerProductIds: Record<string, string> }, provider: string) {
+  return product.providerProductIds[provider];
+}
 
 const DISPUTE_REVERSAL_EVENTS = new Set(["dispute.accepted", "dispute.lost"]);
 
@@ -223,10 +225,6 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
         throw new Error(`Refusing payment ${event.paymentId}: currency missing.`);
       }
 
-      if (event.currency !== EXPECTED_PAYMENT_CURRENCY) {
-        throw new Error(`Refusing payment ${event.paymentId}: expected ${EXPECTED_PAYMENT_CURRENCY}, received ${event.currency}.`);
-      }
-
       if (!Number.isFinite(event.totalAmount) || event.totalAmount === undefined || event.totalAmount <= 0) {
         throw new Error(`Refusing payment ${event.paymentId}: invalid total amount.`);
       }
@@ -268,8 +266,12 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       }
 
       const matchedPlan = subscriptionPlans.find((item) => item.key === planKey);
-      if (!matchedPlan || matchedPlan.productId !== event.productId) {
+      if (!matchedPlan || productIdForProvider(matchedPlan, event.provider) !== event.productId) {
         throw new Error(`Refusing payment ${event.paymentId}: unknown subscription plan.`);
+      }
+
+      if (event.currency !== matchedPlan.currency) {
+        throw new Error(`Refusing payment ${event.paymentId}: expected ${matchedPlan.currency}, received ${event.currency}.`);
       }
 
       const discountCode = getMetadataString(event.metadata, "discountCode");
@@ -314,7 +316,7 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       );
     }
 
-    const matchedPackage = deps.creditPackages.find((item) => item.productId === event.productId);
+    const matchedPackage = deps.creditPackages.find((item) => productIdForProvider(item, event.provider) === event.productId);
     if (!matchedPackage) {
       throw new Error(`Unknown product id: ${event.productId}`);
     }
@@ -323,8 +325,8 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       throw new Error(`Refusing payment ${event.paymentId}: currency missing.`);
     }
 
-    if (event.currency !== EXPECTED_PAYMENT_CURRENCY) {
-      throw new Error(`Refusing payment ${event.paymentId}: expected ${EXPECTED_PAYMENT_CURRENCY}, received ${event.currency}.`);
+    if (event.currency !== matchedPackage.currency) {
+      throw new Error(`Refusing payment ${event.paymentId}: expected ${matchedPackage.currency}, received ${event.currency}.`);
     }
 
     if (!Number.isFinite(event.totalAmount) || event.totalAmount === undefined || event.totalAmount <= 0) {

@@ -28,10 +28,10 @@ describe("billing mode", () => {
 
   it("maps checkout products by billing mode", () => {
     expect(getDodoCheckoutProductsForBillingMode("credits")).toEqual(
-      creditPackages.map((pkg) => ({ productId: pkg.productId, slug: pkg.key })),
+      creditPackages.map((pkg) => ({ productId: pkg.providerProductIds.dodo, slug: pkg.key })),
     );
     expect(getDodoCheckoutProductsForBillingMode("subscriptions")).toEqual(
-      subscriptionPlans.map((plan) => ({ productId: plan.productId, slug: plan.key })),
+      subscriptionPlans.map((plan) => ({ productId: plan.providerProductIds.dodo, slug: plan.key })),
     );
   });
 });

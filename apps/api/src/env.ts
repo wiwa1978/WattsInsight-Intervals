@@ -31,6 +31,7 @@ const envSchema = z.object({
   ADMIN_APP_URL: z.string().url().optional(),
   ADMIN_SECRET: z.string().optional(),
   TRUST_PROXY: z.coerce.boolean().default(false),
+  PAYMENT_PROVIDER: z.enum(["dodo", "stripe"]).default("dodo"),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GITHUB_CLIENT_ID: z.string().optional(),
@@ -39,6 +40,7 @@ const envSchema = z.object({
   DODO_PAYMENTS_WEBHOOK_SECRET: z.string().optional(),
   DODO_PAYMENTS_ENVIRONMENT: z.enum(["test_mode", "live_mode"]).default("test_mode"),
   BILLING_RECONCILIATION_SECRET: z.string().optional(),
+  JOBS_SECRET_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().optional(),
   JWT_SECRET: z.string().min(16),
@@ -55,6 +57,17 @@ const envSchema = z.object({
         code: z.ZodIssueCode.custom,
         path: [key],
         message: `${key} must be a non-placeholder production secret with at least 32 characters`,
+      });
+    }
+  }
+
+  for (const key of ["ADMIN_SECRET", "BILLING_RECONCILIATION_SECRET", "JOBS_SECRET_KEY"] as const) {
+    const secret = value[key];
+    if (!secret || placeholderSecrets.has(secret) || secret.length < 32) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [key],
+        message: `${key} must be configured in production with at least 32 characters`,
       });
     }
   }

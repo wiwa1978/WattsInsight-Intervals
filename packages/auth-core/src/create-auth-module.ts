@@ -37,8 +37,10 @@ function invalidRefreshTokenResponse(c: { json: (body: unknown, status?: number)
   return c.json(
     {
       success: false,
-      error: "Invalid refresh token",
-      errorCode: errorCode.invalidRefreshToken,
+      error: {
+        code: errorCode.invalidRefreshToken,
+        message: "Invalid refresh token",
+      },
     },
     401,
   );
@@ -48,8 +50,10 @@ function reusedRefreshTokenResponse(c: { json: (body: unknown, status?: number) 
   return c.json(
     {
       success: false,
-      error: "Refresh token has already been used",
-      errorCode: errorCode.refreshTokenReused,
+      error: {
+        code: errorCode.refreshTokenReused,
+        message: "Refresh token has already been used",
+      },
     },
     401,
   );
@@ -121,7 +125,7 @@ export function createAuthModule(options: AuthModuleOptions) {
 
     const session = (await auth.api.getSession({ headers })) as
       | {
-          user?: { id?: string; role?: string | null; email?: string | null };
+          user?: { id?: string; role?: string | null; email?: string | null; twoFactorEnabled?: boolean | null };
           session?: unknown;
         }
       | null;
@@ -136,7 +140,10 @@ export function createAuthModule(options: AuthModuleOptions) {
     }
 
     return {
-      user: persistedUser,
+      user: {
+        ...persistedUser,
+        twoFactorEnabled: session.user.twoFactorEnabled ?? persistedUser.twoFactorEnabled ?? null,
+      },
       session: session.session ?? null,
     };
   });
@@ -200,8 +207,10 @@ export function createAuthModule(options: AuthModuleOptions) {
       return c.json(
         {
           success: false,
-          error: "Invalid credentials",
-          errorCode: errorCode.invalidCredentials,
+          error: {
+            code: errorCode.invalidCredentials,
+            message: "Invalid credentials",
+          },
         },
         401,
       );
@@ -216,8 +225,10 @@ export function createAuthModule(options: AuthModuleOptions) {
       return c.json(
         {
           success: false,
-          error: "Invalid credentials",
-          errorCode: errorCode.invalidCredentials,
+          error: {
+            code: errorCode.invalidCredentials,
+            message: "Invalid credentials",
+          },
         },
         401,
       );
@@ -229,8 +240,10 @@ export function createAuthModule(options: AuthModuleOptions) {
       return c.json(
         {
           success: false,
-          error: gate.error,
-          errorCode: gate.errorCode,
+          error: {
+            code: gate.errorCode,
+            message: gate.error,
+          },
         },
         gate.status,
       );
@@ -279,8 +292,10 @@ export function createAuthModule(options: AuthModuleOptions) {
       return c.json(
         {
           success: false,
-          error: gate.error,
-          errorCode: gate.errorCode,
+          error: {
+            code: gate.errorCode,
+            message: gate.error,
+          },
         },
         gate.status,
       );

@@ -1,6 +1,18 @@
 import { defineConfig } from "drizzle-kit";
+import { existsSync, readFileSync } from "node:fs";
 
-const databaseUrl = process.env.DATABASE_URL;
+function readApiDatabaseUrl() {
+  const envPath = "./apps/api/.env";
+
+  if (!existsSync(envPath)) {
+    return undefined;
+  }
+
+  const match = readFileSync(envPath, "utf8").match(/^DATABASE_URL=(.*)$/m);
+  return match?.[1]?.trim().replace(/^['"]|['"]$/g, "");
+}
+
+const databaseUrl = process.env.DATABASE_URL ?? readApiDatabaseUrl();
 
 if (process.env.DRIZZLE_REQUIRE_DATABASE_URL === "1" && !databaseUrl) {
   throw new Error("DATABASE_URL is required for database migration commands.");

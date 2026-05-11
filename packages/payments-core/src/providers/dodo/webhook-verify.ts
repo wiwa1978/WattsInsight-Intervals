@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import type { WebhookVerifyResult } from "../../types";
+
 export type WebhookVerifyFailureReason =
   | "missing_header"
   | "missing_secret"
@@ -7,9 +9,7 @@ export type WebhookVerifyFailureReason =
   | "timestamp_out_of_window"
   | "signature_mismatch";
 
-export type WebhookVerifyResult =
-  | { ok: true }
-  | { ok: false; reason: WebhookVerifyFailureReason };
+export type { WebhookVerifyResult };
 
 /** Default tolerance window: ±5 minutes either side of the signed timestamp. */
 export const DODO_WEBHOOK_DEFAULT_TOLERANCE_SECONDS = 300;

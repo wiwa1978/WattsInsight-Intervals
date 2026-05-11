@@ -8,6 +8,7 @@ import {
   getAdminBillingStatsApi,
   getAdminBillingSubscriptionEventsApi,
   getAdminBillingSubscriptionFinanceSummaryApi,
+  getAdminBillingSubscriptionFinanceDashboardApi,
   getAdminBillingSubscriptionPaymentsApi,
   getAdminBillingSubscriptionPlanDistributionApi,
   getAdminBillingSubscriptionStatsApi,
@@ -59,6 +60,7 @@ import type {
   RevenuePoint,
   SubscriptionEvent,
   SubscriptionFinanceSummary,
+  AdminSubscriptionFinanceDashboard,
   SubscriptionPlanDistributionPoint,
   SubscriptionPaymentsList,
   SubscriptionStats,
@@ -297,6 +299,10 @@ export async function getAdminBillingSubscriptionFinanceSummary(): Promise<Subsc
 
     throw error;
   }
+}
+
+export async function getAdminBillingSubscriptionFinanceDashboard(): Promise<AdminSubscriptionFinanceDashboard> {
+  return getAdminBillingSubscriptionFinanceDashboardApi();
 }
 
 export async function getAdminBillingSubscriptions(limit: number = 20, offset: number = 0, searchEmail?: string): Promise<SubscriptionsList> {

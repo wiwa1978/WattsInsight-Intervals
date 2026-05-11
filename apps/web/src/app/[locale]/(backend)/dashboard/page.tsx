@@ -2,10 +2,9 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getServerSession } from "@/lib/auth-session";
-import { getMyApplicationConfig } from "@/lib/api/me";
+import { getCreditBalanceServer, getMyApplicationConfigServer } from "@/lib/api/me.server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCreditBalance } from "@/lib/services/credits";
 import { StatCard } from "@/components/layout/backend/shared/stat-card";
 import { CreditCard, Wallet, TrendingDown, DollarSign } from "lucide-react";
 import { ClientDashboardWrapper } from "./client-wrapper";
@@ -17,7 +16,7 @@ export default async function DashboardPage() {
   }
 
   const t = await getTranslations("dashboard");
-  const applicationConfig = await getMyApplicationConfig();
+  const applicationConfig = await getMyApplicationConfigServer();
 
   return (
     <ClientDashboardWrapper>
@@ -32,7 +31,7 @@ export default async function DashboardPage() {
 }
 
 async function CreditCards() {
-  const balance = await getCreditBalance();
+  const balance = await getCreditBalanceServer();
   const t = await getTranslations("admin.billing.stats");
 
   // Calculate bonus credits (total received - purchased)

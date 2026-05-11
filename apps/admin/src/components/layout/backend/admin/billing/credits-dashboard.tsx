@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, RefreshCcw } from "lucide-react";
+import { Activity, ArrowUpDown, CreditCard, DollarSign, Gauge, RefreshCcw, TrendingDown, Wallet } from "lucide-react";
 
 import type { AdminCreditsDashboard } from "@platform/contracts";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DataTable } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   Dialog,
   DialogContent,
@@ -94,6 +103,7 @@ export function CreditsDashboard({ initialDashboard }: CreditsDashboardProps) {
   });
 
   const totalAvailableCredits = Number(data.stats.totalCreditsPurchased) - Number(data.stats.totalCreditsConsumed);
+  const refundAndAdjustmentTransactions = data.transactions.filter((transaction) => transaction.type === "refund" || transaction.type === "admin_adjustment");
 
   const statCards = [
     {
@@ -184,66 +194,90 @@ export function CreditsDashboard({ initialDashboard }: CreditsDashboardProps) {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="space-y-2">
-              <CardDescription>{stat.title}</CardDescription>
-              <CardTitle className="text-2xl">{stat.value}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{stat.description}</p>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">{t("title")}</h1>
+        <p className="mt-2 text-muted-foreground">{t("description")}</p>
       </div>
 
-      <RevenueChart
-        dailyData={data.revenue.dailyData}
-        weeklyData={data.revenue.weeklyData}
-        monthlyData={data.revenue.monthlyData}
-        yearlyData={data.revenue.yearlyData}
-      />
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1">
+          <TabsTrigger value="overview"><Gauge className="size-4" /> {t("tabs.overview")}</TabsTrigger>
+          <TabsTrigger value="revenue"><DollarSign className="size-4" /> {t("tabs.revenue")}</TabsTrigger>
+          <TabsTrigger value="purchases"><CreditCard className="size-4" /> {t("tabs.purchases")}</TabsTrigger>
+          <TabsTrigger value="ledger"><Wallet className="size-4" /> {t("tabs.ledger")}</TabsTrigger>
+          <TabsTrigger value="consumption"><TrendingDown className="size-4" /> {t("tabs.consumption")}</TabsTrigger>
+          <TabsTrigger value="activity"><Activity className="size-4" /> {t("tabs.activity")}</TabsTrigger>
+          <TabsTrigger value="refunds"><RefreshCcw className="size-4" /> {t("tabs.refunds")}</TabsTrigger>
+        </TabsList>
 
-      <TransactionHistoryTable
-        transactions={data.transactions}
-        total={data.transactions.length}
-        description={t("transactionsDescription")}
-      />
+        <TabsContent value="overview" className="space-y-6">
+          <StatsGrid statCards={statCards} />
+          <div className="grid gap-6 xl:grid-cols-2">
+            <RevenueChart dailyData={data.revenue.dailyData} weeklyData={data.revenue.weeklyData} monthlyData={data.revenue.monthlyData} yearlyData={data.revenue.yearlyData} />
+            <CreditsConsumedChart dailyData={data.consumption.dailyData} weeklyData={data.consumption.weeklyData} monthlyData={data.consumption.monthlyData} yearlyData={data.consumption.yearlyData} />
+          </div>
+        </TabsContent>
 
-      <PurchaseHistoryTable
-        purchases={data.purchases}
-        total={data.pagination.purchases.totalItems}
-        loading={dashboard.isFetching}
-        description={t("purchases.description")}
-        onSearchPageChange={(state) => {
-          setQuery((current) => ({
-            ...current,
-            creditsPurchasesPage: Math.floor(state.offset / PAGE_SIZE) + 1,
-            creditsPurchasesSearch: state.searchEmail,
-          }));
-        }}
-      />
+        <TabsContent value="revenue">
+          <RevenueChart dailyData={data.revenue.dailyData} weeklyData={data.revenue.weeklyData} monthlyData={data.revenue.monthlyData} yearlyData={data.revenue.yearlyData} />
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("refund.title")}</CardTitle>
-          <CardDescription>{t("refund.description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form className="flex gap-2" onSubmit={submitRefundSearch}>
-            <Input value={refundSearch} onChange={(event) => setRefundSearch(event.target.value)} placeholder={t("searchPlaceholder")} />
-            <Button type="submit">{t("search")}</Button>
-          </form>
-          <DataTable columns={refundColumns} data={data.refundablePurchases} loading={dashboard.isFetching} emptyText={t("refund.empty")} />
-          <PaginationControls
-            page={data.pagination.refunds.page}
-            totalPages={data.pagination.refunds.totalPages}
-            onPageChange={(page) => setPage("refunds", page)}
+        <TabsContent value="purchases">
+          <PurchaseHistoryTable
+            purchases={data.purchases}
+            total={data.pagination.purchases.totalItems}
+            loading={dashboard.isFetching}
+            description={t("purchases.description")}
+            onSearchPageChange={(state) => {
+              setQuery((current) => ({
+                ...current,
+                creditsPurchasesPage: Math.floor(state.offset / PAGE_SIZE) + 1,
+                creditsPurchasesSearch: state.searchEmail,
+              }));
+            }}
           />
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="ledger">
+          <TransactionHistoryTable transactions={data.transactions} total={data.transactions.length} description={t("transactionsDescription")} />
+        </TabsContent>
+
+        <TabsContent value="consumption">
+          <CreditsConsumedChart dailyData={data.consumption.dailyData} weeklyData={data.consumption.weeklyData} monthlyData={data.consumption.monthlyData} yearlyData={data.consumption.yearlyData} />
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <CreditsActivityChart dailyData={data.activity.dailyData} weeklyData={data.activity.weeklyData} monthlyData={data.activity.monthlyData} yearlyData={data.activity.yearlyData} />
+        </TabsContent>
+
+        <TabsContent value="refunds" className="space-y-6">
+          <StatsGrid
+            statCards={[
+              { title: t("refund.refundablePurchases"), value: String(data.refundablePurchases.length), description: t("refund.refundablePurchasesDescription") },
+              { title: t("refund.refundCredits"), value: formatCredits(data.stats.refundCredits), description: t("refund.refundCreditsDescription") },
+              { title: t("refund.adminAdjustments"), value: formatCredits(data.stats.adminAdjustmentCredits), description: t("refund.adminAdjustmentsDescription") },
+              { title: t("refund.refundedPurchases"), value: String(data.refundedPurchases.length), description: t("refund.refundedPurchasesDescription") },
+            ]}
+          />
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("refund.title")}</CardTitle>
+              <CardDescription>{t("refund.description")}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form className="flex gap-2" onSubmit={submitRefundSearch}>
+                <Input value={refundSearch} onChange={(event) => setRefundSearch(event.target.value)} placeholder={t("searchPlaceholder")} />
+                <Button type="submit">{t("search")}</Button>
+              </form>
+              <DataTable columns={refundColumns} data={data.refundablePurchases} loading={dashboard.isFetching} emptyText={t("refund.empty")} />
+              <PaginationControls page={data.pagination.refunds.page} totalPages={data.pagination.refunds.totalPages} onPageChange={(page) => setPage("refunds", page)} />
+            </CardContent>
+          </Card>
+          <TransactionHistoryTable transactions={refundAndAdjustmentTransactions} total={refundAndAdjustmentTransactions.length} description={t("refund.ledgerDescription")} />
+          <PurchaseHistoryTable purchases={data.refundedPurchases} total={data.refundedPurchases.length} description={t("refund.refundedPurchasesDescription")} />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={Boolean(selectedPurchase)} onOpenChange={(open) => !open && setSelectedPurchase(null)}>
         <DialogContent>
@@ -273,6 +307,125 @@ export function CreditsDashboard({ initialDashboard }: CreditsDashboardProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function StatsGrid({ statCards }: { statCards: Array<{ title: string; value: string; description?: string }> }) {
+  return (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {statCards.map((stat) => (
+        <Card key={stat.title}>
+          <CardHeader className="space-y-2">
+            <CardDescription>{stat.title}</CardDescription>
+            <CardTitle className="text-2xl">{stat.value}</CardTitle>
+          </CardHeader>
+          {stat.description ? (
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{stat.description}</p>
+            </CardContent>
+          ) : null}
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+type ConsumedPoint = { period: string; consumed: number };
+type ActivityPoint = { period: string; count: number };
+
+function CreditsConsumedChart({ dailyData, weeklyData, monthlyData, yearlyData }: { dailyData: ConsumedPoint[]; weeklyData: ConsumedPoint[]; monthlyData: ConsumedPoint[]; yearlyData: ConsumedPoint[] }) {
+  const t = useTranslations("admin.billing.creditsDashboard");
+  const chartT = useTranslations("admin.billing.revenueChart");
+  return (
+    <SimpleChartCard
+      title={t("consumptionChart.title")}
+      description={t("consumptionChart.description")}
+      valueKey="consumed"
+      valueLabel={t("consumptionChart.label")}
+      labels={{ daily: chartT("daily"), weekly: chartT("weekly"), monthly: chartT("monthly"), yearly: chartT("yearly") }}
+      dailyData={dailyData}
+      weeklyData={weeklyData}
+      monthlyData={monthlyData}
+      yearlyData={yearlyData}
+    />
+  );
+}
+
+function CreditsActivityChart({ dailyData, weeklyData, monthlyData, yearlyData }: { dailyData: ActivityPoint[]; weeklyData: ActivityPoint[]; monthlyData: ActivityPoint[]; yearlyData: ActivityPoint[] }) {
+  const t = useTranslations("admin.billing.creditsDashboard");
+  const chartT = useTranslations("admin.billing.revenueChart");
+  return (
+    <SimpleChartCard
+      title={t("activityChart.title")}
+      description={t("activityChart.description")}
+      valueKey="count"
+      valueLabel={t("activityChart.label")}
+      labels={{ daily: chartT("daily"), weekly: chartT("weekly"), monthly: chartT("monthly"), yearly: chartT("yearly") }}
+      dailyData={dailyData}
+      weeklyData={weeklyData}
+      monthlyData={monthlyData}
+      yearlyData={yearlyData}
+    />
+  );
+}
+
+function SimpleChartCard<T extends Record<string, string | number>>({
+  title,
+  description,
+  valueKey,
+  valueLabel,
+  labels,
+  dailyData,
+  weeklyData,
+  monthlyData,
+  yearlyData,
+}: {
+  title: string;
+  description: string;
+  valueKey: keyof T & string;
+  valueLabel: string;
+  labels: { daily: string; weekly: string; monthly: string; yearly: string };
+  dailyData: T[];
+  weeklyData: T[];
+  monthlyData: T[];
+  yearlyData: T[];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="daily" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="daily">{labels.daily}</TabsTrigger>
+            <TabsTrigger value="weekly">{labels.weekly}</TabsTrigger>
+            <TabsTrigger value="monthly">{labels.monthly}</TabsTrigger>
+            <TabsTrigger value="yearly">{labels.yearly}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="daily" className="mt-6"><SimpleLineChart data={dailyData} valueKey={valueKey} valueLabel={valueLabel} /></TabsContent>
+          <TabsContent value="weekly" className="mt-6"><SimpleLineChart data={weeklyData} valueKey={valueKey} valueLabel={valueLabel} /></TabsContent>
+          <TabsContent value="monthly" className="mt-6"><SimpleLineChart data={monthlyData} valueKey={valueKey} valueLabel={valueLabel} /></TabsContent>
+          <TabsContent value="yearly" className="mt-6"><SimpleLineChart data={yearlyData} valueKey={valueKey} valueLabel={valueLabel} /></TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SimpleLineChart<T extends Record<string, string | number>>({ data, valueKey, valueLabel }: { data: T[]; valueKey: keyof T & string; valueLabel: string }) {
+  return (
+    <div className="h-[300px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+          <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} domain={[0, "auto"]} />
+          <Tooltip formatter={(value) => [Number(value ?? 0).toFixed(2), valueLabel]} />
+          <Line type="monotone" dataKey={valueKey} name={valueLabel} stroke="#3b82f6" strokeWidth={2.5} dot={{ fill: "white", stroke: "#3b82f6", strokeWidth: 2, r: 5 }} />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
 }

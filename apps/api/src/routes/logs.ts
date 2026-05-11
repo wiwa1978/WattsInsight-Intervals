@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { clientLogSchema } from "@platform/contracts";
 
 import type { AppEnv } from "../context";
-import { fail } from "../lib/http";
+import { fail, validationError } from "../lib/http";
 import { logger } from "../observability/logger";
 import { redactLogValue, redactString } from "../observability/redaction";
 
@@ -45,7 +45,7 @@ export function createLogsRouter() {
     const parsed = clientLogSchema.safeParse(parsedJson);
 
     if (!parsed.success) {
-      return c.json({ success: false, error: "Invalid log payload" }, 400);
+      return validationError(c, "Invalid log payload");
     }
 
     const payload = parsed.data;
@@ -74,7 +74,7 @@ export function createLogsRouter() {
       logger.debug(logRecord, message);
     }
 
-    return c.json({ success: true });
+    return c.json({ success: true, data: { accepted: true } });
   });
 
   return router;

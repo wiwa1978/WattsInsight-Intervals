@@ -6,6 +6,10 @@ import { and, count, desc, eq, gte, ilike, lte, or, type SQL } from "drizzle-orm
 import {
   banUserSchema,
   adminCreditsDashboardQuerySchema,
+  adminSubscriptionFinanceDashboardQuerySchema,
+  adminJobRunsQuerySchema,
+  adminJobsQuerySchema,
+  adminPendingEmailsQuerySchema,
   billingListQuerySchema,
   billingRangeQuerySchema,
   createCreditRefundSchema,
@@ -37,7 +41,7 @@ import {
   webhookEventIdParamSchema,
   webhookEventsQuerySchema,
 } from "@platform/contracts";
-import { paymentWebhookEvents } from "@platform/platform-db";
+import { jobRuns, jobs, paymentWebhookEvents, pendingEmails } from "@platform/platform-db";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
@@ -45,7 +49,7 @@ import { authConfig } from "../config/auth";
 import { env } from "../env";
 import { createJsonResponseFromAuthResponse, resolveAdminAuthApi } from "../lib/auth-admin";
 import { ensureCreditBillingEnabled, ensureSubscriptionBillingEnabled, getBillingModeDisabledErrorMessage } from "../lib/feature-guards";
-import { forbidden, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
+import { badRequest, fail, forbidden, notFound, parseJsonBody, parseParams, parseQuery, validationError } from "../lib/http";
 import { buildRoleChangeAuditMetadata, checkSetRoleGovernance, isImpersonatedSession } from "../modules/admin/governance";
 import { getAuditRequestContext } from "../modules/audit/service";
 import { logger } from "../observability/logger";
@@ -104,10 +108,10 @@ function canEnrollTotp(authUser: ReturnType<typeof getAuthUser>) {
 }
 
 function billingModeErrorResponse(c: Context<AppEnv>, error: unknown) {
-  const billingModeError = getBillingModeDisabledErrorMessage(error);
-  if (billingModeError) {
-    return c.json({ success: false, error: billingModeError }, 400);
-  }
+    const billingModeError = getBillingModeDisabledErrorMessage(error);
+    if (billingModeError) {
+      return badRequest(c, billingModeError);
+    }
 
   throw error;
 }
@@ -199,6 +203,10 @@ function isSuccessfulMutationResult(result: unknown) {
   return !isRecord(result) || result.success !== false;
 }
 
+function resultSuccess(result: unknown) {
+  return !isRecord(result) || result.success !== false;
+}
+
 function isActiveAdmin(userRecord: { role?: string | null; banned?: boolean | null }) {
   return userRecord.role === "admin" && userRecord.banned !== true;
 }
@@ -233,6 +241,9 @@ function notificationSendHistoryItem(entry: Record<string, unknown>) {
 }
 
 type WebhookEventRow = typeof paymentWebhookEvents.$inferSelect;
+type JobRow = typeof jobs.$inferSelect;
+type JobRunRow = typeof jobRuns.$inferSelect;
+type PendingEmailRow = typeof pendingEmails.$inferSelect;
 
 function isoDate(value: Date | string | null | undefined) {
   if (!value) return null;
@@ -257,6 +268,61 @@ function publicWebhookEvent(event: WebhookEventRow) {
     failedAt: isoDate(event.failedAt),
     createdAt: isoDate(event.createdAt) ?? new Date(0).toISOString(),
     updatedAt: isoDate(event.updatedAt) ?? new Date(0).toISOString(),
+  };
+}
+
+function publicJob(job: JobRow) {
+  return {
+    id: job.id,
+    name: job.name,
+    status: job.status,
+    intervalSeconds: job.intervalSeconds,
+    nextRunAt: isoDate(job.nextRunAt) ?? new Date(0).toISOString(),
+    lockedAt: isoDate(job.lockedAt),
+    lockedBy: job.lockedBy,
+    lastRunAt: isoDate(job.lastRunAt),
+    lastSuccessAt: isoDate(job.lastSuccessAt),
+    lastFailureAt: isoDate(job.lastFailureAt),
+    lastError: job.lastError,
+    metadata: job.metadata ?? null,
+    createdAt: isoDate(job.createdAt) ?? new Date(0).toISOString(),
+    updatedAt: isoDate(job.updatedAt) ?? new Date(0).toISOString(),
+  };
+}
+
+function publicJobRun(run: JobRunRow) {
+  return {
+    id: run.id,
+    jobId: run.jobId,
+    jobName: run.jobName,
+    status: run.status,
+    startedAt: isoDate(run.startedAt) ?? new Date(0).toISOString(),
+    finishedAt: isoDate(run.finishedAt) ?? new Date(0).toISOString(),
+    durationMs: run.durationMs,
+    result: run.result ?? null,
+    error: run.error,
+    createdAt: isoDate(run.createdAt) ?? new Date(0).toISOString(),
+  };
+}
+
+function publicPendingEmail(email: PendingEmailRow) {
+  return {
+    id: email.id,
+    to: email.to,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+    status: email.status,
+    attempts: email.attempts,
+    maxAttempts: email.maxAttempts,
+    nextAttemptAt: isoDate(email.nextAttemptAt) ?? new Date(0).toISOString(),
+    sentAt: isoDate(email.sentAt),
+    failedAt: isoDate(email.failedAt),
+    lastError: email.lastError,
+    providerMessageId: email.providerMessageId,
+    metadata: email.metadata ?? null,
+    createdAt: isoDate(email.createdAt) ?? new Date(0).toISOString(),
+    updatedAt: isoDate(email.updatedAt) ?? new Date(0).toISOString(),
   };
 }
 
@@ -298,6 +364,29 @@ function buildWebhookEventWhere(filters: {
   const dateTo = parseOptionalDate(filters.dateTo);
   if (dateTo) conditions.push(lte(paymentWebhookEvents.createdAt, dateTo));
 
+  return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+function buildJobsWhere(filters: { name?: string; status?: "idle" | "running" | "disabled" }) {
+  const conditions: SQL[] = [];
+  if (filters.name) conditions.push(ilike(jobs.name, `%${filters.name}%`));
+  if (filters.status) conditions.push(eq(jobs.status, filters.status));
+  return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+function buildJobRunsWhere(filters: { jobName?: string; status?: "success" | "failed" }) {
+  const conditions: SQL[] = [];
+  if (filters.jobName) conditions.push(ilike(jobRuns.jobName, `%${filters.jobName}%`));
+  if (filters.status) conditions.push(eq(jobRuns.status, filters.status));
+  return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+function buildPendingEmailsWhere(filters: { status?: "pending" | "sending" | "sent" | "failed"; text?: string }) {
+  const conditions: SQL[] = [];
+  if (filters.status) conditions.push(eq(pendingEmails.status, filters.status));
+  if (filters.text) {
+    conditions.push(or(ilike(pendingEmails.to, `%${filters.text}%`), ilike(pendingEmails.subject, `%${filters.text}%`))!);
+  }
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
@@ -376,7 +465,7 @@ export function createAdminRouter() {
     }).catch(() => ({ success: false as const }));
 
     if (!result.success) {
-      return c.json({ success: false, error: "Audit logging unavailable" }, 503);
+      return fail(c, "Audit logging unavailable", 503);
     }
 
     return null;
@@ -402,7 +491,7 @@ export function createAdminRouter() {
     }).catch(() => ({ success: false as const }));
 
     if (!result.success) {
-      return c.json({ success: false, error: "Audit logging unavailable" }, 503);
+      return fail(c, "Audit logging unavailable", 503);
     }
 
     return null;
@@ -580,7 +669,11 @@ export function createAdminRouter() {
     }
 
     const result = await bootstrap.adminService.verifyAdminSecret(parsedBody.data.secret);
-    return c.json(result, result.success ? 200 : 400);
+    if (!result.success) {
+      return badRequest(c, result.error ?? "Invalid admin secret");
+    }
+
+    return c.json(result);
   });
 
   router.get("/dashboard/stats", async (c) => {
@@ -704,7 +797,7 @@ export function createAdminRouter() {
       const targetUser = await bootstrap.adminService.getUserById(impersonationBody.userId);
 
       if (!targetUser) {
-        return c.json({ success: false, error: "User not found" }, 404);
+        return notFound(c, "User not found");
       }
 
       if (actor.id === impersonationBody.userId) {
@@ -767,7 +860,7 @@ export function createAdminRouter() {
     return withUserIdParam(c, async (userId) => {
       const userRecord = await bootstrap.adminService.getUserById(userId);
       if (!userRecord) {
-        return c.json({ success: false, error: "User not found" }, 404);
+        return notFound(c, "User not found");
       }
 
       return c.json({ success: true, data: userRecord });
@@ -969,7 +1062,7 @@ export function createAdminRouter() {
       } catch (error) {
         const message = safeErrorMessage(error, "Failed to create credit refund");
         const status = message === "Credit purchase not found" ? 404 : message === "Only completed credit purchases can be refunded" ? 400 : 502;
-        return c.json({ success: false, error: message }, status);
+        return fail(c, message, status);
       }
 
       const auditFailure = await recordMutationAudit(c, {
@@ -1081,6 +1174,34 @@ export function createAdminRouter() {
     return c.json({ success: true, data });
   });
 
+  router.get("/billing/subscription-finance-dashboard", async (c) => {
+    try {
+      ensureSubscriptionBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    const parsedQuery = parseQuery(adminSubscriptionFinanceDashboardQuerySchema, {
+      range: c.req.query("range"),
+      startDate: c.req.query("startDate"),
+      endDate: c.req.query("endDate"),
+      grouping: c.req.query("grouping"),
+      currency: c.req.query("currency"),
+      planKey: c.req.query("planKey"),
+      status: c.req.query("status"),
+      search: c.req.query("search"),
+      subscriptionsPage: c.req.query("subscriptionsPage"),
+      subscriptionsSearch: c.req.query("subscriptionsSearch"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid subscription finance dashboard query");
+    }
+
+    const data = await bootstrap.adminSubscriptionFinanceDashboardService.getDashboard(parsedQuery.data);
+    return c.json({ success: true, data });
+  });
+
   router.get("/billing/subscription-plan-distribution", async (c) => {
     try {
       ensureSubscriptionBillingEnabled();
@@ -1127,7 +1248,7 @@ export function createAdminRouter() {
       } catch (error) {
         const message = safeErrorMessage(error, "Failed to create subscription refund");
         const status = message === "Subscription payment not found" ? 404 : message === "Only completed payments can be refunded" ? 400 : 502;
-        return c.json({ success: false, error: message }, status);
+        return fail(c, message, status);
       }
 
       const auditFailure = await recordMutationAudit(c, {
@@ -1230,12 +1351,108 @@ export function createAdminRouter() {
         });
 
         if (!event) {
-          return c.json({ success: false, error: "Webhook event not found" }, 404);
+          return notFound(c, "Webhook event not found");
         }
 
         return c.json({ success: true, data: publicWebhookEvent(event) });
       },
     );
+  });
+
+  router.get("/operations/stats", async (c) => {
+    const [jobRows, failedJobRunRows, emailRows] = await Promise.all([
+      bootstrap.db.select({ status: jobs.status, count: count() }).from(jobs).groupBy(jobs.status),
+      bootstrap.db.select({ count: count() }).from(jobRuns).where(eq(jobRuns.status, "failed")),
+      bootstrap.db.select({ status: pendingEmails.status, count: count() }).from(pendingEmails).groupBy(pendingEmails.status),
+    ]);
+
+    const data = {
+      jobs: { total: 0, idle: 0, running: 0, disabled: 0, failedRuns: Number(failedJobRunRows[0]?.count ?? 0) },
+      emails: { total: 0, pending: 0, sending: 0, sent: 0, failed: 0 },
+    };
+
+    for (const row of jobRows) {
+      const status = row.status;
+      const value = Number(row.count ?? 0);
+      if (status === "idle" || status === "running" || status === "disabled") {
+        data.jobs[status] = value;
+        data.jobs.total += value;
+      }
+    }
+
+    for (const row of emailRows) {
+      const status = row.status;
+      const value = Number(row.count ?? 0);
+      if (status === "pending" || status === "sending" || status === "sent" || status === "failed") {
+        data.emails[status] = value;
+        data.emails.total += value;
+      }
+    }
+
+    return c.json({ success: true, data });
+  });
+
+  router.get("/operations/jobs", async (c) => {
+    const parsedQuery = parseQuery(adminJobsQuerySchema, {
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+      name: c.req.query("name"),
+      status: c.req.query("status"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid jobs query");
+    }
+
+    const where = buildJobsWhere(parsedQuery.data);
+    const [rows, totalRows] = await Promise.all([
+      bootstrap.db.select().from(jobs).where(where).orderBy(desc(jobs.nextRunAt)).limit(parsedQuery.data.limit).offset(parsedQuery.data.offset),
+      bootstrap.db.select({ count: count() }).from(jobs).where(where),
+    ]);
+
+    return c.json({ success: true, data: { jobs: rows.map(publicJob), total: Number(totalRows[0]?.count ?? 0) } });
+  });
+
+  router.get("/operations/job-runs", async (c) => {
+    const parsedQuery = parseQuery(adminJobRunsQuerySchema, {
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+      jobName: c.req.query("jobName"),
+      status: c.req.query("status"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid job runs query");
+    }
+
+    const where = buildJobRunsWhere(parsedQuery.data);
+    const [rows, totalRows] = await Promise.all([
+      bootstrap.db.select().from(jobRuns).where(where).orderBy(desc(jobRuns.startedAt)).limit(parsedQuery.data.limit).offset(parsedQuery.data.offset),
+      bootstrap.db.select({ count: count() }).from(jobRuns).where(where),
+    ]);
+
+    return c.json({ success: true, data: { runs: rows.map(publicJobRun), total: Number(totalRows[0]?.count ?? 0) } });
+  });
+
+  router.get("/operations/pending-emails", async (c) => {
+    const parsedQuery = parseQuery(adminPendingEmailsQuerySchema, {
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+      status: c.req.query("status"),
+      text: c.req.query("text"),
+    });
+
+    if (!parsedQuery.success) {
+      return validationError(c, "Invalid pending emails query");
+    }
+
+    const where = buildPendingEmailsWhere(parsedQuery.data);
+    const [rows, totalRows] = await Promise.all([
+      bootstrap.db.select().from(pendingEmails).where(where).orderBy(desc(pendingEmails.createdAt)).limit(parsedQuery.data.limit).offset(parsedQuery.data.offset),
+      bootstrap.db.select({ count: count() }).from(pendingEmails).where(where),
+    ]);
+
+    return c.json({ success: true, data: { emails: rows.map(publicPendingEmail), total: Number(totalRows[0]?.count ?? 0) } });
   });
 
   router.get("/discounts", async (c) => {
@@ -1262,7 +1479,11 @@ export function createAdminRouter() {
   router.get("/discounts/:discountId", async (c) => {
     return withDiscountIdParam(c, async (discountId) => {
       const result = await bootstrap.discountsService.getDiscountById(discountId);
-      return c.json(result, result.success ? 200 : 404);
+      if (!result.success) {
+        return notFound(c, resultError(result, "Discount not found"));
+      }
+
+      return c.json(result);
     });
   });
 
@@ -1278,7 +1499,7 @@ export function createAdminRouter() {
       const code = await bootstrap.discountsService.generateDiscountCode(parsedBody.data.overridePrefix);
       return c.json({ success: true, data: { code } });
     } catch (error) {
-      return c.json({ success: false, error: error instanceof Error ? error.message : "Failed" }, 400);
+      return badRequest(c, error instanceof Error ? error.message : "Failed");
     }
   });
 
@@ -1342,7 +1563,11 @@ export function createAdminRouter() {
     });
     if (auditFailure) return auditFailure;
 
-    return c.json(result, result.success ? 200 : 400);
+    if (!resultSuccess(result)) {
+      return badRequest(c, resultError(result, "Discount create failed"));
+    }
+
+    return c.json(result);
   });
 
   router.patch("/discounts/:discountId", async (c) => {
@@ -1394,7 +1619,11 @@ export function createAdminRouter() {
         });
         if (auditFailure) return auditFailure;
 
-        return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
+        if (!resultSuccess(result)) {
+          return badRequest(c, resultError(result, "Discount update failed"));
+        }
+
+        return c.json(publicMutationResult(result, ["previousDiscount"]));
       });
     });
   });
@@ -1438,7 +1667,11 @@ export function createAdminRouter() {
       });
       if (auditFailure) return auditFailure;
 
-      return c.json(publicMutationResult(result, ["previousDiscount"]), result.success ? 200 : 400);
+      if (!resultSuccess(result)) {
+        return badRequest(c, resultError(result, "Discount delete failed"));
+      }
+
+      return c.json(publicMutationResult(result, ["previousDiscount"]));
     });
   });
 
@@ -1480,7 +1713,11 @@ export function createAdminRouter() {
   router.get("/vouchers/:voucherId", async (c) => {
     return withVoucherIdParam(c, async (voucherId) => {
       const result = await bootstrap.vouchersService.getVoucherById(voucherId);
-      return c.json(result, result.success ? 200 : 404);
+      if (!result.success) {
+        return notFound(c, resultError(result, "Voucher not found"));
+      }
+
+      return c.json(result);
     });
   });
 
@@ -1526,7 +1763,11 @@ export function createAdminRouter() {
     });
     if (auditFailure) return auditFailure;
 
-    return c.json(result, result.success ? 200 : 400);
+    if (!resultSuccess(result)) {
+      return badRequest(c, resultError(result, "Voucher create failed"));
+    }
+
+    return c.json(result);
   });
 
   router.patch("/vouchers/:voucherId", async (c) => {
@@ -1572,7 +1813,11 @@ export function createAdminRouter() {
         });
         if (auditFailure) return auditFailure;
 
-        return c.json(publicMutationResult(result, ["previousVoucher"]), result.success ? 200 : 400);
+        if (!resultSuccess(result)) {
+          return badRequest(c, resultError(result, "Voucher update failed"));
+        }
+
+        return c.json(publicMutationResult(result, ["previousVoucher"]));
       });
     });
   });

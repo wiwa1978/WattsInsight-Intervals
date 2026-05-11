@@ -2,7 +2,9 @@ import type { ErrorHandler } from "hono";
 
 import type { AppEnv } from "../context";
 import { env } from "../env";
-import { buildErrorCode } from "../lib/http";
+import { errorCode as apiErrorCode } from "@platform/contracts/wire";
+
+import { buildErrorCode, errorPayload } from "../lib/http";
 import { logger } from "../observability/logger";
 
 function serializeError(error: unknown) {
@@ -34,18 +36,8 @@ export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
 
   const response = c.json(
     env.NODE_ENV === "development"
-      ? {
-          success: false,
-          error: error instanceof Error ? error.message : "Internal server error",
-          errorCode,
-          requestId,
-        }
-      : {
-          success: false,
-          error: "Internal server error",
-          errorCode,
-          requestId,
-        },
+      ? { ...errorPayload(apiErrorCode.internalServerError, error instanceof Error ? error.message : "Internal server error"), errorCode, requestId }
+      : { ...errorPayload(apiErrorCode.internalServerError, "Internal server error"), errorCode, requestId },
     500,
   );
 

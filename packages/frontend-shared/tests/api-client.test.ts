@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createApiRequest, createBearerApiRequest } from "../src/api-client";
+import { ApiRequestError, createApiRequest, createBearerApiRequest } from "../src/api-client";
 
 describe("frontend shared API client", () => {
   beforeEach(() => {
@@ -49,5 +49,26 @@ describe("frontend shared API client", () => {
 
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(init.credentials).toBe("omit");
+  });
+
+  it("uses nested API error code and message from failed responses", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      success: false,
+      error: {
+        code: "VALIDATION_FAILED",
+        message: "Invalid payload",
+      },
+      requestId: "req-123",
+    }), { status: 400 }));
+    const request = createApiRequest({ baseURL: "https://api.example.test" });
+
+    await expect(request("/bad", { method: "POST", body: "{}" })).rejects.toMatchObject({
+      name: "ApiRequestError",
+      status: 400,
+      message: "API request failed (400): Invalid payload",
+      errorCode: "VALIDATION_FAILED",
+      requestId: "req-123",
+      digest: "VALIDATION_FAILED",
+    } satisfies Partial<ApiRequestError>);
   });
 });

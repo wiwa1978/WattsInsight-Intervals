@@ -124,6 +124,8 @@ export const creditPurchases = pgTable(
   ],
 );
 
+export type PaymentWebhookProcessingStatus = "processing" | "processed" | "failed" | "dead_lettered";
+
 export const paymentWebhookEvents = pgTable(
   "payment_webhook_events",
   {
@@ -137,7 +139,10 @@ export const paymentWebhookEvents = pgTable(
     requestId: text("request_id"),
     correlationId: text("correlation_id"),
     durationMs: integer("duration_ms"),
-    processingStatus: text("processing_status").$type<"processing" | "processed" | "failed">().default("processing").notNull(),
+    processingStatus: text("processing_status").$type<PaymentWebhookProcessingStatus>().default("processing").notNull(),
+    retryCount: integer("retry_count").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+    deadLetteredAt: timestamp("dead_lettered_at", { withTimezone: true }),
     errorDetails: jsonb("error_details"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     failedAt: timestamp("failed_at", { withTimezone: true }),

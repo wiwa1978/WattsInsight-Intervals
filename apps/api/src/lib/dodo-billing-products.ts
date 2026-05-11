@@ -5,7 +5,7 @@ export function getDodoCheckoutProductsForBillingMode(mode: BillingMode) {
   const products = mode === "credits" ? creditPackages : subscriptionPlans;
 
   return products.map((product) => ({
-    productId: product.productId,
+    productId: product.providerProductIds.dodo,
     slug: product.key,
   }));
 }

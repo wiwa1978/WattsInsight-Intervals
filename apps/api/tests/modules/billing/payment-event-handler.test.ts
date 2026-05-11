@@ -6,6 +6,8 @@ import { createPaymentEventHandler } from "../../../src/modules/billing/payment-
 
 const originalBillingMode = applicationConfig.billing.mode;
 const starterPlan = subscriptionPlans.find((plan) => plan.key === "Bronze")!;
+const starterPlanProductId = starterPlan.providerProductIds.dodo;
+const bronzeCreditPackage = { key: "bronze", credits: 100, price: 1000, currency: "EUR", providerProductIds: { dodo: "pdt_1" } };
 
 afterEach(() => {
   (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = originalBillingMode;
@@ -56,7 +58,7 @@ describe("payment event handler billing modes", () => {
     (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "subscriptions";
     const billing = createBillingDeps();
     const handler = createPaymentEventHandler({
-      creditPackages: [{ key: "bronze", credits: 100, price: 1000, productId: "pdt_1" }],
+      creditPackages: [bronzeCreditPackage],
       billing,
     });
 
@@ -116,7 +118,7 @@ describe("payment event handler billing modes", () => {
       billingMode: "subscriptions",
       packageKey: null,
       planKey: starterPlan.key,
-      productId: starterPlan.productId,
+      productId: starterPlanProductId,
     }));
     const handler = createPaymentEventHandler({
       creditPackages: [],
@@ -132,12 +134,12 @@ describe("payment event handler billing modes", () => {
       provider: "dodo",
       eventType: "payment.succeeded",
       paymentId: "pay_sub_1",
-      productId: starterPlan.productId,
+      productId: starterPlanProductId,
       metadata: {
         billingMode: "subscriptions",
         userId: "user-1",
         planKey: starterPlan.key,
-        productId: starterPlan.productId,
+        productId: starterPlanProductId,
         checkoutReferenceId: "checkout-ref-1",
         subscriptionId: "sub_1",
       },
@@ -172,7 +174,7 @@ describe("payment event handler billing modes", () => {
     const billing = createBillingDeps();
     const checkoutIntents = createCheckoutIntentDeps(null as never);
     const handler = createPaymentEventHandler({
-      creditPackages: [{ key: "bronze", credits: 100, price: 1000, productId: "pdt_1" }],
+      creditPackages: [bronzeCreditPackage],
       billing,
       checkoutIntents,
     });
@@ -205,7 +207,7 @@ describe("payment event handler billing modes", () => {
     const billing = createBillingDeps();
     const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent());
     const handler = createPaymentEventHandler({
-      creditPackages: [{ key: "bronze", credits: 100, price: 1000, productId: "pdt_1" }],
+      creditPackages: [bronzeCreditPackage],
       billing,
       checkoutIntents,
     });
@@ -254,7 +256,7 @@ describe("payment event handler billing modes", () => {
     const billing = createBillingDeps();
     const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({ status: "completed", paymentId: "pay_1" }));
     const handler = createPaymentEventHandler({
-      creditPackages: [{ key: "bronze", credits: 100, price: 1000, productId: "pdt_1" }],
+      creditPackages: [bronzeCreditPackage],
       billing,
       checkoutIntents,
     });
@@ -288,7 +290,7 @@ describe("payment event handler billing modes", () => {
       billingMode: "subscriptions",
       packageKey: null,
       planKey: starterPlan.key,
-      productId: starterPlan.productId,
+      productId: starterPlanProductId,
       discountCode: "SAVE10",
     }));
     const recordSubscriptionPayment = vi.fn().mockResolvedValue({});
@@ -306,13 +308,13 @@ describe("payment event handler billing modes", () => {
       provider: "dodo",
       eventType: "payment.succeeded",
       paymentId: "pay_sub_1",
-      productId: starterPlan.productId,
+      productId: starterPlanProductId,
       metadata: {
         billingMode: "subscriptions",
         userId: "user-1",
         planKey: starterPlan.key,
         discountCode: "SAVE10",
-        productId: starterPlan.productId,
+        productId: starterPlanProductId,
         checkoutReferenceId: "checkout-ref-1",
         subscriptionId: "sub_1",
       },
@@ -339,7 +341,7 @@ describe("payment event handler billing modes", () => {
       billingMode: "subscriptions",
       packageKey: null,
       planKey: starterPlan.key,
-      productId: starterPlan.productId,
+      productId: starterPlanProductId,
       discountCode: null,
     }));
     const recordSubscriptionPayment = vi.fn().mockResolvedValue({});
@@ -357,12 +359,12 @@ describe("payment event handler billing modes", () => {
       provider: "dodo",
       eventType: "payment.succeeded",
       paymentId: "pay_sub_bad_amount",
-      productId: starterPlan.productId,
+      productId: starterPlanProductId,
       metadata: {
         billingMode: "subscriptions",
         userId: "user-1",
         planKey: starterPlan.key,
-        productId: starterPlan.productId,
+        productId: starterPlanProductId,
         checkoutReferenceId: "checkout-ref-1",
         subscriptionId: "sub_1",
       },

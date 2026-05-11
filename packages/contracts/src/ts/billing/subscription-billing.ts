@@ -8,7 +8,7 @@ export const subscriptionPlans = (Object.keys(SUBSCRIPTION_PLAN_DEFINITIONS) as 
     price: plan.price,
     currency: plan.currency,
     interval: plan.interval,
-    productId: plan.productId,
+    providerProductIds: plan.providerProductIds,
     popular: plan.popular ?? false,
     features: plan.features,
   };

@@ -2,8 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { getServerSession } from "@/lib/auth-session";
-import { getMyApplicationConfig, getMySubscription, getMySubscriptionPayments } from "@/lib/api/me";
-import { getCreditPurchases } from "@/lib/services/credits";
+import { getCreditPurchasesServer, getMyApplicationConfigServer, getMySubscriptionPaymentsServer, getMySubscriptionServer } from "@/lib/api/me.server";
 import { PurchaseHistory } from "@/components/layout/backend/billing/purchase-history";
 import { CreditPricing } from "@/components/layout/backend/billing/credit-pricing";
 import { RedeemVoucherCard } from "@/components/layout/backend/billing/redeem-voucher-card";
@@ -47,7 +46,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   const resolvedSearchParams = await searchParams;
   const checkoutOutcome = getCheckoutOutcome(resolvedSearchParams);
   const t = await getTranslations("billing");
-  const applicationConfig = await getMyApplicationConfig();
+  const applicationConfig = await getMyApplicationConfigServer();
 
   if (applicationConfig.billing.subscriptionSurfacesEnabled) {
     return <SubscriptionBillingPage checkoutOutcome={checkoutOutcome} />;
@@ -89,8 +88,8 @@ async function SubscriptionBillingPage({ checkoutOutcome }: { checkoutOutcome: C
   const t = await getTranslations("billing");
   const subscriptionT = await getTranslations("billing.subscription");
   const [subscription, payments] = await Promise.all([
-    getMySubscription(),
-    getMySubscriptionPayments(50),
+    getMySubscriptionServer(),
+    getMySubscriptionPaymentsServer(50),
   ]);
 
   return (
@@ -111,7 +110,7 @@ async function SubscriptionBillingPage({ checkoutOutcome }: { checkoutOutcome: C
 }
 
 async function PurchaseHistoryWrapper() {
-  const purchases = await getCreditPurchases(50);
+  const purchases = await getCreditPurchasesServer(50);
   
   return <PurchaseHistory purchases={purchases} />;
 }

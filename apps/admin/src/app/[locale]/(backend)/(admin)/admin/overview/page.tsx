@@ -13,19 +13,24 @@ import {
 import { Link } from "@/i18n/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  getAdminCreditsConsumedData,
-  getAdminDashboardStats,
-  getAdminRevenueData,
-  getAdminTransactionData,
-} from "@/lib/services/admin";
+  getAdminCreditsConsumedDataServer,
+  getAdminDashboardStatsServer,
+  getAdminRevenueDataServer,
+  getAdminTransactionDataServer,
+} from "@/lib/api/admin.server";
 import { AdminStatsCard } from "@/components/layout/backend/admin/overview/overview-stats-card";
 import { TransactionsChart } from "@/components/layout/backend/admin/transactions-chart";
 import { CreditsConsumedChart } from "@/components/layout/backend/admin/credits-consumed-chart";
 import { RevenueChart } from "@/components/layout/backend/admin/billing/revenue-chart";
 import { Separator } from "@/components/ui/separator";
+import { getMyApplicationConfigServer } from "@/lib/api/me.server";
 
 export default async function AdminDashboardPage() {
-  const t = await getTranslations("admin");
+  const [t, applicationConfig] = await Promise.all([
+    getTranslations("admin"),
+    getMyApplicationConfigServer(),
+  ]);
+  const showCreditBillingCharts = applicationConfig.billing.creditSurfacesEnabled;
 
   return (
     <Container className="py-6">
@@ -85,35 +90,39 @@ export default async function AdminDashboardPage() {
         </Suspense>
       </div>
 
-      {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2 mb-6">
-        <Suspense fallback={<ChartSkeleton />}>
-          <TransactionsChartSection />
-        </Suspense>
-        <Suspense fallback={<ChartSkeleton />}>
-          <CreditsConsumedChartSection />
-        </Suspense>
-      </div>
-      <div className="grid gap-6">
-        <Suspense fallback={<ChartSkeleton />}>
-          <RevenueChartSection />
-        </Suspense>
-      </div>
+      {showCreditBillingCharts ? (
+        <>
+          {/* Charts */}
+          <div className="grid gap-6 lg:grid-cols-2 mb-6">
+            <Suspense fallback={<ChartSkeleton />}>
+              <TransactionsChartSection />
+            </Suspense>
+            <Suspense fallback={<ChartSkeleton />}>
+              <CreditsConsumedChartSection />
+            </Suspense>
+          </div>
+          <div className="grid gap-6">
+            <Suspense fallback={<ChartSkeleton />}>
+              <RevenueChartSection />
+            </Suspense>
+          </div>
+        </>
+      ) : null}
     </Container>
   );
 }
 
 async function AdminStatsSection() {
-  const stats = await getAdminDashboardStats();
+  const stats = await getAdminDashboardStatsServer();
   return <AdminStatsCard {...stats} />;
 }
 
 async function TransactionsChartSection() {
   const [dailyData, weeklyData, monthlyData, yearlyData] = await Promise.all([
-    getAdminTransactionData("daily"),
-    getAdminTransactionData("weekly"),
-    getAdminTransactionData("monthly"),
-    getAdminTransactionData("yearly"),
+    getAdminTransactionDataServer("daily"),
+    getAdminTransactionDataServer("weekly"),
+    getAdminTransactionDataServer("monthly"),
+    getAdminTransactionDataServer("yearly"),
   ]);
   return (
     <TransactionsChart
@@ -127,10 +136,10 @@ async function TransactionsChartSection() {
 
 async function CreditsConsumedChartSection() {
   const [dailyData, weeklyData, monthlyData, yearlyData] = await Promise.all([
-    getAdminCreditsConsumedData("daily"),
-    getAdminCreditsConsumedData("weekly"),
-    getAdminCreditsConsumedData("monthly"),
-    getAdminCreditsConsumedData("yearly"),
+    getAdminCreditsConsumedDataServer("daily"),
+    getAdminCreditsConsumedDataServer("weekly"),
+    getAdminCreditsConsumedDataServer("monthly"),
+    getAdminCreditsConsumedDataServer("yearly"),
   ]);
   return (
     <CreditsConsumedChart
@@ -144,10 +153,10 @@ async function CreditsConsumedChartSection() {
 
 async function RevenueChartSection() {
   const [dailyData, weeklyData, monthlyData, yearlyData] = await Promise.all([
-    getAdminRevenueData("daily"),
-    getAdminRevenueData("weekly"),
-    getAdminRevenueData("monthly"),
-    getAdminRevenueData("yearly"),
+    getAdminRevenueDataServer("daily"),
+    getAdminRevenueDataServer("weekly"),
+    getAdminRevenueDataServer("monthly"),
+    getAdminRevenueDataServer("yearly"),
   ]);
   return (
     <RevenueChart

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileJson, Loader2, RefreshCw, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ import {
   listMyDataExports,
   type UserDataExportSummary,
 } from "@/lib/api/me";
+import { webQueryKeys } from "@/lib/query/keys";
 
 type ExportWithToken = UserDataExportSummary & { downloadToken?: string };
 
@@ -32,62 +34,45 @@ function formatBytes(value: number | null) {
 
 export function DataExportCard() {
   const t = useTranslations("settings.dataExport");
-  const [exports, setExports] = React.useState<ExportWithToken[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isRequesting, setIsRequesting] = React.useState(false);
-  const [cancelingId, setCancelingId] = React.useState<string | null>(null);
-
-  const loadExports = React.useCallback(async () => {
-    setIsLoading(true);
-    try {
-      setExports(await listMyDataExports());
-    } catch {
-      toast.error(t("loadFailed"));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [t]);
-
-  React.useEffect(() => {
-    void loadExports();
-  }, [loadExports]);
-
-  const handleRequest = async () => {
-    setIsRequesting(true);
-    try {
-      const result = await createMyDataExport();
+  const queryClient = useQueryClient();
+  const exportsQuery = useQuery({
+    queryKey: webQueryKeys.dataExports,
+    queryFn: () => listMyDataExports() as Promise<ExportWithToken[]>,
+  });
+  const requestMutation = useMutation({
+    mutationFn: createMyDataExport,
+    onSuccess: async (result) => {
       if (!result.success || !result.data) {
         toast.error(result.error ?? t("failed"));
         return;
       }
-
-      setExports((current) => [result.data!, ...current.filter((item) => item.id !== result.data!.id)]);
+      await queryClient.invalidateQueries({ queryKey: webQueryKeys.dataExports });
       toast.success(t("success"));
-    } catch {
-      toast.error(t("failed"));
-    } finally {
-      setIsRequesting(false);
-    }
-  };
-
-  const handleCancel = async (exportId: string) => {
-    setCancelingId(exportId);
-    try {
-      const result = await cancelMyDataExport(exportId);
+    },
+    onError: () => toast.error(t("failed")),
+  });
+  const cancelMutation = useMutation({
+    mutationFn: cancelMyDataExport,
+    onSuccess: async (result) => {
       if (!result.success || !result.data) {
         toast.error(result.error ?? t("cancelFailed"));
         return;
       }
-
-      setExports((current) => current.map((item) => (item.id === exportId ? result.data! : item)));
+      await queryClient.invalidateQueries({ queryKey: webQueryKeys.dataExports });
       toast.success(t("cancelSuccess"));
-    } catch {
-      toast.error(t("cancelFailed"));
-    } finally {
-      setCancelingId(null);
-    }
+    },
+    onError: () => toast.error(t("cancelFailed")),
+  });
+
+  const handleRequest = async () => {
+    await requestMutation.mutateAsync();
   };
 
+  const handleCancel = async (exportId: string) => {
+    await cancelMutation.mutateAsync(exportId);
+  };
+
+  const exports = exportsQuery.data ?? [];
   const activeExport = exports.find((item) => item.status === "pending" || item.status === "ready");
 
   return (
@@ -101,7 +86,7 @@ export function DataExportCard() {
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {isLoading ? (
+        {exportsQuery.isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             {t("loading")}
@@ -138,10 +123,10 @@ export function DataExportCard() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={cancelingId === item.id}
+                        disabled={cancelMutation.variables === item.id && cancelMutation.isPending}
                         onClick={() => void handleCancel(item.id)}
                       >
-                        {cancelingId === item.id ? (
+                        {cancelMutation.variables === item.id && cancelMutation.isPending ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                         ) : (
                           <X className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -158,11 +143,11 @@ export function DataExportCard() {
       </CardContent>
 
       <CardFooter className="flex flex-wrap gap-3">
-        <Button onClick={handleRequest} disabled={isRequesting || !!activeExport}>
-          {isRequesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-          {isRequesting ? t("requesting") : t("requestButton")}
+        <Button onClick={handleRequest} disabled={requestMutation.isPending || !!activeExport}>
+          {requestMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+          {requestMutation.isPending ? t("requesting") : t("requestButton")}
         </Button>
-        <Button variant="outline" onClick={() => void loadExports()} disabled={isLoading}>
+        <Button variant="outline" onClick={() => void queryClient.invalidateQueries({ queryKey: webQueryKeys.dataExports })} disabled={exportsQuery.isLoading}>
           <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
           {t("refreshButton")}
         </Button>

@@ -22,6 +22,7 @@ import { createAuditService } from "./modules/audit/service";
 import { createCheckoutIntentsService } from "./modules/billing/checkout-intents";
 import { createBillingReconciliationService } from "./modules/billing/reconciliation";
 import { createAdminCreditsDashboardService } from "./modules/billing/credits-dashboard-service";
+import { createAdminSubscriptionFinanceDashboardService } from "./modules/billing/subscription-finance-dashboard-service";
 import { createBillingService } from "./modules/billing/service";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
@@ -29,10 +30,15 @@ import { createSubscriptionService } from "./modules/billing/subscription-servic
 import { createSubscriptionWebhookHandler } from "./modules/billing/subscription-webhooks";
 import { createPaymentProviderRegistry } from "./modules/payments/provider";
 import { createDodoPaymentProvider } from "./modules/payments/providers/dodo";
+import { createStripePaymentProvider } from "./modules/payments/providers/stripe";
 import { createPaymentWebhookEventStore } from "./modules/payments/webhook-event-store";
 import { createNotificationsService } from "./modules/notifications/service";
 import { createPrivacyService } from "./modules/privacy/service";
 import { createVouchersService } from "./modules/vouchers/service";
+import { createApiKeysService } from "./modules/api-keys/service";
+import { createEmailQueue } from "./modules/email/queue";
+import { createJobsRunner } from "./modules/jobs/runner";
+import { createWebhookRecoveryService } from "./modules/payments/webhook-recovery";
 
 const adminAllowlist = new Set(
   (env.ADMIN_ALLOWLIST ?? "")
@@ -57,13 +63,18 @@ const emailProvider = env.RESEND_API_KEY
       },
     };
 
+const emailQueue = createEmailQueue({ db, provider: emailProvider });
+
 const emailModule = createEmailModule({
-  provider: emailProvider,
+  provider: {
+    send: emailQueue.sendEmail,
+  },
   defaultFrom: env.RESEND_FROM_EMAIL ?? "noreply@example.com",
 });
 
 const notificationsService = createNotificationsService({ db });
 const privacyService = createPrivacyService({ db });
+const apiKeysService = createApiKeysService({ db });
 
 const dodoPaymentsClient = env.DODO_PAYMENTS_API_KEY
   ? new DodoPayments({
@@ -99,12 +110,21 @@ function createPaymentProviderAuthPlugins(client: DodoPayments | null) {
 }
 
 const paymentProviders = createPaymentProviderRegistry(
-  createDodoPaymentProvider({
+  env.PAYMENT_PROVIDER === "stripe" ? createStripePaymentProvider() : createDodoPaymentProvider({
     apiKey: env.DODO_PAYMENTS_API_KEY,
     environment: env.DODO_PAYMENTS_ENVIRONMENT,
     appUrl: env.APP_URL,
     client: dodoPaymentsClient,
   }),
+  [
+    createDodoPaymentProvider({
+      apiKey: env.DODO_PAYMENTS_API_KEY,
+      environment: env.DODO_PAYMENTS_ENVIRONMENT,
+      appUrl: env.APP_URL,
+      client: dodoPaymentsClient,
+    }),
+    createStripePaymentProvider(),
+  ],
 );
 
 const billingService = createBillingService({
@@ -120,15 +140,45 @@ const adminService = createAdminService({
   adminSecret: env.ADMIN_SECRET,
 });
 const adminCreditsDashboardService = createAdminCreditsDashboardService({ adminService });
+const adminSubscriptionFinanceDashboardService = createAdminSubscriptionFinanceDashboardService({
+  db,
+  paymentProvider: paymentProviders.activeProvider,
+});
 const discountsService = createDiscountsService({
   db,
-  env,
+  paymentProvider: paymentProviders.activeProvider,
 });
 const vouchersService = createVouchersService({
   db,
   notifications: notificationsService,
 });
 const paymentWebhookEventStore = createPaymentWebhookEventStore({ db });
+const webhookRecoveryService = createWebhookRecoveryService({ db });
+const jobsRunner = createJobsRunner({
+  db,
+  jobs: [
+    {
+      name: "billing-reconciliation",
+      intervalSeconds: 3600,
+      handler: () => billingReconciliationService.reconcileProviderBillingStateSafely(),
+    },
+    {
+      name: "webhook-recovery",
+      intervalSeconds: 300,
+      handler: () => webhookRecoveryService.recoverFailed(),
+    },
+    {
+      name: "expire-user-data-exports",
+      intervalSeconds: 3600,
+      handler: () => privacyService.expireExports(),
+    },
+    {
+      name: "process-pending-emails",
+      intervalSeconds: 60,
+      handler: () => emailQueue.processPending(),
+    },
+  ],
+});
 
 const authModule = createAuthModule({
   betterAuthOptions: {
@@ -384,16 +434,21 @@ export const bootstrap = {
   authModule,
   adminService,
   adminCreditsDashboardService,
+  adminSubscriptionFinanceDashboardService,
+  apiKeysService,
   auditService,
   billingService,
   billingReconciliationService,
   checkoutIntentsService,
   subscriptionService,
   discountsService,
+  emailQueue,
+  jobsRunner,
   notificationsService,
   privacyService,
   vouchersService,
   paymentsModule,
   paymentProviders,
+  webhookRecoveryService,
   dodoPaymentsClient,
 };
