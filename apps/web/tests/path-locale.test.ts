@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPathLocale } from "../src/i18n/path-locale";
+import { getInternalNavigationPath, getPathLocale } from "../src/i18n/path-locale";
 
 describe("getPathLocale", () => {
   it("parses supported locale from first path segment", () => {
@@ -19,5 +19,16 @@ describe("getPathLocale", () => {
       activeLocale: "en",
       pathWithoutLocale: "/dashboard",
     });
+  });
+});
+
+describe("getInternalNavigationPath", () => {
+  it("removes the locale prefix before using next-intl navigation", () => {
+    expect(getInternalNavigationPath("/nl/dashboard")).toBe("/dashboard");
+    expect(getInternalNavigationPath("/fr/billing?success=true")).toBe("/billing?success=true");
+  });
+
+  it("keeps unlocalized paths unchanged", () => {
+    expect(getInternalNavigationPath("/dashboard")).toBe("/dashboard");
   });
 });

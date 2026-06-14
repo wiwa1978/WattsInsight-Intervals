@@ -218,7 +218,8 @@
       "EMAIL_NOT_VERIFIED": "Please verify your email address first.",
       "INVALID_TOKEN": "Invalid or expired token.",
       "TOO_MANY_REQUESTS": "Too many requests. Please try again later.",
-      "BANNED_USER": "Your account has been banned. Please contact support for assistance."
+      "BANNED_USER": "Your account has been banned. Please contact support for assistance.",
+      "WEB_LOGIN_FORBIDDEN": "This account does not have access to the web app. Please use the admin portal."
     },
     "signup": {
       "title": "Create an account",

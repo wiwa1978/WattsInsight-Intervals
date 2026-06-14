@@ -13,3 +13,10 @@ export function getPathLocale(pathname: string): {
 
   return { activeLocale, pathWithoutLocale };
 }
+
+export function getInternalNavigationPath(path: string): string {
+  const [pathname, suffix = ""] = path.split(/(?=[?#])/, 2);
+  const { pathWithoutLocale } = getPathLocale(pathname);
+
+  return pathWithoutLocale + suffix;
+}

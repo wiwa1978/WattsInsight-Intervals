@@ -218,7 +218,8 @@
       "EMAIL_NOT_VERIFIED": "Verifieer eerst je e-mailadres.",
       "INVALID_TOKEN": "Ongeldige of verlopen token.",
       "TOO_MANY_REQUESTS": "Te veel verzoeken. Probeer het later opnieuw.",
-      "BANNED_USER": "Uw account is geblokkeerd. Neem contact op met de ondersteuning voor hulp."
+      "BANNED_USER": "Uw account is geblokkeerd. Neem contact op met de ondersteuning voor hulp.",
+      "WEB_LOGIN_FORBIDDEN": "Dit account heeft geen toegang tot de webapp. Gebruik het adminportaal."
     },
     "signup": {
       "title": "Account aanmaken",

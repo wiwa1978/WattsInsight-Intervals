@@ -218,7 +218,8 @@
       "EMAIL_NOT_VERIFIED": "Veuillez d'abord vérifier votre adresse e-mail.",
       "INVALID_TOKEN": "Jeton invalide ou expiré.",
       "TOO_MANY_REQUESTS": "Trop de demandes. Veuillez réessayer plus tard.",
-      "BANNED_USER": "Votre compte a été banni. Veuillez contacter le support pour obtenir de l'aide."
+      "BANNED_USER": "Votre compte a été banni. Veuillez contacter le support pour obtenir de l'aide.",
+      "WEB_LOGIN_FORBIDDEN": "Ce compte n'a pas accès à l'application web. Veuillez utiliser le portail admin."
     },
     "signup": {
       "title": "Créer un compte",

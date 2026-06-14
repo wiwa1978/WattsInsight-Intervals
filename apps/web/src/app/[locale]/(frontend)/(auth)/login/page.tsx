@@ -24,7 +24,9 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SocialAuthButtons } from "@/components/layout/frontend/social-auth-buttons";
 import { Link, useRouter } from "@/i18n/navigation";
+import { getInternalNavigationPath } from "@/i18n/path-locale";
 import { authClient } from "@/lib/auth-client";
+import { getPasswordSignInRequest, getWebLoginAccessDecision } from "@/lib/login-submit";
 import { authConfig } from "@/config/auth";
 import { signInSchema, type SignInInput, magicLinkSchema, type MagicLinkFormValues } from "@/schemas";
 
@@ -58,6 +60,7 @@ function LoginPageContent() {
   const callbackUrl = searchParams.get("callbackUrl");
   const redirectTo =
     callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : DEFAULT_REDIRECT;
+  const navigationPath = getInternalNavigationPath(redirectTo);
 
   // Helper to get translated error message
   const getErrorMessage = (error: { code?: string; message?: string }) => {
@@ -110,12 +113,9 @@ function LoginPageContent() {
       setPasswordErrorCode(null);
       setVerificationNotice(null);
 
-      const { error } = await authClient.signIn.email({
-        email: values.email,
-        password: values.password,
-        ...(authConfig.rememberMeEnabled && { rememberMe: values.rememberMe }),
-        callbackURL: redirectTo,
-      });
+      const { data, error } = await authClient.signIn.email(
+        getPasswordSignInRequest(values, authConfig.rememberMeEnabled),
+      );
 
       if (error) {
         setPasswordErrorCode(error.code ?? null);
@@ -135,7 +135,18 @@ function LoginPageContent() {
         });
         passwordForm.resetField("password");
       } else {
-        router.push(redirectTo);
+        const accessDecision = getWebLoginAccessDecision(data?.user);
+
+        if (!accessDecision.allowed) {
+          await authClient.signOut();
+          passwordForm.setError("root", {
+            message: tErrors(accessDecision.errorCode),
+          });
+          passwordForm.resetField("password");
+          return;
+        }
+
+        router.push(navigationPath);
       }
     } catch (error) {
       setPasswordErrorCode(null);
