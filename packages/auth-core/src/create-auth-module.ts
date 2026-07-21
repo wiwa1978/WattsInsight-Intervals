@@ -149,6 +149,14 @@ export function createAuthModule(options: AuthModuleOptions) {
   });
   const requireAdminAccess = createRequireAdminAccess({
     allowlist: options.admin.allowlist,
+    allowTotpBootstrapPaths: [
+      "/admin/status",
+      "/admin/session",
+      "/admin/dashboard/stats",
+      "/admin/users/stats",
+      "/admin/application-settings",
+    ],
+    isAdminBootstrapAllowed: options.admin.isBootstrapAccessAllowed,
   });
 
   router.on(["GET", "POST", "OPTIONS"], "/*", async (c) => {

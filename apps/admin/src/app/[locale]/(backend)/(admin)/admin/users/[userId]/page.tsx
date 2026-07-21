@@ -4,14 +4,16 @@ import { getTranslations } from "next-intl/server";
 import {
   getAdminUserCreditBalanceServer,
   getAdminUserCreditHistoryServer,
+  getAdminUserCreditLiabilitiesServer,
   getAdminUserCreditPurchasesServer,
   getAdminUserServer,
 } from "@/lib/api/admin.server";
 import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +22,7 @@ import { PurchaseHistoryTable } from "@/components/layout/backend/admin/shared/p
 import { formatDate } from "@/lib/utils";
 import { StatCard } from "@/components/layout/backend/shared/stat-card";
 import { CreditCard, Wallet, TrendingDown, DollarSign } from "lucide-react";
+import type { AdminUserCreditLiability } from "@platform/contracts";
 
 interface UserDetailPageProps {
   params: Promise<{
@@ -68,6 +71,10 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
 
       {/* Transaction and Purchase History */}
       <div className="grid gap-6 lg:grid-cols-1">
+        <Suspense fallback={<TableSkeleton />}>
+          <UserCreditLiabilities userId={userId} />
+        </Suspense>
+
         <Suspense fallback={<TableSkeleton />}>
           <UserTransactionHistory userId={userId} userName={user.name} />
         </Suspense>
@@ -222,6 +229,58 @@ async function CreditCards({ userId }: { userId: string }) {
       ))}
     </div>
   );
+}
+
+async function UserCreditLiabilities({ userId }: { userId: string }) {
+  const t = await getTranslations("admin.userDetail.creditLiabilities");
+  const liabilities = await getAdminUserCreditLiabilitiesServer(userId);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {liabilities.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("remaining")}</TableHead>
+                <TableHead>{t("reason")}</TableHead>
+                <TableHead>{t("source")}</TableHead>
+                <TableHead>{t("status")}</TableHead>
+                <TableHead>{t("created")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {liabilities.map((liability) => (
+                <TableRow key={liability.id}>
+                  <TableCell className="font-medium">{Number(liability.remainingAmount).toFixed(2)}</TableCell>
+                  <TableCell>{liability.reason}</TableCell>
+                  <TableCell className="font-mono text-xs">{liabilitySource(liability)}</TableCell>
+                  <TableCell><Badge variant="secondary">{liability.status}</Badge></TableCell>
+                  <TableCell>{formatDate(liability.createdAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("empty")}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function liabilitySource(liability: AdminUserCreditLiability) {
+  const sources = [
+    liability.sourcePaymentId ? `payment: ${liability.sourcePaymentId}` : null,
+    liability.sourceRefundId ? `refund: ${liability.sourceRefundId}` : null,
+    liability.sourceDisputeId ? `dispute: ${liability.sourceDisputeId}` : null,
+  ].filter((source): source is string => Boolean(source));
+
+  return sources.length > 0 ? sources.join(" / ") : "-";
 }
 
 async function UserTransactionHistory({ userId, userName }: { userId: string; userName: string }) {

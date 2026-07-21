@@ -33,6 +33,18 @@ afterEach(() => {
 });
 
 describe("createBillingService", () => {
+  it("finds credit purchases by provider payment id", async () => {
+    const purchase = { id: "cp_1", paymentProvider: "dodo", paymentId: "pay_1" };
+    const findFirst = vi.fn().mockResolvedValue(purchase);
+    const service = createBillingService({
+      db: { query: { creditPurchases: { findFirst } } },
+      notifications: { createNotification: vi.fn() },
+    } as any);
+
+    await expect(service.findCreditPurchaseByProviderPayment("dodo", "pay_1")).resolves.toBe(purchase);
+    expect(findFirst).toHaveBeenCalledOnce();
+  });
+
   // Verifies credit rows are lazily initialized for users without a prior balance record.
   it("initializes user credits when missing", async () => {
     const findFirst = vi.fn().mockResolvedValueOnce(null);
@@ -107,6 +119,7 @@ describe("createBillingService", () => {
   // Verifies successful purchases atomically update purchases, balances, ledger entries, and notifications.
   it("processes completed purchase and writes ledger + notification", async () => {
     const notifications = { createNotification: vi.fn().mockResolvedValue(undefined) };
+    const creditLiabilities = { applyIncomingCredits: vi.fn().mockResolvedValue({ usableCredits: 30, settledCredits: 0 }) };
     const inserts: Array<{ table: unknown; values: unknown }> = [];
     const updates: Array<{ table: unknown; set: unknown }> = [];
 
@@ -148,6 +161,7 @@ describe("createBillingService", () => {
       db: db as any,
       env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
       notifications,
+      creditLiabilities,
     });
 
     const purchase = await service.processCreditPurchase("u1", "advanced", "pay_1", "completed");
@@ -167,12 +181,50 @@ describe("createBillingService", () => {
     });
     expect(updates).toHaveLength(1);
     expect(updates[0]?.table).toBe(userCredits);
+    expect(creditLiabilities.applyIncomingCredits).toHaveBeenCalledWith("u1", 30);
     expect(notifications.createNotification).toHaveBeenCalledOnce();
 
     const transactionInserts = inserts.filter((entry) => entry.table === creditTransactions);
     expect(transactionInserts).toHaveLength(2);
     expect(transactionInserts[0]?.values).toMatchObject({ type: "purchase", userId: "u1", referenceId: "pay_1" });
     expect(transactionInserts[1]?.values).toMatchObject({ type: "bonus", userId: "u1", referenceId: "pay_1" });
+  });
+
+  it("settles liabilities before adding usable credits for completed purchases", async () => {
+    const creditLiabilities = { applyIncomingCredits: vi.fn().mockResolvedValue({ usableCredits: 10, settledCredits: 20 }) };
+    const updates: Array<{ table: unknown; set: unknown }> = [];
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce(null),
+        },
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "100", totalPurchased: "100", totalSpent: "0" }),
+        },
+      },
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn(() => {
+          if (table === creditPurchases) {
+            return { returning: vi.fn().mockResolvedValue([{ id: "purchase-1", paymentStatus: "completed" }]) };
+          }
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: updateReturningMock(updates, "110"),
+    };
+
+    const service = createBillingService({
+      db: { transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)) } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn().mockResolvedValue(undefined) },
+      creditLiabilities,
+    });
+
+    await service.processCreditPurchase("u1", "advanced", "pay_1", "completed");
+
+    expect(creditLiabilities.applyIncomingCredits).toHaveBeenCalledWith("u1", 30);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.table).toBe(userCredits);
   });
 
   // Verifies pending purchases do not mutate balances or produce side effects.
@@ -473,6 +525,59 @@ describe("createBillingService", () => {
       balanceAfter: "40.00",
       metadata: { refundId: "rfnd_123" },
     });
+  });
+
+  it("creates a liability when refund reversal exceeds usable balance", async () => {
+    const creditLiabilities = { create: vi.fn().mockResolvedValue({ id: "liability-1" }) };
+    const inserts: Array<{ table: unknown; values: unknown }> = [];
+    const updates: Array<{ table: unknown; set: unknown }> = [];
+    const tx = {
+      query: {
+        creditPurchases: {
+          findFirst: vi.fn().mockResolvedValueOnce({
+            id: "purchase-refund",
+            userId: "u1",
+            packageKey: "advanced",
+            paymentId: "pay_refund",
+            paymentStatus: "completed",
+            credits: 100,
+            bonusCredits: 10,
+            creditsGrantedAt: new Date("2026-01-01T00:00:00Z"),
+          }),
+        },
+        userCredits: {
+          findFirst: vi.fn().mockResolvedValueOnce({ userId: "u1", balance: "40", totalPurchased: "100", totalSpent: "0" }),
+        },
+      },
+      insert: vi.fn().mockImplementation((table: unknown) => ({
+        values: vi.fn((values: unknown) => {
+          inserts.push({ table, values });
+          if (table === creditTransactions) {
+            return { returning: vi.fn().mockResolvedValue([{ id: "tx-refund-1" }]) };
+          }
+          return Promise.resolve(undefined);
+        }),
+      })),
+      update: updateReturningMock(updates, "0"),
+    };
+
+    const service = createBillingService({
+      db: { transaction: vi.fn(async (cb: (trx: any) => unknown) => cb(tx)) } as any,
+      env: { DODO_PAYMENTS_ENVIRONMENT: "test_mode" },
+      notifications: { createNotification: vi.fn() },
+      creditLiabilities,
+    });
+
+    await service.processCreditRefund("pay_refund", "rfnd_123");
+
+    expect(creditLiabilities.create).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "u1",
+      amount: 70,
+      reason: "refund",
+      sourcePaymentId: "pay_refund",
+      sourceRefundId: "rfnd_123",
+    }));
+    expect(inserts[0]?.values).toMatchObject({ amount: "-40.00", balanceAfter: "0.00" });
   });
 
   // Verifies repeated refund events do not create duplicate reversal transactions.

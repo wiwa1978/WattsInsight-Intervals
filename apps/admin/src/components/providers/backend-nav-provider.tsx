@@ -1,7 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { BackendNavAdminItems } from "@/config/backend-navbar-admin"
+import { useQuery } from "@tanstack/react-query"
+import { getBackendNavAdminItems } from "@/config/backend-navbar-admin"
+import { getMyApplicationConfig } from "@/lib/api/me"
+import { adminQueryKeys } from "@/lib/query/keys"
 
 export interface DashboardNavItem {
   title: string
@@ -16,7 +19,12 @@ interface DashboardNavContextValue {
 const DashboardNavContext = React.createContext<DashboardNavContextValue | undefined>(undefined)
 
 export function DashboardNavProvider({ children }: { children: React.ReactNode }) {
-  const navItems = React.useMemo(() => BackendNavAdminItems, []);
+  const applicationConfigQuery = useQuery({
+    queryKey: adminQueryKeys.applicationConfig,
+    queryFn: getMyApplicationConfig,
+    staleTime: 60_000,
+  })
+  const navItems = getBackendNavAdminItems(applicationConfigQuery.data)
 
   return (
     <DashboardNavContext.Provider value={{ navItems }}>

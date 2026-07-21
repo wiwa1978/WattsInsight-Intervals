@@ -1,4 +1,5 @@
-import { LayoutDashboard, LucideIcon, Settings, Wallet } from "lucide-react";
+import { getBillingCapability, type BillingCapabilityInput } from "@platform/frontend-shared";
+import { LayoutDashboard, LucideIcon, Settings } from "lucide-react";
 
 export interface BackendNavDashboardItem {
   title: string;
@@ -7,12 +8,7 @@ export interface BackendNavDashboardItem {
   requiresBillingSurface?: true;
 }
 
-type BillingSurfaceConfig = {
-  billing?: {
-    creditSurfacesEnabled?: boolean;
-    subscriptionSurfacesEnabled?: boolean;
-  };
-} | null | undefined;
+type BillingSurfaceConfig = BillingCapabilityInput | null | undefined;
 
 
 export const BackendNavItems: BackendNavDashboardItem[] = [
@@ -20,12 +16,6 @@ export const BackendNavItems: BackendNavDashboardItem[] = [
     title: "dashboard.nav.overview",
     url: "/dashboard",
     icon: LayoutDashboard,
-  },
-  {
-    title: "dashboard.nav.billing",
-    url: "/billing",
-    icon: Wallet,
-    requiresBillingSurface: true,
   },
 ];
 
@@ -35,22 +25,14 @@ export const UserDropdownNavItems: BackendNavDashboardItem[] = [
     url: "/settings",
     icon: Settings,
   },
-  {
-    title: "dashboard.nav.billing",
-    url: "/billing",
-    icon: Wallet,
-    requiresBillingSurface: true,
-  },
 ];
 
 function hasBillingSurface(config: BillingSurfaceConfig) {
-  if (!config?.billing) {
+  if (!config) {
     return true;
   }
 
-  const billingEnabled = config?.billing?.creditSurfacesEnabled === true || config?.billing?.subscriptionSurfacesEnabled === true;
-
-  return billingEnabled;
+  return getBillingCapability(config).userBillingVisible;
 }
 
 function filterBillingSurfaceItems<T extends { requiresBillingSurface?: true }>(items: T[], config: BillingSurfaceConfig): T[] {

@@ -28,6 +28,7 @@ export type PaymentEventHandlerDeps = {
         customerId?: string;
       },
     ) => Promise<unknown>;
+    findCreditPurchaseByProviderPayment: (provider: string, paymentId: string) => Promise<unknown | null>;
     processCreditRefund: (paymentId: string, refundId?: string) => Promise<unknown>;
     processCreditDisputeLoss: (paymentId: string, disputeId?: string, disputeStatus?: string) => Promise<unknown>;
   };
@@ -50,6 +51,9 @@ export type PaymentEventHandlerDeps = {
         currency: string;
       };
     }) => Promise<unknown>;
+    findSubscriptionPaymentByProviderPayment?: (provider: string, paymentId: string) => Promise<unknown | null>;
+    recordSubscriptionRefund?: (provider: string, paymentId: string, refundId?: string) => Promise<unknown>;
+    recordSubscriptionDisputeLoss?: (provider: string, paymentId: string, disputeId?: string, disputeStatus?: string) => Promise<unknown>;
   };
 };
 
@@ -174,22 +178,51 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
     }
 
     if (event.eventType === "refund.succeeded") {
-      ensureCreditBillingEnabled();
       if (event.refundIsPartial) {
         throw new Error(`Refusing payment ${event.paymentId}: partial refunds require manual reconciliation.`);
       }
 
-      await deps.billing.processCreditRefund(event.paymentId, event.refundId);
+      const creditPurchase = await deps.billing.findCreditPurchaseByProviderPayment(event.provider, event.paymentId);
+      if (creditPurchase) {
+        await deps.billing.processCreditRefund(event.paymentId, event.refundId);
+        return;
+      }
+
+      const subscriptionPayment = await deps.subscriptions?.findSubscriptionPaymentByProviderPayment?.(event.provider, event.paymentId);
+      if (subscriptionPayment) {
+        if (!deps.subscriptions?.recordSubscriptionRefund) {
+          throw new Error(`Subscription refund handling is not configured for ${event.provider} payment ${event.paymentId}`);
+        }
+
+        await deps.subscriptions.recordSubscriptionRefund(event.provider, event.paymentId, event.refundId);
+        return;
+      }
+
+      throw new Error(`No local payment found for ${event.provider} payment ${event.paymentId}`);
+    }
+
+    if (event.eventType.startsWith("dispute.") && !DISPUTE_REVERSAL_EVENTS.has(event.eventType)) {
       return;
     }
 
-    if (event.eventType.startsWith("dispute.")) {
-      ensureCreditBillingEnabled();
-      if (DISPUTE_REVERSAL_EVENTS.has(event.eventType)) {
+    if (DISPUTE_REVERSAL_EVENTS.has(event.eventType)) {
+      const creditPurchase = await deps.billing.findCreditPurchaseByProviderPayment(event.provider, event.paymentId);
+      if (creditPurchase) {
         await deps.billing.processCreditDisputeLoss(event.paymentId, event.disputeId, event.disputeStatus);
+        return;
       }
 
-      return;
+      const subscriptionPayment = await deps.subscriptions?.findSubscriptionPaymentByProviderPayment?.(event.provider, event.paymentId);
+      if (subscriptionPayment) {
+        if (!deps.subscriptions?.recordSubscriptionDisputeLoss) {
+          throw new Error(`Subscription dispute handling is not configured for ${event.provider} payment ${event.paymentId}`);
+        }
+
+        await deps.subscriptions.recordSubscriptionDisputeLoss(event.provider, event.paymentId, event.disputeId, event.disputeStatus);
+        return;
+      }
+
+      throw new Error(`No local payment found for ${event.provider} payment ${event.paymentId}`);
     }
 
     if (

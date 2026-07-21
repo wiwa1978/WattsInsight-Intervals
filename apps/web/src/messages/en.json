@@ -322,6 +322,7 @@
     "subtitle": "Manage your account and preferences.",
     "tabs": {
       "profile": "Profile",
+      "preferences": "Preferences",
       "security": "Security",
       "accounts": "Accounts",
       "privacy": "Privacy"
@@ -331,6 +332,7 @@
       "description": "Manage your profile information",
       "personalInfo": "Personal Information",
       "addressInfo": "Address",
+      "defaultBillingAddress": "This address is used as your default billing address during checkout.",
       "avatar": "Profile Picture",
       "avatarHint": "Click to upload a new picture (max 500KB)",
       "invalidFileType": "Please select an image file",
@@ -359,6 +361,18 @@
       "saving": "Saving...",
       "success": "Profile updated successfully!",
       "error": "Failed to update profile"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "description": "Manage how the app behaves for your account.",
+      "language": "Language",
+      "success": "Preferences updated successfully.",
+      "error": "Failed to update preferences.",
+      "languages": {
+        "en": "English",
+        "nl": "Dutch",
+        "fr": "French"
+      }
     },
     "emailChange": {
       "title": "Change Email",

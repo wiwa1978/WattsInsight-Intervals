@@ -33,6 +33,7 @@ interface BillingClientWrapperProps {
   children: ReactNode;
   addresses: BillingAddressOption[];
   checkoutOutcome: CheckoutOutcome;
+  vouchersVisible: boolean;
 }
 
 type BillingAddressOption = CheckoutAddressInput & {
@@ -54,7 +55,7 @@ export function useBilling() {
   return context;
 }
 
-export function BillingClientWrapper({ children, addresses, checkoutOutcome }: BillingClientWrapperProps) {
+export function BillingClientWrapper({ children, addresses, checkoutOutcome, vouchersVisible }: BillingClientWrapperProps) {
   const billingT = useTranslations("billing");
   const checkoutT = useTranslations("billing.credits.checkout");
   const { data: session } = authClient.useSession();
@@ -95,7 +96,7 @@ export function BillingClientWrapper({ children, addresses, checkoutOutcome }: B
       const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
       const checkoutSession = await checkoutMutation.mutateAsync({
         packageKey: selectedPackage.key,
-        discountCode: voucherCode.trim().toUpperCase() || undefined,
+        discountCode: vouchersVisible ? voucherCode.trim().toUpperCase() || undefined : undefined,
         address: selectedAddress ? toCheckoutAddress(selectedAddress) : undefined,
       });
       if (checkoutSession.data.checkoutUrl) {
@@ -165,6 +166,7 @@ export function BillingClientWrapper({ children, addresses, checkoutOutcome }: B
         onVoucherCodeChange={(value) => setVoucherCode(value.toUpperCase())}
         packageConfig={selectedPackage}
         selectedAddressId={selectedAddressId}
+        vouchersVisible={vouchersVisible}
         voucherCode={voucherCode}
       />
     </BillingContext.Provider>
@@ -180,6 +182,7 @@ type CreditCheckoutDialogProps = {
   onVoucherCodeChange: (value: string) => void;
   packageConfig: CreditPackage | null;
   selectedAddressId: string;
+  vouchersVisible: boolean;
   voucherCode: string;
 };
 
@@ -192,6 +195,7 @@ function CreditCheckoutDialog({
   onVoucherCodeChange,
   packageConfig,
   selectedAddressId,
+  vouchersVisible,
   voucherCode,
 }: CreditCheckoutDialogProps) {
   const t = useTranslations("billing.credits.checkout");
@@ -230,16 +234,18 @@ function CreditCheckoutDialog({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="credit-checkout-voucher">{t("voucherLabel")}</Label>
-                <Input
-                  id="credit-checkout-voucher"
-                  value={voucherCode}
-                  onChange={(event) => onVoucherCodeChange(event.target.value)}
-                  placeholder={t("voucherPlaceholder")}
-                />
-                <p className="text-xs text-muted-foreground">{t("voucherDescription")}</p>
-              </div>
+              {vouchersVisible ? (
+                <div className="space-y-2">
+                  <Label htmlFor="credit-checkout-voucher">{t("voucherLabel")}</Label>
+                  <Input
+                    id="credit-checkout-voucher"
+                    value={voucherCode}
+                    onChange={(event) => onVoucherCodeChange(event.target.value)}
+                    placeholder={t("voucherPlaceholder")}
+                  />
+                  <p className="text-xs text-muted-foreground">{t("voucherDescription")}</p>
+                </div>
+              ) : null}
 
               <div className="space-y-2 rounded-xl border p-4">
                 <Label>{t("billingAddress")}</Label>

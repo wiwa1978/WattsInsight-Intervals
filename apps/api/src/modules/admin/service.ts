@@ -312,6 +312,15 @@ export function createAdminService(deps: AdminServiceDeps) {
     return Number(result?.count ?? 0);
   }
 
+  async function hasAnyTotpEnabledAdmin() {
+    const [result] = await deps.db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(user)
+      .where(and(eq(user.role, "admin"), eq(user.banned, false), eq(user.twoFactorEnabled, true)));
+
+    return Number(result?.count ?? 0) > 0;
+  }
+
   async function getUserCreditBalance(userId: string) {
     let credits = await deps.db.query.userCredits.findFirst({
       where: eq(userCredits.userId, userId),
@@ -627,6 +636,7 @@ export function createAdminService(deps: AdminServiceDeps) {
     getUserStats,
     getUserById,
     countActiveAdmins,
+    hasAnyTotpEnabledAdmin,
     getUserCreditBalance,
     getUserCreditHistory,
     getUserCreditPurchases,

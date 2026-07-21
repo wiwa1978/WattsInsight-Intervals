@@ -10,7 +10,7 @@ export type CreditPlanDefinition = {
 export type CreditPlanConfig = Record<string, CreditPlanDefinition>;
 
 export type CreditBillingConfig = {
-  features: Record<string, number>;
+  features: Record<string, { cost: number }>;
   lowCreditThreshold: number;
   allowNegativeCredits: boolean;
   maxCredits: number;
@@ -46,13 +46,13 @@ export const CREDIT_PLAN_DEFINITIONS: Record<CreditPlanKey, CreditPlanDefinition
 
 export const creditBillingConfig = {
   features: {
-    aiGeneration: 1,
-    apiCall: 0.1,
-    exportPdf: 5,
-    prioritySupport: 10,
-    chatText: 0.1,
-    chatAudio: 1,
-    chatVideo: 2,
+    aiGeneration: { cost: 1 },
+    apiCall: { cost: 0.1 },
+    exportPdf: { cost: 5 },
+    prioritySupport: { cost: 10 },
+    chatText: { cost: 0.1 },
+    chatAudio: { cost: 1 },
+    chatVideo: { cost: 2 },
   },
   lowCreditThreshold: 10,
   allowNegativeCredits: false,

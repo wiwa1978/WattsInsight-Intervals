@@ -7,7 +7,7 @@ import {
   billingListQuerySchema,
   billingRangeQuerySchema,
   clientLogSchema,
-  consumeCreditsRequestSchema,
+  consumeFeatureUsageRequestSchema,
   countriesResponseSchema,
   countriesQuerySchema,
   createCheckoutRequestSchema,
@@ -387,7 +387,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   }),
   route("post", "/me/credits/consume", ["Me"], "Consume credits for a feature", {
     security: cookieOrBearerAuth,
-    requestBody: requestBody(consumeCreditsRequestSchema),
+    requestBody: requestBody(consumeFeatureUsageRequestSchema),
     responses: defaultResponses("Credits consumed", ["400", "401"]),
   }),
   route("get", "/me/subscription", ["Me"], "Get current user subscription", {
@@ -529,6 +529,11 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     security: cookieOrBearerAuth,
     parameters: [pathParameter("userId", userIdParamSchema.shape.userId), ...optionalLimitParameters],
     responses: defaultResponses("User credit purchases", ["400", "401", "403"]),
+  }),
+  route("get", "/admin/users/{userId}/credit-liabilities", ["Admin Users"], "Get user credit liabilities", {
+    security: cookieOrBearerAuth,
+    parameters: [pathParameter("userId", userIdParamSchema.shape.userId)],
+    responses: defaultResponses("User credit liabilities", ["400", "401", "403"]),
   }),
   route("get", "/admin/users/{userId}/subscription", ["Admin Users"], "Get user subscription", {
     security: cookieOrBearerAuth,

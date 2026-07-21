@@ -13,7 +13,7 @@ import { createPlatformDb, mobileRefreshToken, user } from "@platform/platform-d
 
 import { authConfig } from "./config/auth";
 import { buildSocialProviders } from "./config/auth-social-providers";
-import { creditPackages } from "./config/billing";
+import { creditBillingConfig, creditPackages } from "./config/billing";
 import { env } from "./env";
 import { getBillingMode } from "./lib/billing-mode";
 import { getDodoCheckoutProductsForBillingMode } from "./lib/dodo-billing-products";
@@ -21,10 +21,13 @@ import { createAdminService } from "./modules/admin/service";
 import { createAuditService } from "./modules/audit/service";
 import { createApplicationSettingsService } from "./modules/application-settings/service";
 import { createCheckoutIntentsService } from "./modules/billing/checkout-intents";
+import { createCreditLiabilityService } from "./modules/billing/credit-liabilities";
+import { createEntitlementService } from "./modules/billing/entitlements";
 import { createBillingReconciliationService } from "./modules/billing/reconciliation";
 import { createAdminCreditsDashboardService } from "./modules/billing/credits-dashboard-service";
 import { createAdminSubscriptionFinanceDashboardService } from "./modules/billing/subscription-finance-dashboard-service";
 import { createBillingService } from "./modules/billing/service";
+import { createUsageService } from "./modules/billing/usage";
 import { createDiscountsService } from "./modules/discounts/service";
 import { createPaymentEventHandler } from "./modules/billing/payment-event-handler";
 import { createSubscriptionService } from "./modules/billing/subscription-service";
@@ -129,6 +132,7 @@ const paymentProviders = createPaymentProviderRegistry(
   ],
 );
 
+const creditLiabilityService = createCreditLiabilityService({ db });
 const billingService = createBillingService({
   db,
   paymentProvider: paymentProviders.activeProvider,
@@ -136,6 +140,16 @@ const billingService = createBillingService({
 });
 const billingReconciliationService = createBillingReconciliationService({ db, paymentProvider: paymentProviders.activeProvider });
 const subscriptionService = createSubscriptionService({ db, paymentProvider: paymentProviders.activeProvider });
+const entitlementService = createEntitlementService({
+  billingMode: getBillingMode,
+  credits: billingService,
+  subscriptions: subscriptionService,
+});
+const usageService = createUsageService({
+  billingMode: getBillingMode,
+  features: creditBillingConfig.features,
+  billingService,
+});
 const checkoutIntentsService = createCheckoutIntentsService({ db });
 const adminService = createAdminService({
   db,
@@ -337,6 +351,15 @@ const authModule = createAuthModule({
   },
   admin: {
     allowlist: adminAllowlist,
+    async isBootstrapAccessAllowed(_email, path) {
+      return [
+        "/admin/status",
+        "/admin/session",
+        "/admin/dashboard/stats",
+        "/admin/users/stats",
+        "/admin/application-settings",
+      ].includes(path) && (await adminService.countActiveAdmins()) === 0;
+    },
   },
   jwt: {
     secret: env.JWT_SECRET,
@@ -427,6 +450,9 @@ const paymentsModule = createPaymentsModule({
         subscriptions: subscriptionService,
       }),
       recordSubscriptionPayment: subscriptionService.recordSubscriptionPayment,
+      findSubscriptionPaymentByProviderPayment: subscriptionService.findSubscriptionPaymentByProviderPayment,
+      recordSubscriptionRefund: subscriptionService.recordSubscriptionRefund,
+      recordSubscriptionDisputeLoss: subscriptionService.recordSubscriptionDisputeLoss,
     },
   }),
 });
@@ -442,7 +468,10 @@ export const bootstrap = {
   applicationSettingsService,
   billingService,
   billingReconciliationService,
+  creditLiabilityService,
   checkoutIntentsService,
+  entitlementService,
+  usageService,
   subscriptionService,
   discountsService,
   emailQueue,

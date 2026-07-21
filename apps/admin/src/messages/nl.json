@@ -772,7 +772,17 @@
       "role": "Rol",
       "status": "Status",
       "createdAt": "Aangemaakt op",
-      "userId": "Gebruikers-ID"
+      "userId": "Gebruikers-ID",
+      "creditLiabilities": {
+        "title": "Openstaande creditverplichtingen",
+        "description": "Credits die negatief zouden zijn geworden en nog verrekend moeten worden.",
+        "remaining": "Resterend",
+        "reason": "Reden",
+        "source": "Bron",
+        "status": "Status",
+        "created": "Aangemaakt",
+        "empty": "Geen openstaande creditverplichtingen"
+      }
     },
     "success": {
       "roleUpdated": "Gebruikersrol succesvol bijgewerkt.",

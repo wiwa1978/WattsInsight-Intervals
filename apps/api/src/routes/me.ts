@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import {
   createApiKeySchema,
-  consumeCreditsRequestSchema,
+  consumeFeatureUsageRequestSchema,
   revokeApiKeyParamSchema,
   invoiceRequestSchema,
   notificationIdParamSchema,
@@ -265,14 +265,14 @@ export function createMeRouter() {
   router.post("/credits/consume", async (c) => {
     const authUser = getAuthUser(c);
     const body = await c.req.json().catch(() => null);
-    const parsedBody = parseJsonBody(consumeCreditsRequestSchema, body);
+    const parsedBody = parseJsonBody(consumeFeatureUsageRequestSchema, body);
 
     if (!parsedBody.success) {
       return validationError(c, "Invalid credit usage payload");
     }
 
     try {
-      const result = await bootstrap.billingService.consumeCredits(authUser.id, parsedBody.data);
+      const result = await bootstrap.usageService.consumeFeatureUsage(authUser.id, parsedBody.data);
       return c.json({ success: true, data: result });
     } catch (error) {
       return badRequest(c, error instanceof Error ? error.message : "Failed to consume credits");

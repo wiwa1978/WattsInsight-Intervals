@@ -11,6 +11,8 @@ type AuthUser = {
 
 type RequireAdminAccessOptions = {
   allowlist: Set<string>;
+  allowTotpBootstrapPaths?: string[];
+  isAdminBootstrapAllowed?: (email: string, path: string) => boolean | Promise<boolean>;
 };
 
 export function createRequireAdminAccess(options: RequireAdminAccessOptions): AuthMiddleware {
@@ -18,6 +20,7 @@ export function createRequireAdminAccess(options: RequireAdminAccessOptions): Au
     const user = c.get("authUser") as AuthUser | undefined;
     const email = normalizeAuthEmail(user?.email);
     const isAllowedEmail = options.allowlist.has(email);
+    const isTotpBootstrapAllowed = hasAdminAccess(user) && isAllowedEmail && await options.isAdminBootstrapAllowed?.(email, c.req.path) === true;
 
     if (!hasAdminAccess(user) || !isAllowedEmail) {
       const response = c.json(
@@ -37,7 +40,8 @@ export function createRequireAdminAccess(options: RequireAdminAccessOptions): Au
       return response;
     }
 
-    if (authConfig.adminPortalTotpRequired && user?.twoFactorEnabled !== true) {
+    const isTotpBootstrapPath = isTotpBootstrapAllowed || options.allowTotpBootstrapPaths?.includes(c.req.path) === true;
+    if (authConfig.adminPortalTotpRequired && user?.twoFactorEnabled !== true && !isTotpBootstrapPath) {
       return c.json(
         {
           success: false,

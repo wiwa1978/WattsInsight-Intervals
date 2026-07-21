@@ -804,7 +804,17 @@
       "role": "Role",
       "status": "Status",
       "createdAt": "Created",
-      "userId": "User ID"
+      "userId": "User ID",
+      "creditLiabilities": {
+        "title": "Open Credit Liabilities",
+        "description": "Credits that would have gone negative and still need settlement.",
+        "remaining": "Remaining",
+        "reason": "Reason",
+        "source": "Source",
+        "status": "Status",
+        "created": "Created",
+        "empty": "No open credit liabilities"
+      }
     },
     "success": {
       "roleUpdated": "User role updated successfully.",

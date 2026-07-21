@@ -23,6 +23,7 @@ import {
   getAdminUserApi,
   getAdminUserCreditBalanceApi,
   getAdminUserCreditHistoryApi,
+  getAdminUserCreditLiabilitiesApi,
   getAdminUserCreditPurchasesApi,
   getAdminUserStatsApi,
   getAdminUsersApi,
@@ -45,6 +46,7 @@ import type {
   AdminCreditRefundResponseData,
   AdminCreditsDashboard,
   AdminSubscriptionRefundResponseData,
+  AdminUserCreditLiability,
   AdminUserDetail,
   AdminUsersList,
   AdminUserStats,
@@ -207,6 +209,10 @@ export async function getAdminUserCreditPurchases(userId: string, limit: number 
   }
 
   return [];
+}
+
+export async function getAdminUserCreditLiabilities(userId: string): Promise<AdminUserCreditLiability[]> {
+  return getAdminUserCreditLiabilitiesApi(userId);
 }
 
 export async function getAdminBillingStats(): Promise<BillingStats> {

@@ -57,6 +57,23 @@ export const adminUserDetailSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const adminUserCreditLiabilitySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  amount: z.string(),
+  remainingAmount: z.string(),
+  reason: z.enum(["refund", "chargeback", "dispute", "manual"]),
+  status: z.enum(["open", "settled", "waived"]),
+  sourcePaymentId: z.string().nullable().optional(),
+  sourceRefundId: z.string().nullable().optional(),
+  sourceDisputeId: z.string().nullable().optional(),
+  metadata: z.unknown().nullable().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  settledAt: z.string().nullable().optional(),
+  waivedAt: z.string().nullable().optional(),
+});
+
 export const adminSearchUserSchema = z.object({
   id: z.string().uuid(),
   name: z.string().nullable(),
@@ -188,6 +205,7 @@ export const adminUserDetailResponseSchema = successResultSchema(adminUserDetail
 export const adminUserCreditBalanceResponseSchema = successResultSchema(creditBalanceSchema);
 export const adminUserCreditHistoryResponseSchema = successResultSchema(z.array(creditTransactionSchema));
 export const adminUserCreditPurchasesResponseSchema = successResultSchema(z.array(creditPurchaseSchema));
+export const adminUserCreditLiabilitiesResponseSchema = successResultSchema(z.array(adminUserCreditLiabilitySchema));
 export const adminSearchUsersResponseSchema = successResultSchema(z.array(adminSearchUserSchema));
 export const adminWebhookEventsListResponseSchema = successResultSchema(adminWebhookEventsListSchema);
 export const adminWebhookStatsResponseSchema = successResultSchema(adminWebhookStatsSchema);
@@ -201,6 +219,7 @@ export type AdminDashboardStats = z.infer<typeof adminDashboardStatsSchema>;
 export type AdminUsersList = z.infer<typeof adminUsersListSchema>;
 export type AdminUserStats = z.infer<typeof adminUserStatsSchema>;
 export type AdminUserDetail = z.infer<typeof adminUserDetailSchema>;
+export type AdminUserCreditLiability = z.infer<typeof adminUserCreditLiabilitySchema>;
 export type AdminUserListItem = z.infer<typeof adminUserListItemSchema>;
 export type AdminSearchUser = z.infer<typeof adminSearchUserSchema>;
 export type AdminWebhookEventStatus = z.infer<typeof adminWebhookEventStatusSchema>;

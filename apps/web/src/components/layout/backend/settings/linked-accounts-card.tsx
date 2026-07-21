@@ -52,7 +52,6 @@ export function LinkedAccountsCard() {
     try {
       const { data, error } = await listAccounts();
       if (error) {
-        console.error("Failed to fetch accounts:", error);
         return;
       }
       // Filter to only OAuth accounts (exclude credential)
@@ -61,7 +60,6 @@ export function LinkedAccountsCard() {
       );
       setAccounts(oauthAccounts);
     } catch {
-      console.error("Error fetching accounts");
     } finally {
       setIsLoading(false);
     }

@@ -39,6 +39,8 @@ export type SubscriptionPaymentStatus =
   | "requires_capture"
   | "partially_captured"
   | "partially_captured_and_capturable";
+export type CreditLiabilityReason = "refund" | "chargeback" | "dispute" | "manual";
+export type CreditLiabilityStatus = "open" | "settled" | "waived";
 
 export const userCredits = pgTable(
   "user_credits",
@@ -128,6 +130,32 @@ export const creditPurchases = pgTable(
     index("credit_purchases_payment_status_created_at_idx").on(table.paymentStatus, table.createdAt),
     check("credit_purchases_amounts_non_negative", sql`${table.credits} > 0 AND ${table.bonusCredits} >= 0 AND ${table.price} >= 0 AND ${table.priceExclVat} >= 0 AND ${table.priceInclVat} >= 0 AND ${table.vatAmount} >= 0`),
     check("credit_purchases_status_valid", sql`${table.paymentStatus} IN ('pending', 'completed', 'failed', 'refunded')`),
+  ],
+);
+
+export const creditLiabilities = pgTable(
+  "credit_liabilities",
+  {
+    id,
+    userId: uuid("user_id").references(() => user.id, { onDelete: "cascade" }).notNull(),
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    remainingAmount: decimal("remaining_amount", { precision: 10, scale: 2 }).notNull(),
+    reason: text("reason").$type<CreditLiabilityReason>().notNull(),
+    status: text("status").$type<CreditLiabilityStatus>().default("open").notNull(),
+    sourcePaymentId: text("source_payment_id"),
+    sourceRefundId: text("source_refund_id"),
+    sourceDisputeId: text("source_dispute_id"),
+    metadata: jsonb("metadata"),
+    createdAt,
+    updatedAt,
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    waivedAt: timestamp("waived_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("credit_liabilities_user_status_idx").on(table.userId, table.status),
+    check("credit_liabilities_amount_positive", sql`${table.amount} > 0 AND ${table.remainingAmount} >= 0`),
+    check("credit_liabilities_status_valid", sql`${table.status} IN ('open', 'settled', 'waived')`),
+    check("credit_liabilities_reason_valid", sql`${table.reason} IN ('refund', 'chargeback', 'dispute', 'manual')`),
   ],
 );
 
@@ -462,6 +490,13 @@ export const creditUsageEventsRelations = relations(creditUsageEvents, ({ one })
 export const creditPurchasesRelations = relations(creditPurchases, ({ one }) => ({
   user: one(user, {
     fields: [creditPurchases.userId],
+    references: [user.id],
+  }),
+}));
+
+export const creditLiabilitiesRelations = relations(creditLiabilities, ({ one }) => ({
+  user: one(user, {
+    fields: [creditLiabilities.userId],
     references: [user.id],
   }),
 }));

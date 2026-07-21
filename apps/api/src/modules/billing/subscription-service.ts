@@ -180,6 +180,8 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
           providerSubscriptionId,
           dodoCustomerId: providerCustomerId,
           dodoSubscriptionId: providerSubscriptionId,
+          paymentProvider: deps.paymentProvider?.name ?? "dodo",
+          paymentId: input.paymentId,
           paymentStatus: input.paymentStatus,
           priceExclVat: input.pricing.priceExclVat,
           priceInclVat: input.pricing.priceInclVat,
@@ -231,6 +233,93 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
       .where(eq(subscriptionPayments.userId, userId))
       .orderBy(desc(subscriptionPayments.createdAt))
       .limit(normalizedLimit);
+  }
+
+  async function findSubscriptionPaymentByProviderPayment(provider: string, paymentId: string) {
+    return deps.db.query.subscriptionPayments.findFirst({
+      where: (table: any, operators: any) => operators.and(
+        operators.eq(table.paymentProvider, provider),
+        operators.eq(table.paymentId, paymentId),
+      ),
+    });
+  }
+
+  async function recordSubscriptionRefund(provider: string, paymentId: string, refundId?: string) {
+    const payment = await deps.db.query.subscriptionPayments.findFirst({
+      where: (table: any, operators: any) => operators.and(
+        operators.eq(table.paymentProvider, provider),
+        operators.eq(table.paymentId, paymentId),
+      ),
+    });
+
+    if (!payment) {
+      throw new Error(`Subscription payment ${paymentId} not found for refund`);
+    }
+
+    if (payment.paymentStatus === "refunded") {
+      return payment;
+    }
+
+    const paymentSnapshot = {
+      ...(payment.paymentSnapshot && typeof payment.paymentSnapshot === "object" ? payment.paymentSnapshot : {}),
+      providerRefund: { refundId },
+    };
+
+    const [updatedPayment] = await deps.db
+      .update(subscriptionPayments)
+      .set({
+        paymentStatus: "refunded",
+        refundStatus: "succeeded",
+        paymentSnapshot,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptionPayments.id, payment.id))
+      .returning();
+
+    return updatedPayment ?? { ...payment, paymentStatus: "refunded", refundStatus: "succeeded", paymentSnapshot };
+  }
+
+  async function recordSubscriptionDisputeLoss(provider: string, paymentId: string, disputeId?: string, disputeStatus?: string) {
+    const payment = await deps.db.query.subscriptionPayments.findFirst({
+      where: (table: any, operators: any) => operators.and(
+        operators.eq(table.paymentProvider, provider),
+        operators.eq(table.paymentId, paymentId),
+      ),
+    });
+
+    if (!payment) {
+      throw new Error(`Subscription payment ${paymentId} not found for dispute`);
+    }
+
+    if (payment.paymentStatus === "failed" && payment.refundStatus === (disputeStatus ?? "dispute_lost")) {
+      return payment;
+    }
+
+    const normalizedDisputeStatus = disputeStatus ?? "dispute_lost";
+    const paymentSnapshot = {
+      ...(payment.paymentSnapshot && typeof payment.paymentSnapshot === "object" ? payment.paymentSnapshot : {}),
+      providerDispute: { disputeId, disputeStatus: normalizedDisputeStatus },
+    };
+
+    const [updatedPayment] = await deps.db
+      .update(subscriptionPayments)
+      .set({
+        paymentStatus: "failed",
+        refundStatus: normalizedDisputeStatus,
+        errorCode: "dispute_lost",
+        paymentSnapshot,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptionPayments.id, payment.id))
+      .returning();
+
+    return updatedPayment ?? {
+      ...payment,
+      paymentStatus: "failed",
+      refundStatus: normalizedDisputeStatus,
+      errorCode: "dispute_lost",
+      paymentSnapshot,
+    };
   }
 
   async function listSubscriptionPayments(limit = 20, offset = 0, searchEmail?: string) {
@@ -666,6 +755,9 @@ export function createSubscriptionService(deps: SubscriptionServiceDeps) {
     getUserSubscription,
     recordSubscriptionPayment,
     listUserSubscriptionPayments,
+    findSubscriptionPaymentByProviderPayment,
+    recordSubscriptionRefund,
+    recordSubscriptionDisputeLoss,
     listSubscriptionPayments,
     downloadSubscriptionInvoice,
     createSubscriptionRefund,

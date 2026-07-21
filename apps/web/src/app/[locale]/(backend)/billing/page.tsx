@@ -1,3 +1,4 @@
+import { getBillingCapability } from "@platform/frontend-shared";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -53,19 +54,20 @@ export default async function BillingPage({ params, searchParams }: BillingPageP
   const checkoutOutcome = getCheckoutOutcome(resolvedSearchParams);
   const t = await getTranslations("billing");
   const applicationConfig = await getMyApplicationConfigServer();
+  const capability = getBillingCapability(applicationConfig);
 
-  if (applicationConfig.billing.subscriptionSurfacesEnabled) {
-    return <SubscriptionBillingPage checkoutOutcome={checkoutOutcome} locale={locale} />;
+  if (capability.subscriptionsVisible) {
+    return <SubscriptionBillingPage checkoutOutcome={checkoutOutcome} discountsVisible={capability.discountsVisible} locale={locale} />;
   }
 
-  if (!applicationConfig.billing.creditSurfacesEnabled) {
-    return null;
+  if (!capability.creditsVisible) {
+    return <BillingUnavailable />;
   }
 
   const addresses = await getBillingAddressOptions(locale);
 
   return (
-    <BillingClientWrapper addresses={addresses} checkoutOutcome={checkoutOutcome}>
+    <BillingClientWrapper addresses={addresses} checkoutOutcome={checkoutOutcome} vouchersVisible={capability.vouchersVisible}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
@@ -87,6 +89,17 @@ export default async function BillingPage({ params, searchParams }: BillingPageP
         </div>
       </div>
     </BillingClientWrapper>
+  );
+}
+
+function BillingUnavailable() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Billing unavailable</h1>
+        <p className="text-muted-foreground">Billing is not available for this workspace.</p>
+      </div>
+    </div>
   );
 }
 
@@ -119,7 +132,7 @@ async function getBillingAddressOptions(locale: string): Promise<BillingAddressO
   }];
 }
 
-async function SubscriptionBillingPage({ checkoutOutcome, locale }: { checkoutOutcome: CheckoutOutcome; locale: string }) {
+async function SubscriptionBillingPage({ checkoutOutcome, discountsVisible, locale }: { checkoutOutcome: CheckoutOutcome; discountsVisible: boolean; locale: string }) {
   const t = await getTranslations("billing");
   const subscriptionT = await getTranslations("billing.subscription");
   const [subscription, payments, addresses] = await Promise.all([
@@ -129,7 +142,7 @@ async function SubscriptionBillingPage({ checkoutOutcome, locale }: { checkoutOu
   ]);
 
   return (
-    <SubscriptionBillingClientWrapper addresses={addresses} checkoutOutcome={checkoutOutcome}>
+    <SubscriptionBillingClientWrapper addresses={addresses} checkoutOutcome={checkoutOutcome} discountsVisible={discountsVisible}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>

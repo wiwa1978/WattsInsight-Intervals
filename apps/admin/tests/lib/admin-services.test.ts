@@ -14,6 +14,7 @@ import {
   getAdminRevenueData,
   getAdminSystemHealth,
   getAdminTransactionData,
+  getAdminUserCreditLiabilities,
   getUsers,
   stopAdminImpersonation,
 } from "../../src/lib/services/admin";
@@ -30,6 +31,7 @@ import {
   getAdminCreditsConsumedDataApi,
   getAdminRevenueDataApi,
   getAdminTransactionDataApi,
+  getAdminUserCreditLiabilitiesApi,
   getAdminUsersApi,
   getSystemHealthApi,
   stopAdminImpersonationApi,
@@ -49,6 +51,7 @@ vi.mock("../../src/lib/api/admin", () => ({
   getAdminCreditsConsumedDataApi: vi.fn(),
   getAdminRevenueDataApi: vi.fn(),
   getAdminTransactionDataApi: vi.fn(),
+  getAdminUserCreditLiabilitiesApi: vi.fn(),
   getAdminUsersApi: vi.fn(),
   getSystemHealthApi: vi.fn(),
   stopAdminImpersonationApi: vi.fn(),
@@ -66,6 +69,7 @@ const getAdminBillingSubscriptionsApiMock = vi.mocked(getAdminBillingSubscriptio
 const getAdminCreditsConsumedDataApiMock = vi.mocked(getAdminCreditsConsumedDataApi);
 const getAdminRevenueDataApiMock = vi.mocked(getAdminRevenueDataApi);
 const getAdminTransactionDataApiMock = vi.mocked(getAdminTransactionDataApi);
+const getAdminUserCreditLiabilitiesApiMock = vi.mocked(getAdminUserCreditLiabilitiesApi);
 const getAdminUsersApiMock = vi.mocked(getAdminUsersApi);
 const getSystemHealthApiMock = vi.mocked(getSystemHealthApi);
 const stopAdminImpersonationApiMock = vi.mocked(stopAdminImpersonationApi);
@@ -160,6 +164,31 @@ describe("admin services", () => {
 
     await expect(getUsers(20, 40, "alice@example.com", "admin")).resolves.toEqual({ data: users, error: null });
     expect(getAdminUsersApiMock).toHaveBeenCalledWith(20, 40, "alice@example.com", "admin");
+  });
+
+  it("delegates open credit liability lookups to the admin API", async () => {
+    const liabilities = [
+      {
+        id: "liability-1",
+        userId: "user-123",
+        amount: "42.00",
+        remainingAmount: "12.50",
+        reason: "refund" as const,
+        status: "open" as const,
+        sourcePaymentId: "payment-1",
+        sourceRefundId: "refund-1",
+        sourceDisputeId: null,
+        metadata: null,
+        createdAt: "2026-07-21T10:00:00.000Z",
+        updatedAt: "2026-07-21T10:00:00.000Z",
+        settledAt: null,
+        waivedAt: null,
+      },
+    ];
+    getAdminUserCreditLiabilitiesApiMock.mockResolvedValue(liabilities);
+
+    await expect(getAdminUserCreditLiabilities("user-123")).resolves.toBe(liabilities);
+    expect(getAdminUserCreditLiabilitiesApiMock).toHaveBeenCalledWith("user-123");
   });
 
   it("returns unavailable system health when the health API cannot be reached", async () => {

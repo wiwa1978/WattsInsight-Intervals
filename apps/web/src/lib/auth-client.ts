@@ -18,7 +18,7 @@ function isHandledAuthError(error: unknown) {
     return false;
   }
 
-  return (error as { code?: unknown }).code === "EMAIL_NOT_VERIFIED";
+  return (error as { code?: unknown }).code === "EMAIL_NOT_VERIFIED" || (error as { code?: unknown }).code === "UNAUTHORIZED";
 }
 
 const authBaseURL = `${normalizeBaseUrl(env.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_APP_URL)}/auth`;

@@ -1,3 +1,4 @@
+import { getBillingCapability } from "@platform/frontend-shared";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
@@ -20,9 +21,17 @@ export default async function BillingPage() {
 
   const t = await getTranslations("billing");
   const applicationConfig = await getMyApplicationConfigServer();
+  const capability = getBillingCapability(applicationConfig);
 
-  if (!applicationConfig.billing.creditSurfacesEnabled) {
-    return null;
+  if (!capability.creditsVisible) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Billing unavailable</h1>
+          <p className="text-muted-foreground">Billing is not available for this workspace.</p>
+        </div>
+      </div>
+    );
   }
 
   return (

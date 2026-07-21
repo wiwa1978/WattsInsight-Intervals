@@ -8,6 +8,7 @@ import type {
   AdminSubscriptionFinanceDashboard,
   AdminSubscriptionRefundResponseData,
   AdminSearchUser,
+  AdminUserCreditLiability,
   AdminUserDetail,
   AdminUsersList,
   AdminUserStats,
@@ -48,7 +49,7 @@ export async function verifyAdminSecretApi(secret: string) {
 export async function getAdminStatusApi() {
   return apiRequest<{
     success: boolean;
-    data: { message: string; totpRequired: boolean; twoFactorEnabled: boolean; canEnrollTotp: boolean };
+    data: { message: string; totpRequired: boolean; twoFactorEnabled: boolean; canEnrollTotp: boolean; bootstrapTotpRequired: boolean };
   }>("/admin/status");
 }
 
@@ -177,6 +178,13 @@ export async function getAdminUserCreditHistoryApi(userId: string) {
 
 export async function getAdminUserCreditPurchasesApi(userId: string) {
   const result = await apiRequest<{ success: boolean; data: CreditPurchase[] }>(`/admin/users/${userId}/credits/purchases`);
+  return result.data;
+}
+
+export async function getAdminUserCreditLiabilitiesApi(userId: string): Promise<AdminUserCreditLiability[]> {
+  const result = await apiRequest<{ success: boolean; data: AdminUserCreditLiability[] }>(
+    apiRoutes.admin.userCreditLiabilities(userId),
+  );
   return result.data;
 }
 

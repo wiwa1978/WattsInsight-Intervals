@@ -134,6 +134,13 @@
       "when": 1784578636331,
       "tag": "0018_phase_3_integrity_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784639100000,
+      "tag": "0019_credit_liabilities",
+      "breakpoints": true
     }
   ]
 }

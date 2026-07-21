@@ -1,3 +1,4 @@
+import { getBillingCapability, type BillingCapability } from "@platform/frontend-shared";
 import { getTranslations } from "next-intl/server";
 import { Container } from "@/components/ui/container";
 import { CreditsDashboard } from "@/components/layout/backend/admin/billing/credits-dashboard";
@@ -28,32 +29,30 @@ function billingSection(value: string | undefined): AdminBillingSection {
   return "overview";
 }
 
+function visibleBillingSection(value: string | undefined, capability: BillingCapability): AdminBillingSection {
+  const section = billingSection(value);
+
+  if (section === "discounts" && !capability.discountsVisible) {
+    return "overview";
+  }
+
+  if (section === "vouchers" && !capability.vouchersVisible) {
+    return "overview";
+  }
+
+  return section;
+}
+
 export default async function AdminBillingPage({ searchParams }: AdminBillingPageProps) {
   const applicationConfig = await getMyApplicationConfigServer();
+  const capability = getBillingCapability(applicationConfig);
 
-  if (!applicationConfig.billing.enabled) {
-    return null;
+  if (!capability.adminBillingVisible) {
+    return <AdminBillingUnavailable />;
   }
 
   const params = (await searchParams) ?? {};
-  const activeSection = billingSection(first(params.section));
-
-  if (applicationConfig.billing.mode === "subscriptions" && applicationConfig.billing.subscriptionSurfacesEnabled && activeSection === "overview") {
-    return (
-      <Container className="py-6">
-        <AdminSubscriptionBillingPage searchParams={params} />
-      </Container>
-    );
-  }
-
-  if (applicationConfig.billing.mode === "credits" && applicationConfig.billing.creditSurfacesEnabled && activeSection === "overview") {
-    const dashboard = await getAdminCreditsDashboardServer();
-    return (
-      <Container className="py-6">
-        <CreditsDashboard initialDashboard={dashboard} />
-      </Container>
-    );
-  }
+  const activeSection = visibleBillingSection(first(params.section), capability);
 
   const t = await getTranslations("admin.billing");
 
@@ -64,43 +63,63 @@ export default async function AdminBillingPage({ searchParams }: AdminBillingPag
         <p className="text-muted-foreground mt-2">{t("description")}</p>
       </div>
 
-      <AdminBillingTabs activeSection={activeSection}>
+      <AdminBillingTabs
+        activeSection={activeSection}
+        discountsVisible={capability.discountsVisible}
+        vouchersVisible={capability.vouchersVisible}
+      >
         {activeSection === "discounts" ? (
           <DiscountsSection />
         ) : activeSection === "vouchers" ? (
           <VouchersSection />
         ) : (
-          <AdminBillingOverview applicationConfig={applicationConfig} searchParams={params} />
+          <AdminBillingOverview capability={capability} searchParams={params} />
         )}
       </AdminBillingTabs>
     </Container>
   );
 }
 
+function AdminBillingUnavailable() {
+  return (
+    <Container className="py-6">
+      <div className="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+        <h1 className="text-3xl font-bold">Billing unavailable</h1>
+        <p className="text-muted-foreground mt-2">Billing is not available for this workspace.</p>
+      </div>
+    </Container>
+  );
+}
+
 async function AdminBillingOverview({
-  applicationConfig,
+  capability,
   searchParams,
 }: {
-  applicationConfig: Awaited<ReturnType<typeof getMyApplicationConfigServer>>;
+  capability: BillingCapability;
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  if (applicationConfig.billing.mode === "subscriptions" && applicationConfig.billing.subscriptionSurfacesEnabled) {
-    return <AdminSubscriptionBillingPage searchParams={searchParams} />;
+  if (capability.subscriptionsVisible) {
+    return <AdminSubscriptionBillingPage discountsVisible={capability.discountsVisible} searchParams={searchParams} />;
   }
 
-  if (!applicationConfig.billing.creditSurfacesEnabled) {
-    return null;
+  if (!capability.creditsVisible) {
+    return (
+      <div className="rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
+        <h2 className="text-xl font-semibold">Billing unavailable</h2>
+        <p className="text-muted-foreground mt-2">No billing surfaces are available for this workspace.</p>
+      </div>
+    );
   }
 
   const dashboard = await getAdminCreditsDashboardServer();
   return <CreditsDashboard initialDashboard={dashboard} />;
 }
 
-async function AdminSubscriptionBillingPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+async function AdminSubscriptionBillingPage({ discountsVisible, searchParams }: { discountsVisible: boolean; searchParams: Record<string, string | string[] | undefined> }) {
   const financeDashboard = await getAdminBillingSubscriptionFinanceDashboardServer(financeQuery(searchParams));
 
   return (
-    <SubscriptionFinanceDashboard dashboard={financeDashboard} />
+    <SubscriptionFinanceDashboard dashboard={financeDashboard} discountsVisible={discountsVisible} />
   );
 }
 

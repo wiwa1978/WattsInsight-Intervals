@@ -12,6 +12,7 @@ import type { ConsumeCreditsRequest, ConsumeCreditsResponse } from "@platform/co
 
 import { creditPackages } from "../../config/billing";
 import type { PaymentProvider } from "../payments/provider";
+import { createCreditLiabilityService } from "./credit-liabilities";
 
 type CreditLedgerTransactionType = "purchase" | "usage" | "refund" | "bonus" | "admin_adjustment" | "voucher";
 type CreditLedgerReferenceType = "payment" | "feature_usage" | "admin" | "bonus" | "voucher";
@@ -26,6 +27,7 @@ type ApplyCreditDeltaInput = {
   metadata?: Record<string, unknown>;
   allowNegativeBalance?: boolean;
   createdAt?: Date;
+  currentCredits?: { balance: number | string };
 };
 
 type ApplyCreditDeltaResult = {
@@ -37,6 +39,18 @@ type ApplyCreditDeltaResult = {
 type BillingServiceDeps = {
   db: any;
   paymentProvider: PaymentProvider;
+  creditLiabilities?: {
+    applyIncomingCredits(userId: string, credits: number): Promise<{ usableCredits: number; settledCredits: number }>;
+    create(input: {
+      userId: string;
+      amount: number;
+      reason: "refund" | "chargeback" | "dispute" | "manual";
+      sourcePaymentId?: string | null;
+      sourceRefundId?: string | null;
+      sourceDisputeId?: string | null;
+      metadata?: unknown;
+    }): Promise<unknown>;
+  };
   notifications: {
     createNotification: (input: {
       userId: string;
@@ -105,7 +119,7 @@ async function getOrInitializeCredits(db: any, userId: string) {
 }
 
 async function applyCreditDelta(db: any, input: ApplyCreditDeltaInput): Promise<ApplyCreditDeltaResult> {
-  const current = await getOrInitializeCredits(db, input.userId);
+  const current = input.currentCredits ?? await getOrInitializeCredits(db, input.userId);
   const balanceBefore = Number(current.balance);
   const now = input.createdAt ?? new Date();
 
@@ -195,6 +209,15 @@ export function createBillingService(deps: BillingServiceDeps) {
       .limit(normalizedLimit);
   }
 
+  async function findCreditPurchaseByProviderPayment(provider: string, paymentId: string) {
+    return deps.db.query.creditPurchases.findFirst({
+      where: (table: any, operators: any) => operators.and(
+        operators.eq(table.paymentProvider, provider),
+        operators.eq(table.paymentId, paymentId),
+      ),
+    });
+  }
+
   async function processCreditPurchase(
     userId: string,
     packageKey: string,
@@ -233,16 +256,24 @@ export function createBillingService(deps: BillingServiceDeps) {
     });
 
     const result = await deps.db.transaction(async (tx: any) => {
+      const creditLiabilities = deps.creditLiabilities ?? (tx.query?.creditLiabilities || tx.select ? createCreditLiabilityService({ db: tx }) : null);
+
       async function grantCredits(grantedAt: Date) {
         const baseCredits = creditPackage.credits;
         const bonusCredits = "bonus" in creditPackage ? creditPackage.bonus : 0;
         const totalCredits = baseCredits + bonusCredits;
+        const liabilityResult = creditLiabilities
+          ? await creditLiabilities.applyIncomingCredits(userId, totalCredits)
+          : { usableCredits: totalCredits, settledCredits: 0 };
+        const usableCredits = liabilityResult.usableCredits;
+        const purchaseCredits = Math.min(baseCredits, usableCredits);
+        const bonusUsableCredits = Math.max(0, usableCredits - purchaseCredits);
         const current = await getOrInitializeCredits(tx, userId);
 
         const [updated] = await tx
           .update(userCredits)
           .set({
-            balance: sql`${userCredits.balance} + ${totalCredits}`,
+            balance: sql`${userCredits.balance} + ${usableCredits}`,
             totalPurchased: sql`${userCredits.totalPurchased} + ${baseCredits}`,
             updatedAt: grantedAt,
           })
@@ -252,20 +283,22 @@ export function createBillingService(deps: BillingServiceDeps) {
         const balanceBefore = Number(current.balance);
         const newBalance = Number(updated.balanceAfter);
 
-        await tx.insert(creditTransactions).values({
-          userId,
-          type: "purchase",
-          amount: baseCredits.toString(),
-          description: `Package: ${packageKey.charAt(0).toUpperCase() + packageKey.slice(1)}`,
-          referenceId: paymentId,
-          balanceAfter: (balanceBefore + baseCredits).toString(),
-        });
+        if (purchaseCredits > 0) {
+          await tx.insert(creditTransactions).values({
+            userId,
+            type: "purchase",
+            amount: purchaseCredits.toString(),
+            description: `Package: ${packageKey.charAt(0).toUpperCase() + packageKey.slice(1)}`,
+            referenceId: paymentId,
+            balanceAfter: (balanceBefore + purchaseCredits).toString(),
+          });
+        }
 
-        if (bonusCredits > 0) {
+        if (bonusUsableCredits > 0) {
           await tx.insert(creditTransactions).values({
             userId,
             type: "bonus",
-            amount: bonusCredits.toString(),
+            amount: Math.min(bonusCredits, bonusUsableCredits).toString(),
             description: `Bonus credits for ${packageKey.charAt(0).toUpperCase() + packageKey.slice(1)}`,
             referenceId: paymentId,
             balanceAfter: newBalance.toString(),
@@ -273,7 +306,7 @@ export function createBillingService(deps: BillingServiceDeps) {
           });
         }
 
-        return { credits: totalCredits, amount: priceInclVat / 100, currency };
+        return { credits: usableCredits, amount: priceInclVat / 100, currency, settledCredits: liabilityResult.settledCredits };
       }
 
       const existingPurchase = await tx.query.creditPurchases.findFirst({
@@ -380,6 +413,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     metadata: Record<string, string | undefined> = {},
   ) {
     return deps.db.transaction(async (tx: any) => {
+      const creditLiabilities = deps.creditLiabilities ?? (tx.query?.creditLiabilities || tx.select ? createCreditLiabilityService({ db: tx }) : null);
       const purchase = await tx.query.creditPurchases.findFirst({
         where: eq(creditPurchases.paymentId, paymentId),
       });
@@ -403,17 +437,35 @@ export function createBillingService(deps: BillingServiceDeps) {
       }
 
       const totalCredits = Number(purchase.credits) + Number(purchase.bonusCredits ?? 0);
+      const currentCredits = await getOrInitializeCredits(tx, purchase.userId);
+      const currentBalance = Number(currentCredits.balance);
+      const reversibleCredits = Math.min(currentBalance, totalCredits);
+      const shortfall = creditLiabilities ? Number((totalCredits - reversibleCredits).toFixed(2)) : 0;
 
-      await applyCreditDelta(tx, {
-        userId: purchase.userId,
-        amount: -totalCredits,
-        type: reason === "refund" ? "refund" : "admin_adjustment",
-        description: `${reason === "refund" ? "Refund" : "Dispute reversal"}: ${purchase.packageKey.charAt(0).toUpperCase() + purchase.packageKey.slice(1)}`,
-        referenceType: "payment",
-        referenceId: paymentId,
-        metadata,
-        allowNegativeBalance: true,
-      });
+      if (reversibleCredits > 0) {
+        await applyCreditDelta(tx, {
+          userId: purchase.userId,
+          amount: -reversibleCredits,
+          type: reason === "refund" ? "refund" : "admin_adjustment",
+          description: `${reason === "refund" ? "Refund" : "Dispute reversal"}: ${purchase.packageKey.charAt(0).toUpperCase() + purchase.packageKey.slice(1)}`,
+          referenceType: "payment",
+          referenceId: paymentId,
+          metadata,
+          currentCredits,
+        });
+      }
+
+      if (shortfall > 0 && creditLiabilities) {
+        await creditLiabilities.create({
+          userId: purchase.userId,
+          amount: shortfall,
+          reason,
+          sourcePaymentId: paymentId,
+          sourceRefundId: reason === "refund" ? metadata.refundId ?? null : null,
+          sourceDisputeId: reason === "dispute" ? metadata.disputeId ?? null : null,
+          metadata,
+        });
+      }
 
       await tx
         .update(creditPurchases)
@@ -634,6 +686,7 @@ export function createBillingService(deps: BillingServiceDeps) {
     getCreditBalance,
     getCreditHistory,
     getCreditPurchases,
+    findCreditPurchaseByProviderPayment,
     processCreditPurchase,
     createCreditRefund,
     processCreditRefund,

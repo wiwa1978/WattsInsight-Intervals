@@ -10,6 +10,7 @@ import {
   getAdminBillingSubscriptionStatsApi,
   getAdminBillingSubscriptionsApi,
   getAdminStatusApi,
+  getAdminUserCreditLiabilitiesApi,
   getAdminUsersApi,
   stopAdminImpersonationApi,
   verifyAdminSecretApi,
@@ -38,6 +39,14 @@ describe("admin API", () => {
     await getAdminUsersApi(20, 0, undefined, "admin");
 
     expect(apiRequestMock).toHaveBeenCalledWith("/admin/users?limit=20&offset=0&role=admin");
+  });
+
+  it("fetches open credit liabilities for an admin user", async () => {
+    apiRequestMock.mockResolvedValueOnce({ success: true, data: [] });
+
+    await expect(getAdminUserCreditLiabilitiesApi("user-123")).resolves.toEqual([]);
+
+    expect(apiRequestMock).toHaveBeenCalledWith("/admin/users/user-123/credit-liabilities");
   });
 
   it("encodes search email when fetching admin billing transactions", async () => {
@@ -128,11 +137,13 @@ describe("admin API", () => {
         totpRequired: true,
         twoFactorEnabled: false,
         canEnrollTotp: true,
+        bootstrapTotpRequired: false,
       },
     });
 
     const response = await getAdminStatusApi();
 
     expect(response.data.canEnrollTotp).toBe(true);
+    expect(response.data.bootstrapTotpRequired).toBe(false);
   });
 });

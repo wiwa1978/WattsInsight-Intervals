@@ -9,6 +9,7 @@
     "db:generate": "bun run --cwd ../.. db:generate",
     "db:migrate": "bun run --cwd ../.. db:migrate",
     "db:check": "bun run --cwd ../.. db:check",
+    "test": "vitest run tests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

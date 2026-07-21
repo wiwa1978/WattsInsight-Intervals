@@ -10,6 +10,7 @@ import type {
   AdminPendingEmailsList,
   AdminSubscriptionFinanceDashboard,
   AdminDashboardStats,
+  AdminUserCreditLiability,
   AdminUserDetail,
   AdminUserStats,
   AdminWebhookEventsList,
@@ -136,6 +137,13 @@ export async function getAdminUserCreditHistoryServer(userId: string): Promise<C
 
 export async function getAdminUserCreditPurchasesServer(userId: string): Promise<CreditPurchase[]> {
   const result = await serverApiRequest<{ success: boolean; data: CreditPurchase[] }>(`/admin/users/${userId}/credits/purchases`);
+  return result.data;
+}
+
+export async function getAdminUserCreditLiabilitiesServer(userId: string): Promise<AdminUserCreditLiability[]> {
+  const result = await serverApiRequest<{ success: boolean; data: AdminUserCreditLiability[] }>(
+    apiRoutes.admin.userCreditLiabilities(userId),
+  );
   return result.data;
 }
 

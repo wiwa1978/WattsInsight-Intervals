@@ -10,6 +10,15 @@ export const consumeCreditsRequestSchema = z.object({
 
 export type ConsumeCreditsRequest = z.infer<typeof consumeCreditsRequestSchema>;
 
+export const consumeFeatureUsageRequestSchema = z.object({
+  featureKey: z.string().trim().min(1).max(100),
+  idempotencyKey: z.string().trim().min(8).max(128),
+  description: z.string().trim().min(1).max(500).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type ConsumeFeatureUsageRequest = z.infer<typeof consumeFeatureUsageRequestSchema>;
+
 export const apiKeyScopeSchema = z.enum(["read:profile", "read:billing", "read:credits"]);
 
 export const createApiKeySchema = z.object({

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "swedencentral"
+    },
+    "resourceGroupName": {
+      "value": "RG-WattsInsight-Intervals"
+    },
+    "appName": {
+      "value": "WattsInsights"
+    },
+    "environmentName": {
+      "value": "production"
+    },
+    "postgresServerFqdn": {
+      "value": "pgwimwymedia.postgres.database.azure.com"
+    },
+    "postgresAdminLogin": {
+      "value": "wim"
+    },
+    "postgresAdminPassword": {
+      "value": "<set-via-github-secret>"
+    },
+    "postgresDatabaseName": {
+      "value": "wattsinsight_intervals"
+    },
+    "apiImage": {
+      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    },
+    "enableApiLivenessProbe": {
+      "value": false
+    },
+    "webImage": {
+      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    },
+    "adminImage": {
+      "value": "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
+    },
+    "acrUsername": {
+      "value": ""
+    },
+    "acrPassword": {
+      "value": ""
+    }
+  }
+}

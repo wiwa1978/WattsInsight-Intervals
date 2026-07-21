@@ -30,6 +30,7 @@ interface SubscriptionBillingClientWrapperProps {
   children: ReactNode;
   addresses: BillingAddressOption[];
   checkoutOutcome: "success" | "cancel" | null;
+  discountsVisible: boolean;
 }
 
 type BillingAddressOption = CheckoutAddressInput & {
@@ -51,7 +52,7 @@ export function useSubscriptionBilling() {
   return context;
 }
 
-export function SubscriptionBillingClientWrapper({ children, addresses, checkoutOutcome }: SubscriptionBillingClientWrapperProps) {
+export function SubscriptionBillingClientWrapper({ children, addresses, checkoutOutcome, discountsVisible }: SubscriptionBillingClientWrapperProps) {
   const t = useTranslations("billing.subscription.checkout");
   const subscriptionT = useTranslations("billing.subscription");
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
@@ -85,7 +86,7 @@ export function SubscriptionBillingClientWrapper({ children, addresses, checkout
       const selectedAddress = addresses.find((address) => address.id === selectedAddressId);
       const checkoutSession = await checkoutMutation.mutateAsync({
         planKey: selectedPlan.key,
-        discountCode: discountCode.trim().toUpperCase() || undefined,
+        discountCode: discountsVisible ? discountCode.trim().toUpperCase() || undefined : undefined,
         address: selectedAddress ? toCheckoutAddress(selectedAddress) : undefined,
       });
       if (checkoutSession.data.checkoutUrl) {
@@ -138,6 +139,7 @@ export function SubscriptionBillingClientWrapper({ children, addresses, checkout
       <SubscriptionCheckoutDialog
         addresses={addresses}
         discountCode={discountCode}
+        discountsVisible={discountsVisible}
         isCreatingCheckout={checkoutMutation.isPending}
         onDiscountCodeChange={(value) => setDiscountCode(value.toUpperCase())}
         onOpenChange={(open) => {
@@ -157,6 +159,7 @@ export function SubscriptionBillingClientWrapper({ children, addresses, checkout
 type SubscriptionCheckoutDialogProps = {
   addresses: BillingAddressOption[];
   discountCode: string;
+  discountsVisible: boolean;
   isCreatingCheckout: boolean;
   onDiscountCodeChange: (value: string) => void;
   onOpenChange: (open: boolean) => void;
@@ -169,6 +172,7 @@ type SubscriptionCheckoutDialogProps = {
 function SubscriptionCheckoutDialog({
   addresses,
   discountCode,
+  discountsVisible,
   isCreatingCheckout,
   onDiscountCodeChange,
   onOpenChange,
@@ -210,16 +214,18 @@ function SubscriptionCheckoutDialog({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="subscription-checkout-discount">{t("discountLabel")}</Label>
-                <Input
-                  id="subscription-checkout-discount"
-                  value={discountCode}
-                  onChange={(event) => onDiscountCodeChange(event.target.value)}
-                  placeholder={t("discountPlaceholder")}
-                />
-                <p className="text-xs text-muted-foreground">{t("discountDescription")}</p>
-              </div>
+              {discountsVisible ? (
+                <div className="space-y-2">
+                  <Label htmlFor="subscription-checkout-discount">{t("discountLabel")}</Label>
+                  <Input
+                    id="subscription-checkout-discount"
+                    value={discountCode}
+                    onChange={(event) => onDiscountCodeChange(event.target.value)}
+                    placeholder={t("discountPlaceholder")}
+                  />
+                  <p className="text-xs text-muted-foreground">{t("discountDescription")}</p>
+                </div>
+              ) : null}
 
               <div className="space-y-2 rounded-xl border p-4">
                 <Label>{t("billingAddress")}</Label>

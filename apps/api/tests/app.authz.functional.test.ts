@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
     allowAuth: false,
     allowAdmin: false,
     allowAdminAccess: false,
+    role: "admin",
     twoFactorEnabled: true,
   };
 
@@ -24,6 +25,8 @@ const mocks = vi.hoisted(() => {
     getTransactionData: vi.fn(),
     getCreditsConsumedData: vi.fn(),
     verifyAdminSecret: vi.fn(),
+    countActiveAdmins: vi.fn(),
+    hasAnyTotpEnabledAdmin: vi.fn(),
   };
 
   const billingService = {
@@ -85,7 +88,7 @@ vi.mock("@platform/auth-core", () => {
         if (!mocks.authState.allowAuth) {
           return c.json({ success: false, error: "Unauthorized" }, 401);
         }
-        c.set("authUser", { id: "u1", role: "admin", email: "admin@example.com" });
+        c.set("authUser", { id: "u1", role: mocks.authState.role, email: "admin@example.com" });
         await next();
       },
       requireAdmin: async (c: any, next: any) => {
@@ -95,7 +98,7 @@ vi.mock("@platform/auth-core", () => {
         await next();
       },
       requireAdminAccess: async (c: any, next: any) => {
-        if (!mocks.authState.allowAdminAccess) {
+        if (!mocks.authState.allowAdminAccess || mocks.authState.role !== "admin") {
           return c.json({ success: false, error: "Forbidden" }, 403);
         }
         await next();
@@ -156,8 +159,10 @@ describe("authz contract", () => {
     mocks.authState.allowAuth = false;
     mocks.authState.allowAdmin = false;
     mocks.authState.allowAdminAccess = false;
+    mocks.authState.role = "admin";
     mocks.authState.twoFactorEnabled = true;
     vi.clearAllMocks();
+    mocks.adminService.hasAnyTotpEnabledAdmin.mockResolvedValue(true);
   });
 
   // Ensures user-scoped routes hard-fail when no authenticated identity is present.
@@ -195,8 +200,71 @@ describe("authz contract", () => {
         totpRequired: true,
         twoFactorEnabled: true,
         canEnrollTotp: true,
+        bootstrapTotpRequired: false,
       },
     });
+  });
+
+  it("does not require admin TOTP during first-admin bootstrap", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.twoFactorEnabled = false;
+    mocks.adminService.hasAnyTotpEnabledAdmin.mockResolvedValueOnce(false);
+
+    const res = await app.request("/admin/status");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        totpRequired: false,
+        twoFactorEnabled: false,
+        canEnrollTotp: true,
+        bootstrapTotpRequired: true,
+      },
+    });
+  });
+
+  it("allows admin session lookup during first-admin TOTP bootstrap", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.twoFactorEnabled = false;
+    mocks.adminService.hasAnyTotpEnabledAdmin.mockResolvedValueOnce(false);
+
+    const res = await app.request("/admin/session");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: { role: "admin" },
+    });
+  });
+
+  it("allows read-only bootstrap dashboard endpoints for admin users without TOTP", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.twoFactorEnabled = false;
+    mocks.adminService.hasAnyTotpEnabledAdmin.mockResolvedValue(false);
+    mocks.adminService.getDashboardStats.mockResolvedValueOnce({ totalUsers: 1 });
+
+    const res = await app.request("/admin/dashboard/stats");
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true, data: { totalUsers: 1 } });
+  });
+
+  it("does not allow an allowlisted non-admin user during first-admin bootstrap", async () => {
+    mocks.authState.allowAuth = true;
+    mocks.authState.allowAdminAccess = true;
+    mocks.authState.role = "user";
+    mocks.authState.twoFactorEnabled = false;
+    mocks.adminService.countActiveAdmins.mockResolvedValueOnce(0);
+    mocks.adminService.hasAnyTotpEnabledAdmin.mockResolvedValueOnce(false);
+
+    const res = await app.request("/admin/status");
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toEqual({ success: false, error: "Forbidden" });
   });
 
   // Ensures admin dashboard endpoint enforces allowlisted admin access and returns delegated data.

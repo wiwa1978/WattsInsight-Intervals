@@ -1,8 +1,12 @@
 export type BillingMode = "credits" | "subscriptions";
 
+function getConfiguredBillingMode(): BillingMode {
+  return process.env.BILLING_MODE === "subscriptions" ? "subscriptions" : "credits";
+}
+
 export const applicationConfig = {
   billing: {
-    mode: "credits" as BillingMode,
+    mode: getConfiguredBillingMode(),
   },
   features: {
     billing: true,

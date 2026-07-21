@@ -30,6 +30,7 @@
     "db:migrate": "DRIZZLE_REQUIRE_DATABASE_URL=1 drizzle-kit migrate --config drizzle.config.ts",
     "db:check": "drizzle-kit check --config drizzle.config.ts",
     "db:studio": "DRIZZLE_REQUIRE_DATABASE_URL=1 drizzle-kit studio --config drizzle.config.ts",
+    "db:seed": "bun run --cwd apps/api seed",
     "typecheck:api": "bun run --cwd apps/api typecheck",
     "typecheck:web": "bun run --cwd apps/web typecheck",
     "typecheck:admin": "bun run --cwd apps/admin typecheck",

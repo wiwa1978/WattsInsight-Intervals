@@ -772,7 +772,17 @@
       "role": "Rôle",
       "status": "Statut",
       "createdAt": "Créé le",
-      "userId": "ID utilisateur"
+      "userId": "ID utilisateur",
+      "creditLiabilities": {
+        "title": "Passifs de crédits ouverts",
+        "description": "Crédits qui seraient devenus négatifs et restent à régler.",
+        "remaining": "Restant",
+        "reason": "Raison",
+        "source": "Source",
+        "status": "Statut",
+        "created": "Créé",
+        "empty": "Aucun passif de crédits ouvert"
+      }
     },
     "success": {
       "roleUpdated": "Rôle utilisateur mis à jour avec succès.",

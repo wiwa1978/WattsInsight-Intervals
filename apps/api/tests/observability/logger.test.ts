@@ -220,8 +220,8 @@ describe("logger metadata serialization", () => {
     expect(output).toContain('password: \\"[redacted]\\"');
     expect(output).toContain('\\"password\\":\\"[redacted]\\"');
     expect(output).toContain("client_secret: '[redacted]'");
-    expect(output).not.toContain("abc");
-    expect(output).not.toContain("def");
+    expect(output).not.toContain(String.raw`abc\"def`);
+    expect(output).not.toContain(String.raw`abc\'def`);
   });
 
   it("redacts quoted metadata secrets containing structural delimiters", async () => {

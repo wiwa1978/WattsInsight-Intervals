@@ -31,13 +31,13 @@ export async function redeemVoucher(code: string) {
 
 export async function canUseFeature(feature: keyof typeof creditBillingConfig.features) {
   const balance = await getCreditBalance();
-  return balance.balance >= creditBillingConfig.features[feature];
+  return balance.balance >= creditBillingConfig.features[feature].cost;
 }
 
 export async function requireCredits(feature: keyof typeof creditBillingConfig.features) {
   const canUse = await canUseFeature(feature);
   if (!canUse) {
-    const cost = creditBillingConfig.features[feature];
+    const cost = creditBillingConfig.features[feature].cost;
     const { balance } = await getCreditBalance();
     throw new Error(`Insufficient credits. Required: ${cost}, Available: ${balance}`);
   }

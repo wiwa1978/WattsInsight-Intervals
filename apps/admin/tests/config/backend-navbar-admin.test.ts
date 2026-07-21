@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { BackendNavAdminItems } from "../../src/config/backend-navbar-admin";
+import { BackendNavAdminItems, getBackendNavAdminItems } from "../../src/config/backend-navbar-admin";
 
 describe("admin backend nav config", () => {
   it("keeps expected order and unique urls", () => {
@@ -17,5 +17,27 @@ describe("admin backend nav config", () => {
       "/admin/notifications",
       "/admin/logs",
     ]);
+  });
+
+  it("hides billing navigation when admin billing is not visible", () => {
+    expect(getBackendNavAdminItems({
+      billing: { enabled: false, mode: "credits", creditSurfacesEnabled: true, subscriptionSurfacesEnabled: true },
+      features: { vouchers: true, discounts: true, notifications: true },
+    }).map((item) => item.url)).toEqual([
+      "/admin/overview",
+      "/admin/system",
+      "/admin/admins",
+      "/admin/users",
+      "/admin/webhooks",
+      "/admin/operations",
+      "/admin/notifications",
+      "/admin/logs",
+    ]);
+  });
+
+  it("keeps billing navigation while application config is loading", () => {
+    expect(getBackendNavAdminItems(undefined)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ url: "/admin/billing" })]),
+    );
   });
 });

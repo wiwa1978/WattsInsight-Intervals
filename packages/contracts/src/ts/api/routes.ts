@@ -102,6 +102,7 @@ export const apiRoutes = {
     userCreditBalance: (userId: string) => `/admin/users/${userId}/credits/balance`,
     userCreditHistory: (userId: string, limit = 50) => withQuery(`/admin/users/${userId}/credits/history`, { limit }),
     userCreditPurchases: (userId: string, limit = 50) => withQuery(`/admin/users/${userId}/credits/purchases`, { limit }),
+    userCreditLiabilities: (userId: string) => `/admin/users/${userId}/credit-liabilities`,
     setUserRole: "/admin/users/set-role",
     unbanUser: "/admin/users/unban",
     banUser: "/admin/users/ban",

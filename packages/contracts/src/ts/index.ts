@@ -9,6 +9,7 @@
 
 export * from "./api/routes";
 export * from "./application-settings";
+export * from "./billing/capabilities";
 export * from "./billing/config";
 export * from "./billing/plans";
 export * from "./auth/forms";

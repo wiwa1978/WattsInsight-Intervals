@@ -125,7 +125,6 @@ export function ActiveSessionsCard() {
       ]);
 
       if (sessionsResult.error) {
-        console.error("Failed to fetch sessions:", sessionsResult.error);
         return;
       }
 
@@ -155,7 +154,6 @@ export function ActiveSessionsCard() {
 
       setSessions(parsed);
     } catch {
-      console.error("Error fetching sessions");
     } finally {
       setIsLoading(false);
     }

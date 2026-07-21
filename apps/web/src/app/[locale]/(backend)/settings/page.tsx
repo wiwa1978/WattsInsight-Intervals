@@ -1,6 +1,6 @@
 "use client";
 
-import { User, Shield, Users, FileJson } from "lucide-react";
+import { CalendarDays, User, Shield, Users, FileJson } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -14,6 +14,7 @@ import {
   DeleteAccountCard,
   DataExportCard,
   ApiKeysCard,
+  PreferencesCard,
 } from "@/components/layout/backend/settings";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -30,10 +31,14 @@ export default function SettingsPage() {
 
       {/* Tabbed Settings */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="profile" className="gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">{t("tabs.profile")}</span>
+          </TabsTrigger>
+          <TabsTrigger value="preferences" className="gap-2">
+            <CalendarDays className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("tabs.preferences")}</span>
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
             <Shield className="h-4 w-4" />
@@ -52,6 +57,11 @@ export default function SettingsPage() {
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-6">
           <ProfileCard />
+        </TabsContent>
+
+        {/* Preferences Tab */}
+        <TabsContent value="preferences" className="space-y-6">
+          <PreferencesCard />
         </TabsContent>
 
         {/* Security Tab */}

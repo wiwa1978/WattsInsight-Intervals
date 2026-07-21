@@ -31,6 +31,7 @@ const envSchema = z.object({
   ADMIN_APP_URL: z.string().url().optional(),
   ADMIN_SECRET: z.string().optional(),
   TRUST_PROXY: z.coerce.boolean().default(false),
+  BILLING_MODE: z.enum(["credits", "subscriptions"]).default("credits"),
   PAYMENT_PROVIDER: z.enum(["dodo", "stripe"]).default("dodo"),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),

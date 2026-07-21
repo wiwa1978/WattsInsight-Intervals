@@ -228,6 +228,124 @@ describe("subscription service helpers", () => {
     }));
   });
 
+  it("stores provider payment id when recording subscription payments", async () => {
+    let insertedValues: Record<string, unknown> | undefined;
+    const returning = vi.fn().mockResolvedValue([{ id: "sp_1", paymentId: "pay_1" }]);
+    const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+    const values = vi.fn().mockImplementation((input) => {
+      insertedValues = input;
+      return { onConflictDoUpdate };
+    });
+    const service = createSubscriptionService({
+      db: {
+        transaction: vi.fn(async (callback) => callback({
+          query: { subscriptionPayments: { findFirst: vi.fn().mockResolvedValue(null) } },
+          insert: vi.fn().mockReturnValue({ values }),
+        })),
+      } as any,
+      paymentProvider: {
+        name: "dodo",
+        capabilities: { checkout: true, customerPortal: false, invoices: false, refunds: false, finance: false },
+        createCheckoutUrl: vi.fn(),
+      },
+    });
+
+    await service.recordSubscriptionPayment({
+      userId: "user_1",
+      planKey: "Bronze",
+      paymentId: "pay_1",
+      paymentStatus: "completed",
+      pricing: {
+        priceExclVat: 1000,
+        priceInclVat: 1210,
+        vatAmount: 210,
+        currency: "EUR",
+      },
+    });
+
+    expect(insertedValues).toMatchObject({
+      paymentProvider: "dodo",
+      paymentId: "pay_1",
+    });
+  });
+
+  it("finds subscription payments by provider payment id", async () => {
+    const payment = { id: "sp_1", paymentProvider: "dodo", paymentId: "pay_1" };
+    const findFirst = vi.fn().mockResolvedValue(payment);
+    const service = createSubscriptionService({
+      db: { query: { subscriptionPayments: { findFirst } } } as any,
+    });
+
+    await expect(service.findSubscriptionPaymentByProviderPayment("dodo", "pay_1")).resolves.toBe(payment);
+    expect(findFirst).toHaveBeenCalledOnce();
+  });
+
+  it("marks subscription payments refunded from provider webhook", async () => {
+    const payment = {
+      id: "sp_1",
+      userId: "user_1",
+      paymentProvider: "dodo",
+      paymentId: "pay_1",
+      paymentStatus: "completed",
+      paymentSnapshot: { existing: true },
+    };
+    const updatedPayment = { ...payment, paymentStatus: "refunded", refundStatus: "succeeded" };
+    const findFirst = vi.fn().mockResolvedValue(payment);
+    const updateReturning = vi.fn().mockResolvedValue([updatedPayment]);
+    const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const update = vi.fn().mockReturnValue({ set: updateSet });
+    const service = createSubscriptionService({
+      db: {
+        query: { subscriptionPayments: { findFirst } },
+        update,
+      } as any,
+    });
+
+    await expect(service.recordSubscriptionRefund("dodo", "pay_1", "rfnd_1")).resolves.toBe(updatedPayment);
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({
+      paymentStatus: "refunded",
+      refundStatus: "succeeded",
+      paymentSnapshot: expect.objectContaining({
+        existing: true,
+        providerRefund: { refundId: "rfnd_1" },
+      }),
+    }));
+  });
+
+  it("marks subscription payments disputed from provider webhook", async () => {
+    const payment = {
+      id: "sp_1",
+      userId: "user_1",
+      paymentProvider: "dodo",
+      paymentId: "pay_1",
+      paymentStatus: "completed",
+      paymentSnapshot: null,
+    };
+    const updatedPayment = { ...payment, paymentStatus: "failed", refundStatus: "dispute_lost" };
+    const findFirst = vi.fn().mockResolvedValue(payment);
+    const updateReturning = vi.fn().mockResolvedValue([updatedPayment]);
+    const updateWhere = vi.fn().mockReturnValue({ returning: updateReturning });
+    const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
+    const update = vi.fn().mockReturnValue({ set: updateSet });
+    const service = createSubscriptionService({
+      db: {
+        query: { subscriptionPayments: { findFirst } },
+        update,
+      } as any,
+    });
+
+    await expect(service.recordSubscriptionDisputeLoss("dodo", "pay_1", "disp_1", "dispute_lost")).resolves.toBe(updatedPayment);
+    expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({
+      paymentStatus: "failed",
+      refundStatus: "dispute_lost",
+      errorCode: "dispute_lost",
+      paymentSnapshot: {
+        providerDispute: { disputeId: "disp_1", disputeStatus: "dispute_lost" },
+      },
+    }));
+  });
+
   it("rolls subscription payment status back when provider refund creation fails", async () => {
     const payment = {
       id: "sp_1",

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "seed": "tsx src/seed.ts",
     "start": "node --enable-source-maps src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

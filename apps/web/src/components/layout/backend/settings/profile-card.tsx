@@ -301,7 +301,10 @@ export function ProfileCard() {
 
               {/* Address Section */}
               <div className="rounded-lg border bg-card p-6 space-y-6">
-                <h3 className="text-sm font-semibold">{t("addressInfo")}</h3>
+                <div>
+                  <h3 className="text-sm font-semibold">{t("addressInfo")}</h3>
+                  <p className="text-xs text-muted-foreground">{t("defaultBillingAddress")}</p>
+                </div>
 
                 <FormField
                   control={form.control}

@@ -35,6 +35,7 @@ export type AuthModuleOptions = {
   };
   admin: {
     allowlist: Set<string>;
+    isBootstrapAccessAllowed?: (email: string, path: string) => boolean | Promise<boolean>;
   };
   jwt: {
     secret: string;

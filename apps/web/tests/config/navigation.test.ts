@@ -15,50 +15,64 @@ describe("web navigation config", () => {
   });
 
   it("contains expected dashboard sidebar entries", () => {
-    expect(BackendNavItems).toHaveLength(2);
+    expect(BackendNavItems).toHaveLength(1);
     expect(BackendNavItems).toEqual([
       expect.objectContaining({
         title: "dashboard.nav.overview",
         url: "/dashboard",
       }),
-      expect.objectContaining({
-        title: "dashboard.nav.billing",
-        url: "/billing",
-      }),
     ]);
   });
 
   it("hides billing navigation when no billing surfaces are enabled", () => {
-    expect(getBackendNavItems({ billing: { creditSurfacesEnabled: false, subscriptionSurfacesEnabled: false } })).toEqual([
+    expect(getBackendNavItems({
+      billing: { enabled: true, mode: "credits", creditSurfacesEnabled: false, subscriptionSurfacesEnabled: false },
+      features: { vouchers: true, discounts: true, notifications: true },
+    })).toEqual([
       expect.objectContaining({ url: "/dashboard" }),
     ]);
   });
 
-  it("shows billing navigation while application config is loading", () => {
-    expect(getBackendNavItems(undefined)).toEqual(
+  it("hides billing navigation when billing is disabled", () => {
+    expect(getBackendNavItems({
+      billing: { enabled: false, mode: "credits", creditSurfacesEnabled: true, subscriptionSurfacesEnabled: true },
+      features: { vouchers: true, discounts: true, notifications: true },
+    })).toEqual([
+      expect.objectContaining({ url: "/dashboard" }),
+    ]);
+  });
+
+  it("does not show billing navigation while application config is loading", () => {
+    expect(getBackendNavItems(undefined)).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
     );
-    expect(getUserDropdownNavItems(undefined)).toEqual(
+    expect(getUserDropdownNavItems(undefined)).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
     );
   });
 
-  it("shows billing navigation when any billing surface is enabled", () => {
-    expect(getBackendNavItems({ billing: { creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false } })).toEqual(
-      expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
-    );
-    expect(getBackendNavItems({ billing: { creditSurfacesEnabled: false, subscriptionSurfacesEnabled: true } })).toEqual(
-      expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
-    );
+  it("keeps billing portal hidden even when billing surfaces are enabled", () => {
+    expect(getBackendNavItems({
+      billing: { enabled: true, mode: "credits", creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false },
+      features: { vouchers: true, discounts: true, notifications: true },
+    })).not.toEqual(expect.arrayContaining([expect.objectContaining({ url: "/billing" })]));
+    expect(getBackendNavItems({
+      billing: { enabled: true, mode: "subscriptions", creditSurfacesEnabled: false, subscriptionSurfacesEnabled: true },
+      features: { vouchers: true, discounts: true, notifications: true },
+    })).not.toEqual(expect.arrayContaining([expect.objectContaining({ url: "/billing" })]));
   });
 
   it("uses the same billing gate for user dropdown navigation", () => {
-    expect(getUserDropdownNavItems({ billing: { creditSurfacesEnabled: false, subscriptionSurfacesEnabled: false } })).toEqual([
+    expect(getUserDropdownNavItems({
+      billing: { enabled: true, mode: "credits", creditSurfacesEnabled: false, subscriptionSurfacesEnabled: false },
+      features: { vouchers: true, discounts: true, notifications: true },
+    })).toEqual([
       expect.objectContaining({ url: "/settings" }),
     ]);
 
-    expect(getUserDropdownNavItems({ billing: { creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false } })).toEqual(
-      expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
-    );
+    expect(getUserDropdownNavItems({
+      billing: { enabled: true, mode: "credits", creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false },
+      features: { vouchers: true, discounts: true, notifications: true },
+    })).not.toEqual(expect.arrayContaining([expect.objectContaining({ url: "/billing" })]));
   });
 });

@@ -40,8 +40,8 @@ type AdminLoginStep = "credentials" | "verify-totp";
 
 async function enforceAdminAccess() {
   try {
-    await getAdminStatus();
-    return { allowed: true };
+    const status = await getAdminStatus();
+    return { allowed: true, status };
   } catch {
     return { allowed: false };
   }
@@ -110,6 +110,20 @@ function LoginPageContent() {
 
     const signInNeedsTotp = Boolean((data as { twoFactorRedirect?: boolean } | null | undefined)?.twoFactorRedirect);
     if (signInNeedsTotp) {
+      const status = await enforceAdminAccess();
+      if (!status.allowed) {
+        await authClient.signOut();
+        passwordForm.setError("root", {
+          message: "This account is not allowed to access the admin portal.",
+        });
+        return;
+      }
+
+      if (!status.status?.data.totpRequired) {
+        await completeAdminLogin();
+        return;
+      }
+
       if (values.totpCode) {
         const verify = await twoFactor.verifyTotp({ code: values.totpCode });
         if (verify.error) {
@@ -255,32 +269,6 @@ function LoginPageContent() {
                         </FormItem>
                       )}
                     />
-
-                    {authConfig.adminPortalTotpRequired && (
-                      <FormField
-                        control={passwordForm.control}
-                        name="totpCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("totpCode")}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                maxLength={6}
-                                placeholder={t("totpCodePlaceholder")}
-                                autoComplete="one-time-code"
-                                disabled={isSubmitting}
-                                {...field}
-                                onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
 
                     {authConfig.rememberMeEnabled && (
                       <FormField

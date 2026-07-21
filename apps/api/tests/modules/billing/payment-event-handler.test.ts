@@ -16,6 +16,7 @@ afterEach(() => {
 function createBillingDeps() {
   return {
     getUserById: vi.fn().mockResolvedValue({ id: "user-1" }),
+    findCreditPurchaseByProviderPayment: vi.fn().mockResolvedValue(null),
     processCreditPurchase: vi.fn().mockResolvedValue({}),
     processCreditRefund: vi.fn().mockResolvedValue({}),
     processCreditDisputeLoss: vi.fn().mockResolvedValue({}),
@@ -419,5 +420,118 @@ describe("payment event handler billing modes", () => {
 
     expect(recordSubscriptionPayment).not.toHaveBeenCalled();
     expect(checkoutIntents.markCompleted).not.toHaveBeenCalled();
+  });
+
+  it("routes subscription refunds by stored provider payment", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "credits";
+    const billing = createBillingDeps();
+    const findSubscriptionPaymentByProviderPayment = vi.fn().mockResolvedValue({ id: "sp_1", paymentId: "pay_sub_1" });
+    const recordSubscriptionRefund = vi.fn().mockResolvedValue({});
+    const handler = createPaymentEventHandler({
+      creditPackages: [bronzeCreditPackage],
+      billing,
+      subscriptions: {
+        handleSubscriptionWebhook: vi.fn(),
+        findSubscriptionPaymentByProviderPayment,
+        recordSubscriptionRefund,
+      },
+    });
+
+    await handler({
+      provider: "dodo",
+      eventType: "refund.succeeded",
+      paymentId: "pay_sub_1",
+      refundId: "rfnd_sub_1",
+      refundIsPartial: false,
+      raw: {},
+    });
+
+    expect(billing.findCreditPurchaseByProviderPayment).toHaveBeenCalledWith("dodo", "pay_sub_1");
+    expect(findSubscriptionPaymentByProviderPayment).toHaveBeenCalledWith("dodo", "pay_sub_1");
+    expect(recordSubscriptionRefund).toHaveBeenCalledWith("dodo", "pay_sub_1", "rfnd_sub_1");
+    expect(billing.processCreditRefund).not.toHaveBeenCalled();
+  });
+
+  it("keeps unknown refunds retryable", async () => {
+    const billing = createBillingDeps();
+    const findSubscriptionPaymentByProviderPayment = vi.fn().mockResolvedValue(null);
+    const recordSubscriptionRefund = vi.fn().mockResolvedValue({});
+    const handler = createPaymentEventHandler({
+      creditPackages: [bronzeCreditPackage],
+      billing,
+      subscriptions: {
+        handleSubscriptionWebhook: vi.fn(),
+        findSubscriptionPaymentByProviderPayment,
+        recordSubscriptionRefund,
+      },
+    });
+
+    await expect(handler({
+      provider: "dodo",
+      eventType: "refund.succeeded",
+      paymentId: "pay_missing",
+      refundId: "rfnd_missing",
+      refundIsPartial: false,
+      raw: {},
+    })).rejects.toThrow("No local payment found for dodo payment pay_missing");
+
+    expect(billing.processCreditRefund).not.toHaveBeenCalled();
+    expect(recordSubscriptionRefund).not.toHaveBeenCalled();
+  });
+
+  it("routes subscription dispute losses by stored provider payment", async () => {
+    const billing = createBillingDeps();
+    const findSubscriptionPaymentByProviderPayment = vi.fn().mockResolvedValue({ id: "sp_1", paymentId: "pay_sub_1" });
+    const recordSubscriptionDisputeLoss = vi.fn().mockResolvedValue({});
+    const handler = createPaymentEventHandler({
+      creditPackages: [bronzeCreditPackage],
+      billing,
+      subscriptions: {
+        handleSubscriptionWebhook: vi.fn(),
+        findSubscriptionPaymentByProviderPayment,
+        recordSubscriptionDisputeLoss,
+      },
+    });
+
+    await handler({
+      provider: "dodo",
+      eventType: "dispute.lost",
+      paymentId: "pay_sub_1",
+      disputeId: "disp_sub_1",
+      disputeStatus: "dispute_lost",
+      raw: {},
+    });
+
+    expect(billing.findCreditPurchaseByProviderPayment).toHaveBeenCalledWith("dodo", "pay_sub_1");
+    expect(findSubscriptionPaymentByProviderPayment).toHaveBeenCalledWith("dodo", "pay_sub_1");
+    expect(recordSubscriptionDisputeLoss).toHaveBeenCalledWith("dodo", "pay_sub_1", "disp_sub_1", "dispute_lost");
+    expect(billing.processCreditDisputeLoss).not.toHaveBeenCalled();
+  });
+
+  it("keeps unknown dispute losses retryable", async () => {
+    const billing = createBillingDeps();
+    const findSubscriptionPaymentByProviderPayment = vi.fn().mockResolvedValue(null);
+    const recordSubscriptionDisputeLoss = vi.fn().mockResolvedValue({});
+    const handler = createPaymentEventHandler({
+      creditPackages: [bronzeCreditPackage],
+      billing,
+      subscriptions: {
+        handleSubscriptionWebhook: vi.fn(),
+        findSubscriptionPaymentByProviderPayment,
+        recordSubscriptionDisputeLoss,
+      },
+    });
+
+    await expect(handler({
+      provider: "dodo",
+      eventType: "dispute.lost",
+      paymentId: "pay_missing",
+      disputeId: "disp_missing",
+      disputeStatus: "dispute_lost",
+      raw: {},
+    })).rejects.toThrow("No local payment found for dodo payment pay_missing");
+
+    expect(billing.processCreditDisputeLoss).not.toHaveBeenCalled();
+    expect(recordSubscriptionDisputeLoss).not.toHaveBeenCalled();
   });
 });

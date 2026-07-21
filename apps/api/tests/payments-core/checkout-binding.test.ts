@@ -205,6 +205,7 @@ describe("createPaymentEventHandler", () => {
     checkoutIntentUserId?: string;
   }) {
     const processCreditPurchase = vi.fn(async () => ({ ok: true }));
+    const findCreditPurchaseByProviderPayment = vi.fn(async () => ({ id: "cp_1" }));
     const processCreditRefund = vi.fn(async () => ({ ok: true }));
     const processCreditDisputeLoss = vi.fn(async () => ({ ok: true }));
     const getUserById = vi.fn(
@@ -235,6 +236,7 @@ describe("createPaymentEventHandler", () => {
     };
     return {
       processCreditPurchase,
+      findCreditPurchaseByProviderPayment,
       processCreditRefund,
       processCreditDisputeLoss,
       getUserById,
@@ -245,6 +247,7 @@ describe("createPaymentEventHandler", () => {
         billing: {
           getUserById,
           processCreditPurchase,
+          findCreditPurchaseByProviderPayment,
           processCreditRefund,
           processCreditDisputeLoss,
         },

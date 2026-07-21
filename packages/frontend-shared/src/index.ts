@@ -1,4 +1,5 @@
 export * from "./api-client";
+export * from "./billing-capabilities";
 export * from "./client-logger";
 export * from "./credits";
 export * from "./me-api";

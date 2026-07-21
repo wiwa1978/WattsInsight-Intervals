@@ -1,3 +1,4 @@
+import { getBillingCapability, type BillingCapabilityInput } from "@platform/frontend-shared"
 import {
   Bell,
   CreditCard,
@@ -15,7 +16,10 @@ export interface BackendNavAdminItem {
   title: string
   url: string
   icon: LucideIcon
+  requiresAdminBillingSurface?: true
 }
+
+type BillingSurfaceConfig = BillingCapabilityInput | null | undefined
 
 
 export const BackendNavAdminItems: BackendNavAdminItem[] = [
@@ -47,6 +51,7 @@ export const BackendNavAdminItems: BackendNavAdminItem[] = [
     title: "admin.nav.billing",
     url: "/admin/billing",
     icon: CreditCard ,
+    requiresAdminBillingSurface: true,
   },
   {
     title: "admin.nav.webhooks",
@@ -70,3 +75,17 @@ export const BackendNavAdminItems: BackendNavAdminItem[] = [
   },
   
 ]
+
+function hasAdminBillingSurface(config: BillingSurfaceConfig) {
+  if (!config) {
+    return true
+  }
+
+  return getBillingCapability(config).adminBillingVisible
+}
+
+export function getBackendNavAdminItems(config: BillingSurfaceConfig): BackendNavAdminItem[] {
+  const billingEnabled = hasAdminBillingSurface(config)
+
+  return BackendNavAdminItems.filter((item) => !item.requiresAdminBillingSurface || billingEnabled)
+}

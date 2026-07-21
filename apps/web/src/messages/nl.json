@@ -322,6 +322,7 @@
     "subtitle": "Beheer je account en voorkeuren.",
     "tabs": {
       "profile": "Profiel",
+      "preferences": "Voorkeuren",
       "security": "Beveiliging",
       "accounts": "Accounts",
       "privacy": "Privacy"
@@ -331,6 +332,7 @@
       "description": "Beheer je profielinformatie",
       "personalInfo": "Persoonlijke Informatie",
       "addressInfo": "Adres",
+      "defaultBillingAddress": "Dit adres wordt gebruikt als je standaard factuuradres tijdens het afrekenen.",
       "avatar": "Profielfoto",
       "avatarHint": "Klik om een nieuwe foto te uploaden (max 500KB)",
       "invalidFileType": "Selecteer een afbeeldingsbestand",
@@ -359,6 +361,18 @@
       "saving": "Opslaan...",
       "success": "Profiel succesvol bijgewerkt!",
       "error": "Kon profiel niet bijwerken"
+    },
+    "preferences": {
+      "title": "Voorkeuren",
+      "description": "Beheer hoe de app zich gedraagt voor je account.",
+      "language": "Taal",
+      "success": "Voorkeuren succesvol bijgewerkt.",
+      "error": "Kon voorkeuren niet bijwerken.",
+      "languages": {
+        "en": "Engels",
+        "nl": "Nederlands",
+        "fr": "Frans"
+      }
     },
     "emailChange": {
       "title": "E-mail wijzigen",

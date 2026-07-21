@@ -15,12 +15,18 @@ const mocks = vi.hoisted(() => {
     getUserByEmail: vi.fn(),
     consumeCredits: vi.fn(),
   };
+  const usageService = {
+    consumeFeatureUsage: vi.fn(),
+  };
   const checkoutIntentsService = {
     create: vi.fn(async () => ({ referenceId: "checkout-ref-functional" })),
     findByReferenceId: vi.fn(),
     markPending: vi.fn(),
     markCompleted: vi.fn(),
     markFailed: vi.fn(),
+  };
+  const creditLiabilityService = {
+    listOpenForUser: vi.fn(),
   };
 
   const subscriptionService = {
@@ -58,6 +64,7 @@ const mocks = vi.hoisted(() => {
     getCreditsConsumedData: vi.fn(),
     searchUsers: vi.fn(),
     countActiveAdmins: vi.fn(),
+    hasAnyTotpEnabledAdmin: vi.fn(),
   };
 
   const adminCreditsDashboardService = {
@@ -184,7 +191,9 @@ const mocks = vi.hoisted(() => {
   };
   return {
     billingService,
+    usageService,
     checkoutIntentsService,
+    creditLiabilityService,
     subscriptionService,
     adminService,
     adminCreditsDashboardService,
@@ -231,8 +240,16 @@ vi.mock("../src/modules/billing/service", () => ({
   createBillingService: () => mocks.billingService,
 }));
 
+vi.mock("../src/modules/billing/usage", () => ({
+  createUsageService: () => mocks.usageService,
+}));
+
 vi.mock("../src/modules/billing/checkout-intents", () => ({
   createCheckoutIntentsService: () => mocks.checkoutIntentsService,
+}));
+
+vi.mock("../src/modules/billing/credit-liabilities", () => ({
+  createCreditLiabilityService: () => mocks.creditLiabilityService,
 }));
 
 vi.mock("../src/modules/billing/subscription-service", () => ({
@@ -366,6 +383,7 @@ vi.mock("@platform/platform-db", () => ({
   auditEntries: {},
   checkoutIntents: {},
   creditPurchases: {},
+  creditLiabilities: {},
   creditTransactions: {},
   mobileRefreshToken: {},
   notification: {},
@@ -504,6 +522,7 @@ describe("API functional routes", () => {
     vi.clearAllMocks();
     setBillingModeForTest("credits");
     mocks.adminService.verifyAdminSecret.mockResolvedValue({ success: true });
+    mocks.adminService.hasAnyTotpEnabledAdmin.mockResolvedValue(true);
     mocks.adminAuthApi.verifyTotp.mockResolvedValue(null);
     mocks.adminAuthApi.getSession.mockResolvedValue({ user: { twoFactorEnabled: true } });
     mocks.auditService.recordAuditEntry.mockResolvedValue({ success: true, entry: { id: "audit-1" } });
@@ -899,6 +918,27 @@ describe("API functional routes", () => {
       success: true,
       data: { id: userId, email: "john@example.com" },
     });
+  });
+
+  it("returns open credit liabilities for an admin user", async () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+    const liabilities = [
+      {
+        id: "liability-1",
+        userId,
+        amount: "42.00",
+        remainingAmount: "42.00",
+        reason: "refund",
+        status: "open",
+      },
+    ];
+    mocks.creditLiabilityService.listOpenForUser.mockResolvedValueOnce(liabilities);
+
+    const res = await app.request(`/admin/users/${userId}/credit-liabilities`);
+
+    expect(res.status).toBe(200);
+    expect(mocks.creditLiabilityService.listOpenForUser).toHaveBeenCalledWith(userId);
+    await expect(res.json()).resolves.toEqual({ success: true, data: liabilities });
   });
 
   // Verifies billing stats endpoint forwards service result without mutation.
@@ -1463,6 +1503,7 @@ describe("API functional routes", () => {
         totpRequired: true,
         twoFactorEnabled: true,
         canEnrollTotp: true,
+        bootstrapTotpRequired: false,
       },
     });
   });
@@ -2899,8 +2940,8 @@ describe("API functional routes", () => {
     expect(output).toContain('\\"password\\":\\"[redacted]\\"');
     expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
     expect(output).toContain("client_secret = [redacted]");
-    expect(output).not.toContain("abc");
-    expect(output).not.toContain("def");
+    expect(output).not.toContain(String.raw`abc\"def`);
+    expect(output).not.toContain(String.raw`abc\'def`);
     infoSpy.mockRestore();
   });
 
@@ -2926,8 +2967,8 @@ describe("API functional routes", () => {
     expect(output).toContain('\\\\\\"password\\\\\\":\\\\\\"[redacted]\\\\\\"');
     expect(output).toContain('\\\\\\"password\\\\\\"=[redacted]');
     expect(output).toContain("\\\\'client_secret\\\\':\\\\'[redacted]\\\\'");
-    expect(output).not.toContain("abc");
-    expect(output).not.toContain("def");
+    expect(output).not.toContain(String.raw`abc\"def`);
+    expect(output).not.toContain(String.raw`abc\'def`);
     infoSpy.mockRestore();
   });
 
@@ -3089,9 +3130,9 @@ describe("API functional routes", () => {
     expect(mocks.discountsService.validateDiscountCode).toHaveBeenCalledWith("SAVE10", "11111111-1111-4111-8111-111111111111");
   });
 
-  // Verifies POST /me/credits/consume successfully consumes credits and returns result.
-  it("consumes credits and returns transaction result", async () => {
-    mocks.billingService.consumeCredits.mockResolvedValueOnce({
+  // Verifies POST /me/credits/consume uses server-owned feature usage and returns the compatible transaction result.
+  it("consumes feature usage and returns transaction result", async () => {
+    mocks.usageService.consumeFeatureUsage.mockResolvedValueOnce({
       transactionId: "tx-1",
       idempotencyKey: "idem-key-12345678",
       balanceBefore: "100.00",
@@ -3103,18 +3144,17 @@ describe("API functional routes", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        featureKey: "ai-query",
-        amount: 5,
+        featureKey: "aiGeneration",
         idempotencyKey: "idem-key-12345678",
       }),
     });
 
     expect(res.status).toBe(200);
-    expect(mocks.billingService.consumeCredits).toHaveBeenCalledWith("auth-user", {
-      featureKey: "ai-query",
-      amount: 5,
+    expect(mocks.usageService.consumeFeatureUsage).toHaveBeenCalledWith("auth-user", {
+      featureKey: "aiGeneration",
       idempotencyKey: "idem-key-12345678",
     });
+    expect(mocks.billingService.consumeCredits).not.toHaveBeenCalled();
     await expect(res.json()).resolves.toEqual({
       success: true,
       data: {
@@ -3127,16 +3167,15 @@ describe("API functional routes", () => {
     });
   });
 
-  // Verifies POST /me/credits/consume returns 400 when service throws (e.g. insufficient credits).
-  it("returns 400 when consuming credits fails", async () => {
-    mocks.billingService.consumeCredits.mockRejectedValueOnce(new Error("Insufficient credits"));
+  // Verifies POST /me/credits/consume returns 400 when usage service throws (e.g. insufficient credits).
+  it("returns 400 when consuming feature usage fails", async () => {
+    mocks.usageService.consumeFeatureUsage.mockRejectedValueOnce(new Error("Insufficient credits"));
 
     const res = await app.request("/me/credits/consume", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        featureKey: "ai-query",
-        amount: 1000,
+        featureKey: "aiGeneration",
         idempotencyKey: "idem-key-12345678",
       }),
     });
@@ -3157,7 +3196,34 @@ describe("API functional routes", () => {
 
     expect(res.status).toBe(400);
     await expectValidationError(res, "Invalid credit usage payload");
-    expect(mocks.billingService.consumeCredits).not.toHaveBeenCalled();
+    expect(mocks.usageService.consumeFeatureUsage).not.toHaveBeenCalled();
+  });
+
+  // Verifies POST /me/credits/consume ignores any legacy client-controlled amount field.
+  it("ignores client-provided amount when consuming feature usage", async () => {
+    mocks.usageService.consumeFeatureUsage.mockResolvedValueOnce({
+      transactionId: "tx-1",
+      idempotencyKey: "idem-key-12345678",
+      balanceBefore: "100.00",
+      balanceAfter: "99.00",
+      alreadyProcessed: false,
+    });
+
+    const res = await app.request("/me/credits/consume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        featureKey: "aiGeneration",
+        amount: 5,
+        idempotencyKey: "idem-key-12345678",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(mocks.usageService.consumeFeatureUsage).toHaveBeenCalledWith("auth-user", {
+      featureKey: "aiGeneration",
+      idempotencyKey: "idem-key-12345678",
+    });
   });
 
 });

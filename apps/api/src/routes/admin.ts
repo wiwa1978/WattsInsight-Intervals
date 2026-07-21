@@ -650,14 +650,18 @@ export function createAdminRouter() {
       | { user?: { twoFactorEnabled?: boolean | null } }
       | null;
     const twoFactorEnabled = Boolean(currentSession?.user?.twoFactorEnabled);
+    const hasAnyTotpEnabledAdmin = await bootstrap.adminService.hasAnyTotpEnabledAdmin();
+    const bootstrapTotpRequired = authConfig.adminPortalTotpRequired && !hasAnyTotpEnabledAdmin;
+    const totpRequired = authConfig.adminPortalTotpRequired && hasAnyTotpEnabledAdmin;
 
     return c.json({
       success: true,
       data: {
         message: "Admin access granted.",
-        totpRequired: authConfig.adminPortalTotpRequired,
+        totpRequired,
         twoFactorEnabled,
         canEnrollTotp: allowTotpEnrollment,
+        bootstrapTotpRequired,
       },
     });
   });
@@ -970,6 +974,19 @@ export function createAdminRouter() {
         const purchases = await bootstrap.adminService.getUserCreditPurchases(userId, limit);
         return c.json({ success: true, data: purchases });
       });
+    });
+  });
+
+  router.get("/users/:userId/credit-liabilities", async (c) => {
+    try {
+      ensureCreditBillingEnabled();
+    } catch (error) {
+      return billingModeErrorResponse(c, error);
+    }
+
+    return withUserIdParam(c, async (userId) => {
+      const liabilities = await bootstrap.creditLiabilityService.listOpenForUser(userId);
+      return c.json({ success: true, data: liabilities });
     });
   });
 

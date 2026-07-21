@@ -36,7 +36,7 @@ function primaryCurrency(dashboard: Dashboard) {
   return dashboard.filters.currency ?? dashboard.transactions.localPayments[0]?.currency ?? dashboard.subscriptions.rows[0]?.currency ?? "EUR";
 }
 
-export function SubscriptionFinanceDashboard({ dashboard }: { dashboard: Dashboard }) {
+export function SubscriptionFinanceDashboard({ dashboard, discountsVisible = true }: { dashboard: Dashboard; discountsVisible?: boolean }) {
   const currency = primaryCurrency(dashboard);
   const [revenueMode, setRevenueMode] = React.useState<"gross" | "net">("gross");
   const [revenueDisplay, setRevenueDisplay] = React.useState<"periodic" | "cumulative">("periodic");
@@ -57,7 +57,7 @@ export function SubscriptionFinanceDashboard({ dashboard }: { dashboard: Dashboa
           <TabsTrigger value="refunds"><RefreshCcw className="size-4" /> Refunds</TabsTrigger>
           <TabsTrigger value="accounting"><Banknote className="size-4" /> Accounting</TabsTrigger>
           <TabsTrigger value="success"><Users className="size-4" /> Success Rate</TabsTrigger>
-          <TabsTrigger value="discounts"><Percent className="size-4" /> Discounts</TabsTrigger>
+          {discountsVisible ? <TabsTrigger value="discounts"><Percent className="size-4" /> Discounts</TabsTrigger> : null}
           <TabsTrigger value="products"><Boxes className="size-4" /> Products</TabsTrigger>
           <TabsTrigger value="disputes"><Scale className="size-4" /> Disputes</TabsTrigger>
         </TabsList>
@@ -146,9 +146,11 @@ export function SubscriptionFinanceDashboard({ dashboard }: { dashboard: Dashboa
           </Card>
         </TabsContent>
 
-        <TabsContent value="discounts" className="space-y-6">
-          <DiscountsTable rows={dashboard.discounts.rows} />
-        </TabsContent>
+        {discountsVisible ? (
+          <TabsContent value="discounts" className="space-y-6">
+            <DiscountsTable rows={dashboard.discounts.rows} />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="products" className="space-y-6">
           <ProductsSummary dashboard={dashboard} currency={currency} />
