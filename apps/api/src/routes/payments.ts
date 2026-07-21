@@ -1,6 +1,8 @@
 import { Hono } from "hono";
+import { eq } from "drizzle-orm";
 
 import { createCheckoutRequestSchema } from "@platform/contracts";
+import { country } from "@platform/platform-db";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
@@ -36,6 +38,7 @@ export function createPaymentsRouter() {
     const packageKey = "packageKey" in parsedBody.data ? parsedBody.data.packageKey : undefined;
     const planKey = "planKey" in parsedBody.data ? parsedBody.data.planKey : undefined;
     const discountCode = "discountCode" in parsedBody.data ? parsedBody.data.discountCode : undefined;
+    const address = "address" in parsedBody.data ? parsedBody.data.address : undefined;
     const requestMode = "billingMode" in parsedBody.data ? parsedBody.data.billingMode : "credits";
 
     try {
@@ -73,6 +76,14 @@ export function createPaymentsRouter() {
       return unauthorized(c, "Unauthenticated");
     }
 
+    const billingAddress = address
+      ? await checkoutBillingAddress(address)
+      : null;
+
+    if (address && !billingAddress) {
+      return badRequest(c, "Selected billing address is invalid");
+    }
+
     const checkoutIntent = await bootstrap.checkoutIntentsService.create({
       userId: authUser.id,
       billingMode: requestMode,
@@ -90,9 +101,10 @@ export function createPaymentsRouter() {
       userId: authUser.id,
       billingMode: requestMode,
       ...(requestMode === "credits" ? { packageKey } : { planKey }),
-      ...(requestMode === "subscriptions" && discountCode ? { discountCode } : {}),
+      ...(discountCode ? { discountCode } : {}),
       referenceId: checkoutIntent.referenceId,
       customerEmail: authUser.email ?? null,
+      billingAddress,
     });
 
     return c.json({ success: true, data: { checkoutUrl } });
@@ -111,4 +123,31 @@ export function createPaymentsRouter() {
   });
 
   return router;
+}
+
+async function checkoutBillingAddress(address: {
+  street: string;
+  number: string;
+  zipcode: string;
+  town: string;
+  countryId: string;
+}) {
+  const [selectedCountry] = await bootstrap.db
+    .select({ code: country.code, name: country.name })
+    .from(country)
+    .where(eq(country.id, address.countryId))
+    .limit(1);
+
+  if (!selectedCountry) {
+    return null;
+  }
+
+  return {
+    street: address.street,
+    number: address.number,
+    zipcode: address.zipcode,
+    town: address.town,
+    countryCode: selectedCountry.code,
+    countryName: selectedCountry.name,
+  };
 }

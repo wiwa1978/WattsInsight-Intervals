@@ -16,6 +16,7 @@ function buildApp() {
   const app = new Hono();
   app.use("/*", originGuard);
   app.post("/me/settings", (c) => c.json({ success: true }));
+  app.post("/admin/settings", (c) => c.json({ success: true }));
   app.post("/payments/webhooks/dodo", (c) => c.json({ success: true }));
   return app;
 }
@@ -57,6 +58,30 @@ describe("originGuard", () => {
 
       expect(res.status, origin).toBe(200);
     }
+  });
+
+  it("only allows the admin origin for admin unsafe requests", async () => {
+    for (const origin of ["https://app.example.com", "https://api.example.com", "https://partner.example.com"]) {
+      const res = await buildApp().request("/admin/settings", {
+        method: "POST",
+        headers: {
+          cookie: "better-auth.session_token=session-token",
+          origin,
+        },
+      });
+
+      expect(res.status, origin).toBe(403);
+    }
+
+    const allowed = await buildApp().request("/admin/settings", {
+      method: "POST",
+      headers: {
+        cookie: "better-auth.session_token=session-token",
+        origin: "https://admin.example.com",
+      },
+    });
+
+    expect(allowed.status).toBe(200);
   });
 
   it("falls back to trusted referer when origin is absent", async () => {

@@ -56,7 +56,10 @@ export const userCredits = pgTable(
     createdAt,
     updatedAt,
   },
-  (table) => [index("user_credits_user_id_idx").on(table.userId)],
+  (table) => [
+    index("user_credits_user_id_idx").on(table.userId),
+    check("user_credits_non_negative", sql`${table.balance} >= 0 AND ${table.totalPurchased} >= 0 AND ${table.totalSpent} >= 0`),
+  ],
 );
 
 export const creditTransactions = pgTable(
@@ -83,6 +86,8 @@ export const creditTransactions = pgTable(
     index("credit_transactions_type_idx").on(table.type),
     index("credit_transactions_created_at_idx").on(table.createdAt),
     index("credit_transactions_type_created_at_idx").on(table.type, table.createdAt),
+    index("credit_transactions_user_created_at_idx").on(table.userId, table.createdAt),
+    check("credit_transactions_type_valid", sql`${table.type} IN ('purchase', 'usage', 'refund', 'bonus', 'admin_adjustment', 'voucher')`),
   ],
 );
 
@@ -121,6 +126,8 @@ export const creditPurchases = pgTable(
     index("credit_purchases_provider_customer_id_idx").on(table.providerCustomerId),
     index("credit_purchases_dodo_customer_id_idx").on(table.dodoCustomerId),
     index("credit_purchases_payment_status_created_at_idx").on(table.paymentStatus, table.createdAt),
+    check("credit_purchases_amounts_non_negative", sql`${table.credits} > 0 AND ${table.bonusCredits} >= 0 AND ${table.price} >= 0 AND ${table.priceExclVat} >= 0 AND ${table.priceInclVat} >= 0 AND ${table.vatAmount} >= 0`),
+    check("credit_purchases_status_valid", sql`${table.paymentStatus} IN ('pending', 'completed', 'failed', 'refunded')`),
   ],
 );
 
@@ -154,6 +161,9 @@ export const paymentWebhookEvents = pgTable(
     index("payment_webhook_events_payment_id_idx").on(table.paymentId),
     index("payment_webhook_events_event_type_idx").on(table.eventType),
     index("payment_webhook_events_processing_status_idx").on(table.processingStatus),
+    index("payment_webhook_events_retry_idx").on(table.processingStatus, table.nextAttemptAt),
+    check("payment_webhook_events_status_valid", sql`${table.processingStatus} IN ('processing', 'processed', 'failed', 'dead_lettered')`),
+    check("payment_webhook_events_retry_count_non_negative", sql`${table.retryCount} >= 0`),
   ],
 );
 

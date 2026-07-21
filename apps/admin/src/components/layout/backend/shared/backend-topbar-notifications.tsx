@@ -22,6 +22,7 @@ import {
   markAllAsRead,
   markAsRead,
 } from "@/lib/services/notifications";
+import { getMyApplicationConfig } from "@/lib/api/me";
 import { useSession } from "@/lib/auth-client";
 import { adminQueryKeys } from "@/lib/query/keys";
 
@@ -31,16 +32,23 @@ export function BackendTopbarNotifications() {
   const { data: session } = useSession();
   const [isOpen, setIsOpen] = React.useState(false);
   const queryClient = useQueryClient();
-  const notificationsQueryKey = adminQueryKeys.notifications(authConfig.notificationsDropdownLimit);
+  const applicationConfigQuery = useQuery({
+    queryKey: adminQueryKeys.applicationConfig,
+    queryFn: getMyApplicationConfig,
+    staleTime: 60_000,
+  });
+  const notificationsDropdownLimit = applicationConfigQuery.data?.ui.notificationsDropdownLimit ?? authConfig.notificationsDropdownLimit;
+  const notificationsPollingInterval = applicationConfigQuery.data?.ui.notificationsPollingIntervalMs ?? authConfig.notificationsPollingInterval;
+  const notificationsQueryKey = adminQueryKeys.notifications(notificationsDropdownLimit);
 
   const notificationsQuery = useQuery({
     queryKey: notificationsQueryKey,
     queryFn: async () => {
-      const result = await getNotifications(authConfig.notificationsDropdownLimit);
+      const result = await getNotifications(notificationsDropdownLimit);
       return result.success && result.data ? result.data as Notification[] : [];
     },
     enabled: Boolean(session?.user?.id),
-    refetchInterval: authConfig.notificationsPollingInterval > 0 ? authConfig.notificationsPollingInterval : false,
+    refetchInterval: notificationsPollingInterval > 0 ? notificationsPollingInterval : false,
   });
 
   const unreadCountQuery = useQuery({
@@ -50,7 +58,7 @@ export function BackendTopbarNotifications() {
       return result.success ? result.count : 0;
     },
     enabled: Boolean(session?.user?.id),
-    refetchInterval: authConfig.notificationsPollingInterval > 0 ? authConfig.notificationsPollingInterval : false,
+    refetchInterval: notificationsPollingInterval > 0 ? notificationsPollingInterval : false,
   });
 
   const refreshNotifications = React.useCallback(async () => {

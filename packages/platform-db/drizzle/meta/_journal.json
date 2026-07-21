@@ -127,6 +127,13 @@
       "when": 1778284800000,
       "tag": "0017_application_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784578636331,
+      "tag": "0018_phase_3_integrity_constraints",
+      "breakpoints": true
     }
   ]
 }

@@ -1189,6 +1189,26 @@
       "cancelTitle": "Paiement annule",
       "cancelDescription": "Aucun credit n'a ete achete."
     },
+    "credits": {
+      "checkout": {
+        "title": "Acheter {package}",
+        "description": "Confirmez les details du forfait avant de continuer vers le paiement.",
+        "packageNotFound": "Forfait de credits introuvable",
+        "baseCredits": "{count} credits",
+        "bonusCredits": "+{count} credits bonus",
+        "totalCredits": "{count} credits au total",
+        "creditsNeverExpire": "Les credits n'expirent jamais",
+        "subtotal": "Sous-total",
+        "voucherLabel": "Code bon ou reduction",
+        "voucherPlaceholder": "Entrez le code",
+        "voucherDescription": "Ce code sera envoye directement au fournisseur de paiement.",
+        "billingAddress": "Adresse de facturation",
+        "addressPlaceholder": "Selectionnez une adresse",
+        "addAddressInSettings": "Ajoutez d'abord une adresse de facturation dans les parametres de profil.",
+        "redirecting": "Redirection...",
+        "proceed": "Continuer vers le paiement"
+      }
+    },
     "portal": {
       "button": "Gerer la facturation",
       "loading": "Ouverture du portail de facturation...",
@@ -1264,6 +1284,7 @@
       "mostPopular": "Le plus populaire",
       "planDescription": "Accès SaaS récurrent facturé chaque {interval}",
       "choosePlan": "Choisir {plan}",
+      "planNotFound": "Formule d'abonnement introuvable",
       "discount": {
         "label": "Code de reduction",
         "placeholder": "Entrez un code de reduction",
@@ -1290,6 +1311,17 @@
         }
       },
       "checkout": {
+        "title": "S'abonner à {plan}",
+        "description": "Confirmez les details de la formule avant de continuer vers le paiement.",
+        "subtotal": "Sous-total",
+        "discountLabel": "Code bon ou reduction",
+        "discountPlaceholder": "Entrez le code",
+        "discountDescription": "Ce code sera envoye directement au fournisseur de paiement.",
+        "billingAddress": "Adresse de facturation",
+        "addressPlaceholder": "Selectionnez une adresse",
+        "addAddressInSettings": "Ajoutez d'abord une adresse de facturation dans les parametres de profil.",
+        "redirecting": "Redirection...",
+        "proceed": "Continuer vers le paiement",
         "successDescription": "Le paiement de l'abonnement est terminé. Votre abonnement sera mis à jour une fois le paiement traité.",
         "cancelDescription": "Le paiement de l'abonnement a été annulé.",
         "portal": {

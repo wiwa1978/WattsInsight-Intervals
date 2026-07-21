@@ -1,4 +1,5 @@
-import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { createdAt, id, updatedAt } from "./helpers";
 
@@ -26,6 +27,8 @@ export const jobs = pgTable(
   (table) => [
     uniqueIndex("jobs_name_idx").on(table.name),
     index("jobs_status_next_run_idx").on(table.status, table.nextRunAt),
+    check("jobs_status_valid", sql`${table.status} IN ('idle', 'running', 'disabled')`),
+    check("jobs_interval_seconds_positive", sql`${table.intervalSeconds} > 0`),
   ],
 );
 
@@ -46,5 +49,7 @@ export const jobRuns = pgTable(
   (table) => [
     index("job_runs_job_name_started_idx").on(table.jobName, table.startedAt),
     index("job_runs_status_started_idx").on(table.status, table.startedAt),
+    check("job_runs_status_valid", sql`${table.status} IN ('success', 'failed')`),
+    check("job_runs_duration_ms_non_negative", sql`${table.durationMs} >= 0`),
   ],
 );

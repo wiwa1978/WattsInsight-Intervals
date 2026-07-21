@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { SocialAuthButtons } from "@/components/layout/frontend/social-auth-buttons";
 import { Link, useRouter } from "@/i18n/navigation";
-import { getInternalNavigationPath } from "@/i18n/path-locale";
+import { sanitizeInternalRedirectPath } from "@/i18n/path-locale";
 import { authClient } from "@/lib/auth-client";
 import { getPasswordSignInRequest, getWebLoginAccessDecision } from "@/lib/login-submit";
 import { authConfig } from "@/config/auth";
@@ -57,10 +57,8 @@ function LoginPageContent() {
   } | null>(null);
 
   // Get callbackUrl from query params, with validation
-  const callbackUrl = searchParams.get("callbackUrl");
-  const redirectTo =
-    callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : DEFAULT_REDIRECT;
-  const navigationPath = getInternalNavigationPath(redirectTo);
+  const redirectTo = sanitizeInternalRedirectPath(searchParams.get("callbackUrl"), DEFAULT_REDIRECT);
+  const navigationPath = redirectTo;
 
   // Helper to get translated error message
   const getErrorMessage = (error: { code?: string; message?: string }) => {

@@ -9,22 +9,33 @@ type PaymentWebhookEventStoreDeps = {
   db: any;
 };
 
-const REDACTED = "[redacted]";
-const SENSITIVE_KEYS = /authorization|card|cvv|email|password|secret|signature|token/i;
 const STALE_PROCESSING_MS = 15 * 60 * 1000;
 
+function pickString(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
+}
+
 function sanitizeJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizeJson);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, child]) => [
-        key,
-        SENSITIVE_KEYS.test(key) ? REDACTED : sanitizeJson(child),
-      ]),
-    );
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
   }
 
-  return value;
+  const record = value as Record<string, unknown>;
+  const data = record.data && typeof record.data === "object" && !Array.isArray(record.data)
+    ? (record.data as Record<string, unknown>)
+    : {};
+
+  return {
+    ...(pickString(record, "id") ? { id: pickString(record, "id") } : {}),
+    ...(pickString(record, "event_type") ? { event_type: pickString(record, "event_type") } : {}),
+    data: {
+      ...(pickString(data, "payment_id") ? { payment_id: pickString(data, "payment_id") } : {}),
+      ...(pickString(data, "subscription_id") ? { subscription_id: pickString(data, "subscription_id") } : {}),
+      ...(pickString(data, "product_id") ? { product_id: pickString(data, "product_id") } : {}),
+      ...(pickString(data, "status") ? { status: pickString(data, "status") } : {}),
+    },
+  };
 }
 
 function numericDetail(error: Error & Record<string, unknown>, key: string) {

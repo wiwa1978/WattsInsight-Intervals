@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { eq } from "drizzle-orm";
 
 import {
   createApiKeySchema,
@@ -10,6 +11,7 @@ import {
   optionalLimitQuerySchema,
   redeemVoucherSchema,
 } from "@platform/contracts/wire";
+import { user } from "@platform/platform-db";
 
 import type { AppEnv } from "../context";
 import { bootstrap } from "../bootstrap";
@@ -60,6 +62,12 @@ export function createMeRouter() {
   });
 
   router.get("/application-config", (c) => {
+    return getApplicationConfigResponse(c);
+  });
+
+  async function getApplicationConfigResponse(c: Context<AppEnv>) {
+    const runtimeSettings = await bootstrap.applicationSettingsService.getRuntimeSettingsPayload();
+
     return ok(c, {
       billing: {
         enabled: applicationConfig.features.billing,
@@ -72,7 +80,25 @@ export function createMeRouter() {
         discounts: applicationConfig.features.discounts,
         notifications: applicationConfig.features.notifications,
       },
+      ui: runtimeSettings.effective,
     });
+  }
+
+  router.get("/profile-address", async (c) => {
+    const authUser = getAuthUser(c);
+    const [profile] = await bootstrap.db
+      .select({
+        street: user.street,
+        number: user.number,
+        zipcode: user.zipcode,
+        town: user.town,
+        countryId: user.countryId,
+      })
+      .from(user)
+      .where(eq(user.id, authUser.id))
+      .limit(1);
+
+    return ok(c, profile ?? null);
   });
 
   router.post("/customer-portal", async (c) => {
@@ -146,7 +172,8 @@ export function createMeRouter() {
 
   router.post("/api-keys", async (c) => {
     const authUser = getAuthUser(c);
-    const parsedBody = await parseJsonBody(c, createApiKeySchema);
+    const body = await c.req.json().catch(() => null);
+    const parsedBody = parseJsonBody(createApiKeySchema, body);
     if (!parsedBody.success) return validationError(c, "Invalid API key payload");
 
     const result = await bootstrap.apiKeysService.create({

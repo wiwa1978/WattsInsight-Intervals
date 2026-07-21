@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPathLocale } from "../src/i18n/path-locale";
+import { getPathLocale, sanitizeInternalRedirectPath } from "../src/i18n/path-locale";
 
 describe("getPathLocale", () => {
   it("parses supported locale from first path segment", () => {
@@ -19,5 +19,16 @@ describe("getPathLocale", () => {
       activeLocale: "en",
       pathWithoutLocale: "/admin/overview",
     });
+  });
+});
+
+describe("sanitizeInternalRedirectPath", () => {
+  it("allows normal internal paths", () => {
+    expect(sanitizeInternalRedirectPath("/fr/admin/overview", "/admin/overview")).toBe("/admin/overview");
+  });
+
+  it("rejects absolute and protocol-relative URLs", () => {
+    expect(sanitizeInternalRedirectPath("https://evil.example.com", "/admin/overview")).toBe("/admin/overview");
+    expect(sanitizeInternalRedirectPath("//evil.example.com", "/admin/overview")).toBe("/admin/overview");
   });
 });

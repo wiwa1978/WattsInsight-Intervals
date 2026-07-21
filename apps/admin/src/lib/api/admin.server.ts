@@ -19,6 +19,7 @@ import type {
   CreditPurchase,
   CreditTransaction,
   CreditsConsumedPoint,
+  NotificationSendHistoryItem,
   RevenuePoint,
   SubscriptionEvent,
   SubscriptionFinanceSummary,
@@ -28,6 +29,7 @@ import type {
   SubscriptionsList,
   TransactionPoint,
 } from "@platform/contracts";
+import type { RuntimeApplicationSettingsPayload } from "@platform/contracts/ts";
 
 import { serverApiRequest } from "./client.server";
 
@@ -105,6 +107,11 @@ function adminOperationsQueryString(query: Record<string, string | number | unde
 
 export async function getAdminDashboardStatsServer(): Promise<AdminDashboardStats> {
   const result = await serverApiRequest<{ success: boolean; data: AdminDashboardStats }>("/admin/dashboard/stats");
+  return result.data;
+}
+
+export async function getAdminApplicationSettingsServer(): Promise<RuntimeApplicationSettingsPayload> {
+  const result = await serverApiRequest<{ success: boolean; data: RuntimeApplicationSettingsPayload }>(apiRoutes.admin.applicationSettings);
   return result.data;
 }
 
@@ -248,5 +255,10 @@ export async function getAdminBillingSubscriptionPlanDistributionServer(): Promi
 
 export async function getAdminBillingSubscriptionEventsServer(limit = 50): Promise<SubscriptionEvent[]> {
   const result = await serverApiRequest<{ success: boolean; data: SubscriptionEvent[] }>(apiRoutes.admin.billingSubscriptionEvents(limit));
+  return result.data;
+}
+
+export async function getNotificationSendHistoryServer(limit = 50): Promise<NotificationSendHistoryItem[]> {
+  const result = await serverApiRequest<{ success: boolean; data: NotificationSendHistoryItem[] }>(apiRoutes.admin.notificationSends(limit));
   return result.data;
 }

@@ -34,8 +34,10 @@ import {
   createSubscriptionRefundSchema,
   createVoucherSchema,
   updateVoucherSchema,
+  updateApplicationSettingSchema,
   verifyAdminSecretSchema,
   adminSecretOnlySchema,
+  resetApplicationSettingSchema,
   voucherIdParamSchema,
   voucherListQuerySchema,
   webhookEventIdParamSchema,
@@ -679,6 +681,67 @@ export function createAdminRouter() {
   router.get("/dashboard/stats", async (c) => {
     const stats = await bootstrap.adminService.getDashboardStats();
     return c.json({ success: true, data: stats });
+  });
+
+  router.get("/application-settings", async (c) => {
+    const settings = await bootstrap.applicationSettingsService.getRuntimeSettingsPayload();
+    return c.json({ success: true, data: settings });
+  });
+
+  router.put("/application-settings/setting", async (c) => {
+    const parsedBody = parseJsonBody(updateApplicationSettingSchema, await c.req.json().catch(() => null));
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid application setting payload");
+    }
+
+    const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+    if (secretFailure) return secretFailure;
+
+    const authUser = getAuthUser(c);
+    const result = await bootstrap.applicationSettingsService.updateRuntimeSetting({
+      key: parsedBody.data.key,
+      value: parsedBody.data.value,
+      updatedByUserId: authUser.id,
+    });
+
+    if (!result.success) {
+      return badRequest(c, result.error);
+    }
+
+    const auditContext = getAuditRequestContext(c);
+    await bootstrap.auditService.recordAuditEntry({
+      ...auditContext,
+      action: "application_setting.update",
+      outcome: "success",
+      targetType: "application_setting",
+      targetId: parsedBody.data.key,
+      after: { value: parsedBody.data.value },
+    });
+
+    return c.json({ success: true });
+  });
+
+  router.delete("/application-settings/setting", async (c) => {
+    const parsedBody = parseJsonBody(resetApplicationSettingSchema, await c.req.json().catch(() => null));
+    if (!parsedBody.success) {
+      return validationError(c, "Invalid application setting payload");
+    }
+
+    const secretFailure = await requireAdminActionSecret(c, parsedBody.data.secret);
+    if (secretFailure) return secretFailure;
+
+    await bootstrap.applicationSettingsService.resetRuntimeSetting(parsedBody.data.key);
+
+    const auditContext = getAuditRequestContext(c);
+    await bootstrap.auditService.recordAuditEntry({
+      ...auditContext,
+      action: "application_setting.reset",
+      outcome: "success",
+      targetType: "application_setting",
+      targetId: parsedBody.data.key,
+    });
+
+    return c.json({ success: true });
   });
 
   router.get("/users", async (c) => {

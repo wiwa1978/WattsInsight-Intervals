@@ -516,7 +516,6 @@ export function VouchersSection() {
                           mode="single"
                           selected={field.value ?? undefined}
                           onSelect={(date) => field.onChange(date ?? null)}
-                          initialFocus
                           disabled={(date) => date < new Date("1900-01-01")}
                         />
                       </PopoverContent>

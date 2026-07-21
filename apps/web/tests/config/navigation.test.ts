@@ -34,6 +34,15 @@ describe("web navigation config", () => {
     ]);
   });
 
+  it("shows billing navigation while application config is loading", () => {
+    expect(getBackendNavItems(undefined)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
+    );
+    expect(getUserDropdownNavItems(undefined)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),
+    );
+  });
+
   it("shows billing navigation when any billing surface is enabled", () => {
     expect(getBackendNavItems({ billing: { creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false } })).toEqual(
       expect.arrayContaining([expect.objectContaining({ url: "/billing" })]),

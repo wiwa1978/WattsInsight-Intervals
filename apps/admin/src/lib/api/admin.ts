@@ -36,6 +36,7 @@ import type {
   VoucherStatus,
 } from "@platform/contracts";
 import { apiRoutes } from "@platform/contracts/ts";
+import type { RuntimeApplicationSettingKey } from "@platform/contracts/ts";
 
 export async function verifyAdminSecretApi(secret: string) {
   return apiRequest<{ success: boolean; error?: string }>("/admin/verify-admin-secret", {
@@ -49,6 +50,20 @@ export async function getAdminStatusApi() {
     success: boolean;
     data: { message: string; totpRequired: boolean; twoFactorEnabled: boolean; canEnrollTotp: boolean };
   }>("/admin/status");
+}
+
+export async function updateAdminApplicationSettingApi(payload: { key: RuntimeApplicationSettingKey; value: number; secret: string }) {
+  return apiRequest<{ success: boolean; error?: string }>(apiRoutes.admin.applicationSetting, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resetAdminApplicationSettingApi(payload: { key: RuntimeApplicationSettingKey; secret: string }) {
+  return apiRequest<{ success: boolean; error?: string }>(apiRoutes.admin.applicationSetting, {
+    method: "DELETE",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getAdminDashboardStatsApi() {

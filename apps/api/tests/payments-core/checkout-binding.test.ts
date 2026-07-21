@@ -55,6 +55,35 @@ describe("buildDodoCheckoutUrl", () => {
     expect(url.searchParams.get("metadata_userId")).toBe("user-123");
   });
 
+  it("passes discount codes and billing address prefill to checkout", () => {
+    const url = new URL(
+      buildDodoCheckoutUrl({
+        baseUrl,
+        productId,
+        userId: "user-123",
+        packageKey: "advanced",
+        discountCode: "SAVE10",
+        billingAddress: {
+          street: "Main",
+          number: "1",
+          zipcode: "1000",
+          town: "Brussels",
+          countryCode: "BE",
+          countryName: "Belgium",
+        },
+      }),
+    );
+
+    expect(url.searchParams.get("metadata_discountCode")).toBe("SAVE10");
+    expect(url.searchParams.get("discount_code")).toBe("SAVE10");
+    expect(url.searchParams.get("allow_discount_code")).toBe("true");
+    expect(url.searchParams.get("billing_address_country")).toBe("BE");
+    expect(url.searchParams.get("billing_address_city")).toBe("Brussels");
+    expect(url.searchParams.get("billing_address_street")).toBe("Main 1");
+    expect(url.searchParams.get("billing_address_zipcode")).toBe("1000");
+    expect(url.searchParams.get("billing_address_state")).toBe("Belgium");
+  });
+
   it("URL-encodes userId values to prevent metadata smuggling", () => {
     const url = new URL(
       buildDodoCheckoutUrl({

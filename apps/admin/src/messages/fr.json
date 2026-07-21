@@ -652,6 +652,39 @@
         "description": "Fichiers de journaux app et audit disponibles pour l'API.",
         "app": "Journaux app",
         "audit": "Journaux audit"
+      },
+      "runtimeSettings": {
+        "title": "Paramètres d'exécution",
+        "description": "Ajustez certains paramètres de l'application sans redéployer l'app.",
+        "adminSecret": "Secret admin",
+        "adminSecretPlaceholder": "Saisir le secret admin",
+        "updateSuccess": "Paramètre mis à jour.",
+        "updateError": "Échec de la mise à jour du paramètre.",
+        "resetSuccess": "Paramètre réinitialisé à sa valeur par défaut.",
+        "resetError": "Échec de la réinitialisation du paramètre.",
+        "integerError": "La valeur doit être un entier.",
+        "overrideBadge": "Surcharge",
+        "defaultBadge": "Défaut",
+        "value": "Valeur",
+        "sourceValue": "Défaut : {value}",
+        "range": "Plage : {min}-{max}",
+        "save": "Enregistrer",
+        "reset": "Réinitialiser",
+        "categories": {
+          "ui": "Interface"
+        },
+        "notificationsDropdownLimit": {
+          "label": "Limite du menu de notifications",
+          "description": "Nombre maximal de notifications affichées dans le menu de la barre supérieure."
+        },
+        "notificationsPollingIntervalMs": {
+          "label": "Intervalle d'actualisation des notifications",
+          "description": "Fréquence d'actualisation des compteurs et listes de notifications, en millisecondes. Utilisez 0 pour désactiver l'actualisation."
+        },
+        "deleteAccountCountdownSeconds": {
+          "label": "Compte à rebours de suppression de compte",
+          "description": "Nombre de secondes que les utilisateurs doivent attendre après avoir saisi le code de confirmation avant de supprimer leur compte."
+        }
       }
     },
     "admins": {
@@ -875,6 +908,80 @@
         "revenue": "Revenus",
         "purchases": "Achats",
         "yearly": "Annuel"
+      },
+      "creditsDashboard": {
+        "title": "Tableau de bord des credits",
+        "description": "Suivez les revenus, achats, consommations, activites de registre et remboursements de credits.",
+        "unknownUser": "Inconnu",
+        "search": "Rechercher",
+        "searchPlaceholder": "Rechercher par e-mail utilisateur...",
+        "transactionsDescription": "Activite recente des credits pour tous les utilisateurs",
+        "tabs": {
+          "overview": "Apercu",
+          "revenue": "Revenus",
+          "purchases": "Achats",
+          "ledger": "Registre des credits",
+          "consumption": "Consommation",
+          "activity": "Activite",
+          "refunds": "Remboursements et ajustements"
+        },
+        "consumptionChart": {
+          "title": "Total des credits consommes",
+          "description": "Suivez l'utilisation des credits dans le temps",
+          "label": "Credits consommes"
+        },
+        "activityChart": {
+          "title": "Activite des credits",
+          "description": "Suivez l'activite du registre des credits dans le temps",
+          "label": "Transactions"
+        },
+        "stats": {
+          "receivedBreakdown": "{purchased} achetes · {bonus} bonus d'achat · {vouchers} bon · {adjustments} ajustements admin"
+        },
+        "purchases": {
+          "title": "Achats de credits",
+          "description": "Achats de credits pour tous les utilisateurs"
+        },
+        "pagination": {
+          "page": "Page {current} sur {total}",
+          "previous": "Precedent",
+          "next": "Suivant"
+        },
+        "refund": {
+          "title": "Achats remboursables",
+          "description": "Achats de credits termines qui peuvent etre rembourses via le fournisseur de paiement.",
+          "empty": "Aucun achat remboursable trouve.",
+          "action": "Rembourser",
+          "refundablePurchases": "Achats remboursables",
+          "refundablePurchasesDescription": "Achats termines eligibles au remboursement fournisseur.",
+          "refundCredits": "Credits rembourses",
+          "refundCreditsDescription": "Credits annules par les remboursements.",
+          "adminAdjustments": "Ajustements admin",
+          "adminAdjustmentsDescription": "Ajustements manuels du registre.",
+          "refundedPurchases": "Achats rembourses",
+          "refundedPurchasesDescription": "Achats de credits deja rembourses.",
+          "ledgerDescription": "Remboursements et ajustements admin pour tous les utilisateurs.",
+          "success": "Remboursement cree avec succes",
+          "error": "Echec de la creation du remboursement",
+          "missingPayment": "ID de paiement manquant",
+          "table": {
+            "user": "Utilisateur",
+            "package": "Forfait",
+            "amount": "Montant",
+            "payment": "Paiement",
+            "date": "Date",
+            "actions": "Actions"
+          },
+          "dialog": {
+            "title": "Rembourser l'achat de credits",
+            "description": "Creez un remboursement fournisseur et annulez les credits accordes.",
+            "reason": "Raison",
+            "secret": "Secret admin",
+            "cancel": "Annuler",
+            "submit": "Creer le remboursement",
+            "submitting": "Creation..."
+          }
+        }
       },
       "transactions": {
         "title": "Toutes les Transactions",

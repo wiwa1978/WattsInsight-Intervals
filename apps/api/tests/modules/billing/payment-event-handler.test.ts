@@ -251,6 +251,48 @@ describe("payment event handler billing modes", () => {
     expect(checkoutIntents.markCompleted).toHaveBeenCalledWith({ id: "intent-1", paymentId: "pay_1" });
   });
 
+  it("accepts discounted credit payments with provider-adjusted totals", async () => {
+    (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "credits";
+    const billing = createBillingDeps();
+    const checkoutIntents = createCheckoutIntentDeps(createCheckoutIntent({ discountCode: "SAVE10" }));
+    const handler = createPaymentEventHandler({
+      creditPackages: [bronzeCreditPackage],
+      billing,
+      checkoutIntents,
+    });
+
+    await handler({
+      provider: "dodo",
+      eventType: "payment.succeeded",
+      paymentId: "pay_discounted",
+      productId: "pdt_1",
+      metadata: {
+        userId: "user-1",
+        billingMode: "credits",
+        packageKey: "bronze",
+        productId: "pdt_1",
+        discountCode: "SAVE10",
+        checkoutReferenceId: "checkout-ref-1",
+      },
+      customerId: "cus_1",
+      currency: "EUR",
+      totalAmount: 900,
+      taxAmount: 0,
+      raw: {},
+    });
+
+    expect(billing.processCreditPurchase).toHaveBeenCalledWith(
+      "user-1",
+      "bronze",
+      "pay_discounted",
+      "completed",
+      "cus_1",
+      expect.objectContaining({ priceInclVat: 900 }),
+      expect.any(Object),
+    );
+    expect(checkoutIntents.markCompleted).toHaveBeenCalledWith({ id: "intent-1", paymentId: "pay_discounted" });
+  });
+
   it("does not retry duplicate completed credit payment events for the same payment", async () => {
     (applicationConfig as { billing: { mode: "credits" | "subscriptions" } }).billing.mode = "credits";
     const billing = createBillingDeps();

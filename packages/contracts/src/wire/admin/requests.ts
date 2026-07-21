@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { paginationQuerySchema } from "../common/pagination";
 import { optionalLimitQuerySchema, timeRangeSchema } from "../common/query";
+import { runtimeApplicationSettingKeySchema } from "../application-settings/common";
 
 export const verifyAdminSecretSchema = z.object({
   secret: z.string().trim().min(1).max(255),
@@ -113,6 +114,17 @@ export const adminJobRunsQuerySchema = paginationQuerySchema.extend({
 export const adminPendingEmailsQuerySchema = paginationQuerySchema.extend({
   status: adminPendingEmailStatusFilterSchema.optional(),
   text: z.string().trim().min(1).max(255).optional(),
+});
+
+export const updateApplicationSettingSchema = z.object({
+  key: runtimeApplicationSettingKeySchema,
+  value: z.number().int(),
+  secret: z.string().trim().min(1).max(255),
+});
+
+export const resetApplicationSettingSchema = z.object({
+  key: runtimeApplicationSettingKeySchema,
+  secret: z.string().trim().min(1).max(255),
 });
 
 export const searchUsersQuerySchema = z.object({

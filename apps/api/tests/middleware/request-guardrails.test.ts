@@ -49,4 +49,33 @@ describe("requestGuardrails", () => {
       error: { code: "BAD_REQUEST", message: "Unsupported content type" },
     });
   });
+
+  it("does not trust spoofed forwarded IP headers when proxy trust is disabled", async () => {
+    const app = buildApp();
+
+    for (let i = 0; i < 5; i += 1) {
+      const res = await app.request("/admin/verify-admin-secret", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-forwarded-for": `203.0.113.${i}`,
+          "x-real-ip": `198.51.100.${i}`,
+        },
+        body: JSON.stringify({ secret: "test" }),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    const limited = await app.request("/admin/verify-admin-secret", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": "203.0.113.200",
+        "x-real-ip": "198.51.100.200",
+      },
+      body: JSON.stringify({ secret: "test" }),
+    });
+
+    expect(limited.status).toBe(429);
+  });
 });

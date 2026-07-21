@@ -1189,6 +1189,26 @@
       "cancelTitle": "Afrekenen geannuleerd",
       "cancelDescription": "Er zijn geen credits gekocht."
     },
+    "credits": {
+      "checkout": {
+        "title": "Koop {package}",
+        "description": "Bevestig je pakketgegevens voordat je doorgaat naar betaling.",
+        "packageNotFound": "Tegoedpakket niet gevonden",
+        "baseCredits": "{count} tegoed",
+        "bonusCredits": "+{count} bonustegoed",
+        "totalCredits": "{count} totaal tegoed",
+        "creditsNeverExpire": "Tegoed verloopt nooit",
+        "subtotal": "Subtotaal",
+        "voucherLabel": "Voucher- of kortingscode",
+        "voucherPlaceholder": "Voer code in",
+        "voucherDescription": "Deze code wordt rechtstreeks naar de betalingsprovider gestuurd.",
+        "billingAddress": "Factuuradres",
+        "addressPlaceholder": "Selecteer een adres",
+        "addAddressInSettings": "Voeg eerst een factuuradres toe in je profielinstellingen.",
+        "redirecting": "Doorsturen...",
+        "proceed": "Doorgaan naar betaling"
+      }
+    },
     "portal": {
       "button": "Facturatie beheren",
       "loading": "Facturatieportaal openen...",
@@ -1264,6 +1284,7 @@
       "mostPopular": "Meest populair",
       "planDescription": "Terugkerende SaaS-toegang, gefactureerd per {interval}",
       "choosePlan": "Kies {plan}",
+      "planNotFound": "Abonnement niet gevonden",
       "discount": {
         "label": "Kortingscode",
         "placeholder": "Voer kortingscode in",
@@ -1290,6 +1311,17 @@
         }
       },
       "checkout": {
+        "title": "Abonneer op {plan}",
+        "description": "Bevestig je plangegevens voordat je doorgaat naar betaling.",
+        "subtotal": "Subtotaal",
+        "discountLabel": "Voucher- of kortingscode",
+        "discountPlaceholder": "Voer code in",
+        "discountDescription": "Deze code wordt rechtstreeks naar de betalingsprovider gestuurd.",
+        "billingAddress": "Factuuradres",
+        "addressPlaceholder": "Selecteer een adres",
+        "addAddressInSettings": "Voeg eerst een factuuradres toe in je profielinstellingen.",
+        "redirecting": "Doorsturen...",
+        "proceed": "Doorgaan naar betaling",
         "successDescription": "Abonnement checkout voltooid. Je abonnement wordt bijgewerkt zodra de betaling is verwerkt.",
         "cancelDescription": "Abonnement checkout is geannuleerd.",
         "portal": {

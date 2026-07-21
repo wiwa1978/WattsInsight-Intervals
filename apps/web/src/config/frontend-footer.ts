@@ -1,4 +1,4 @@
-import { Github, Twitter, Linkedin, type LucideIcon } from "lucide-react";
+import { Globe, MessageCircle, Network, type LucideIcon } from "lucide-react";
 
 export interface FooterLink {
   key: string; // Translation key
@@ -58,8 +58,7 @@ export const footerLinks: FooterLinkGroup[] = [
 
 // Social links with translation keys
 export const socialLinks: SocialLink[] = [
-  { key: "github", href: "https://github.com", icon: Github },
-  { key: "twitter", href: "https://twitter.com", icon: Twitter },
-  { key: "linkedin", href: "https://linkedin.com", icon: Linkedin },
+  { key: "github", href: "https://github.com", icon: Globe },
+  { key: "twitter", href: "https://twitter.com", icon: MessageCircle },
+  { key: "linkedin", href: "https://linkedin.com", icon: Network },
 ];
-

@@ -304,7 +304,6 @@ export function DiscountForm({
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      initialFocus
                       disabled={(date) => date < new Date("1900-01-01")}
                     />
                   </PopoverContent>
@@ -348,7 +347,6 @@ export function DiscountForm({
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
-                      initialFocus
                       disabled={(date) => {
                         const startDate = form.getValues("startDate");
                         return date < new Date("1900-01-01") || 

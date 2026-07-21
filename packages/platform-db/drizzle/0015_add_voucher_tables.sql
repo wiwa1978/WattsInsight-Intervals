@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS "vouchers" (
 DO $$ BEGIN
 	ALTER TABLE "vouchers" ADD CONSTRAINT "vouchers_code_unique" UNIQUE("code");
 EXCEPTION
-	WHEN duplicate_object THEN null;
+	WHEN duplicate_object OR duplicate_table THEN null;
 END $$;
 
 CREATE TABLE IF NOT EXISTS "voucher_assignments" (

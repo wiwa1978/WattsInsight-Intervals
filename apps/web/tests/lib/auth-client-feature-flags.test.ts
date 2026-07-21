@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createBasePlugins } from "../../../../packages/auth-client/src/web-shared";
 
 describe("auth client feature flags", () => {
-  it("omits optional auth plugins when their features are disabled", () => {
+  it("keeps a stable plugin surface for Better Auth client inference", () => {
     const plugins = createBasePlugins({
       baseURL: "http://localhost:8787/auth",
       features: {
@@ -14,7 +14,7 @@ describe("auth client feature flags", () => {
       },
     });
 
-    expect(plugins.length).toBe(1);
+    expect(plugins.length).toBe(5);
   });
 
   it("includes optional auth plugins when their features are enabled", () => {

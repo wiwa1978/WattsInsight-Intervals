@@ -684,6 +684,39 @@
         "description": "Available API app and audit log files.",
         "app": "App logs",
         "audit": "Audit logs"
+      },
+      "runtimeSettings": {
+        "title": "Runtime Settings",
+        "description": "Adjust selected application settings without redeploying the app.",
+        "adminSecret": "Admin secret",
+        "adminSecretPlaceholder": "Enter admin secret",
+        "updateSuccess": "Setting updated.",
+        "updateError": "Failed to update setting.",
+        "resetSuccess": "Setting reset to default.",
+        "resetError": "Failed to reset setting.",
+        "integerError": "Value must be an integer.",
+        "overrideBadge": "Override",
+        "defaultBadge": "Default",
+        "value": "Value",
+        "sourceValue": "Default: {value}",
+        "range": "Range: {min}-{max}",
+        "save": "Save",
+        "reset": "Reset",
+        "categories": {
+          "ui": "Interface"
+        },
+        "notificationsDropdownLimit": {
+          "label": "Notification dropdown limit",
+          "description": "Maximum notifications shown in the topbar dropdown."
+        },
+        "notificationsPollingIntervalMs": {
+          "label": "Notification polling interval",
+          "description": "How often notification counts and lists refresh, in milliseconds. Use 0 to disable polling."
+        },
+        "deleteAccountCountdownSeconds": {
+          "label": "Delete-account countdown",
+          "description": "Seconds users must wait after entering the confirmation code before deleting their account."
+        }
       }
     },
     "admins": {
@@ -909,6 +942,8 @@
         "purchases": "Purchases"
       },
       "creditsDashboard": {
+        "title": "Credits dashboard",
+        "description": "Monitor credit revenue, purchases, consumption, ledger activity, and refunds.",
         "unknownUser": "Unknown",
         "search": "Search",
         "searchPlaceholder": "Search by user email...",

@@ -216,14 +216,14 @@ describe("authz contract", () => {
     await expect(ok.json()).resolves.toEqual({ success: true, data: { totalUsers: 10 } });
   });
 
-  // Ensures raw Better Auth admin plugin endpoints remain available to allowlisted admins.
-  it("allows /auth/admin routes for allowlisted admins", async () => {
+  // Ensures raw Better Auth admin plugin endpoints cannot bypass project governance.
+  it("blocks raw /auth/admin mutation routes for allowlisted admins", async () => {
     mocks.authState.allowAuth = true;
     mocks.authState.allowAdminAccess = true;
 
     const res = await app.request("/auth/admin/set-role", { method: "POST" });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 
   // Ensures credentialed admin APIs are not CORS-callable from the public app origin.

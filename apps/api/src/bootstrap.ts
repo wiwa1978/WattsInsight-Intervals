@@ -19,6 +19,7 @@ import { getBillingMode } from "./lib/billing-mode";
 import { getDodoCheckoutProductsForBillingMode } from "./lib/dodo-billing-products";
 import { createAdminService } from "./modules/admin/service";
 import { createAuditService } from "./modules/audit/service";
+import { createApplicationSettingsService } from "./modules/application-settings/service";
 import { createCheckoutIntentsService } from "./modules/billing/checkout-intents";
 import { createBillingReconciliationService } from "./modules/billing/reconciliation";
 import { createAdminCreditsDashboardService } from "./modules/billing/credits-dashboard-service";
@@ -51,6 +52,7 @@ const { db } = createPlatformDb({
   connectionString: env.DATABASE_URL,
 });
 const auditService = createAuditService({ db });
+const applicationSettingsService = createApplicationSettingsService({ db });
 
 const emailProvider = env.RESEND_API_KEY
   ? createResendProvider({
@@ -437,6 +439,7 @@ export const bootstrap = {
   adminSubscriptionFinanceDashboardService,
   apiKeysService,
   auditService,
+  applicationSettingsService,
   billingService,
   billingReconciliationService,
   checkoutIntentsService,

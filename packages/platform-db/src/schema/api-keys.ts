@@ -24,7 +24,9 @@ export const apiKeys = pgTable(
   },
   (table) => [
     uniqueIndex("api_keys_hash_idx").on(table.keyHash),
+    uniqueIndex("api_keys_prefix_idx").on(table.keyPrefix),
     index("api_keys_user_created_idx").on(table.userId, table.createdAt),
     index("api_keys_user_revoked_idx").on(table.userId, table.revokedAt),
+    index("api_keys_user_expires_idx").on(table.userId, table.expiresAt),
   ],
 );

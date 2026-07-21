@@ -652,6 +652,39 @@
         "description": "Beschikbare API app- en auditlogbestanden.",
         "app": "App-logs",
         "audit": "Auditlogs"
+      },
+      "runtimeSettings": {
+        "title": "Runtime-instellingen",
+        "description": "Pas geselecteerde applicatie-instellingen aan zonder de app opnieuw uit te rollen.",
+        "adminSecret": "Admin-secret",
+        "adminSecretPlaceholder": "Voer admin-secret in",
+        "updateSuccess": "Instelling bijgewerkt.",
+        "updateError": "Kan instelling niet bijwerken.",
+        "resetSuccess": "Instelling teruggezet naar standaardwaarde.",
+        "resetError": "Kan instelling niet terugzetten.",
+        "integerError": "Waarde moet een geheel getal zijn.",
+        "overrideBadge": "Overschrijving",
+        "defaultBadge": "Standaard",
+        "value": "Waarde",
+        "sourceValue": "Standaard: {value}",
+        "range": "Bereik: {min}-{max}",
+        "save": "Opslaan",
+        "reset": "Resetten",
+        "categories": {
+          "ui": "Interface"
+        },
+        "notificationsDropdownLimit": {
+          "label": "Limiet meldingenmenu",
+          "description": "Maximaal aantal meldingen dat in het topbarmenu wordt getoond."
+        },
+        "notificationsPollingIntervalMs": {
+          "label": "Pollinginterval meldingen",
+          "description": "Hoe vaak meldingentellers en lijsten verversen, in milliseconden. Gebruik 0 om polling uit te schakelen."
+        },
+        "deleteAccountCountdownSeconds": {
+          "label": "Countdown account verwijderen",
+          "description": "Aantal seconden dat gebruikers moeten wachten na het invoeren van de bevestigingscode voordat ze hun account verwijderen."
+        }
       }
     },
     "admins": {
@@ -909,6 +942,8 @@
         "purchases": "Aankopen"
       },
       "creditsDashboard": {
+        "title": "Creditsdashboard",
+        "description": "Monitor creditomzet, aankopen, verbruik, logboekactiviteit en terugbetalingen.",
         "unknownUser": "Onbekend",
         "search": "Zoeken",
         "searchPlaceholder": "Zoek op e-mail van gebruiker...",

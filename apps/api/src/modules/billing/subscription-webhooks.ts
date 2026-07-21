@@ -72,13 +72,18 @@ function parseDate(value: string | null | undefined) {
   return value ? new Date(value) : null;
 }
 
-function getPlanKey(productId: string, metadata: Record<string, string> | null | undefined) {
-  if (metadata?.planKey) {
-    return metadata.planKey;
-  }
-
+function getProductPlanKey(productId: string) {
   const plan = subscriptionPlans.find((entry) => Object.values(entry.providerProductIds).includes(productId));
   return plan?.key ?? null;
+}
+
+function getPlanKey(productId: string, metadata: Record<string, string> | null | undefined) {
+  const productPlanKey = getProductPlanKey(productId);
+  if (metadata?.planKey && productPlanKey && metadata.planKey !== productPlanKey) {
+    throw new Error("Subscription webhook plan metadata does not match product");
+  }
+
+  return productPlanKey ?? metadata?.planKey ?? null;
 }
 
 export function createSubscriptionWebhookHandler(deps: SubscriptionWebhookDeps) {

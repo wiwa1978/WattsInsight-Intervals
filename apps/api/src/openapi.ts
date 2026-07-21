@@ -319,6 +319,24 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
       "401": jsonResponse("Unauthorized", genericErrorSchema),
     },
   }),
+  route("get", "/me/profile-address", ["Me"], "Get current user profile address", {
+    security: cookieOrBearerAuth,
+    responses: defaultResponses("Profile address", ["401"]),
+  }),
+  route("get", "/me/api-keys", ["Me"], "List current user API keys", {
+    security: cookieOrBearerAuth,
+    responses: defaultResponses("API keys", ["401"]),
+  }),
+  route("post", "/me/api-keys", ["Me"], "Create current user API key", {
+    security: cookieOrBearerAuth,
+    requestBody: requestBody(genericObjectSchema),
+    responses: defaultResponses("API key created", ["400", "401"]),
+  }),
+  route("delete", "/me/api-keys/{keyId}", ["Me"], "Revoke current user API key", {
+    security: cookieOrBearerAuth,
+    parameters: [pathParameter("keyId", z.string().uuid())],
+    responses: defaultResponses("API key revoked", ["400", "401", "404"]),
+  }),
   route("post", "/me/customer-portal", ["Me"], "Create a customer portal session", {
     security: cookieOrBearerAuth,
     responses: {
@@ -430,6 +448,20 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
     security: cookieOrBearerAuth,
     responses: defaultResponses("Admin access status", ["401", "403"]),
   }),
+  route("get", "/admin/application-settings", ["Admin"], "Get runtime application settings", {
+    security: cookieOrBearerAuth,
+    responses: defaultResponses("Application settings", ["401", "403"]),
+  }),
+  route("put", "/admin/application-settings/setting", ["Admin"], "Update runtime application setting", {
+    security: cookieOrBearerAuth,
+    requestBody: requestBody(genericObjectSchema),
+    responses: defaultResponses("Application setting updated", ["400", "401", "403"]),
+  }),
+  route("delete", "/admin/application-settings/setting", ["Admin"], "Reset runtime application setting", {
+    security: cookieOrBearerAuth,
+    requestBody: requestBody(genericObjectSchema),
+    responses: defaultResponses("Application setting reset", ["400", "401", "403"]),
+  }),
   route("post", "/admin/verify-admin-secret", ["Admin"], "Verify admin secret", {
     security: cookieOrBearerAuth,
     requestBody: requestBody(verifyAdminSecretSchema),
@@ -516,6 +548,7 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
   route("get", "/admin/billing/subscription-payments", ["Admin Billing"], "List subscription payments", { security: cookieOrBearerAuth, parameters: billingListParameters, responses: defaultResponses("Subscription payments", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-stats", ["Admin Billing"], "Get subscription billing statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription billing statistics", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-finance-summary", ["Admin Billing"], "Get subscription finance summary", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription finance summary", ["400", "401", "403"]) }),
+  route("get", "/admin/billing/subscription-finance-dashboard", ["Admin Billing"], "Get subscription finance dashboard", { security: cookieOrBearerAuth, parameters: [queryParameter("range", z.enum(["7d", "30d", "90d", "12m", "ytd"]).optional())], responses: defaultResponses("Subscription finance dashboard", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-plan-distribution", ["Admin Billing"], "Get subscription plan distribution", { security: cookieOrBearerAuth, responses: defaultResponses("Subscription plan distribution", ["400", "401", "403"]) }),
   route("get", "/admin/billing/subscription-events", ["Admin Billing"], "List subscription events", { security: cookieOrBearerAuth, parameters: optionalLimitParameters, responses: defaultResponses("Subscription events", ["400", "401", "403"]) }),
   route("post", "/admin/billing/subscription-refunds", ["Admin Billing"], "Create subscription payment refund", { security: cookieOrBearerAuth, requestBody: requestBody(createSubscriptionRefundSchema), responses: defaultResponses("Subscription refund", ["400", "401", "403", "404"]) }),
@@ -541,6 +574,10 @@ export const APP_OWNED_API_ROUTES: AppOwnedApiRoute[] = [
 
   route("get", "/admin/logs/files", ["Admin Logs"], "List log files", { security: cookieOrBearerAuth, parameters: [queryParameter("stream", logFilesQuerySchema.shape.stream)], responses: defaultResponses("Log files", ["400", "401", "403"]) }),
   route("get", "/admin/logs/entries", ["Admin Logs"], "Read log entries", { security: cookieOrBearerAuth, parameters: [queryParameter("stream", logEntriesQuerySchema.shape.stream), queryParameter("file", logEntriesQuerySchema.shape.file), queryParameter("limit", logEntriesQuerySchema.shape.limit)], responses: defaultResponses("Log entries", ["400", "401", "403"]) }),
+  route("get", "/admin/operations/stats", ["Admin Operations"], "Get operations statistics", { security: cookieOrBearerAuth, responses: defaultResponses("Operations statistics", ["401", "403"]) }),
+  route("get", "/admin/operations/jobs", ["Admin Operations"], "List scheduled jobs", { security: cookieOrBearerAuth, responses: defaultResponses("Scheduled jobs", ["400", "401", "403"]) }),
+  route("get", "/admin/operations/job-runs", ["Admin Operations"], "List scheduled job runs", { security: cookieOrBearerAuth, responses: defaultResponses("Scheduled job runs", ["400", "401", "403"]) }),
+  route("get", "/admin/operations/pending-emails", ["Admin Operations"], "List pending emails", { security: cookieOrBearerAuth, responses: defaultResponses("Pending emails", ["400", "401", "403"]) }),
   route("get", "/admin/notifications", ["Admin Notifications"], "List notifications", { security: cookieOrBearerAuth, parameters: [queryParameter("limit", notificationsListQuerySchema.shape.limit)], responses: defaultResponses("Notifications", ["400", "401", "403"]) }),
   route("get", "/admin/notifications/sends", ["Admin Notifications"], "List notification send history", {
     security: cookieOrBearerAuth,

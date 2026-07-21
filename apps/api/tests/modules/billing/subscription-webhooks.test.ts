@@ -32,10 +32,10 @@ describe("subscription webhooks", () => {
       event_type: "subscription.active",
       data: {
         subscription_id: "sub_123",
-        product_id: "pdt_subscription_starter",
+        product_id: "pdt_0Ne6oYX9ZLK155nv6Q416",
         status: "active",
         customer: { customer_id: "cus_123" },
-        metadata: { userId: "user-1", planKey: "starter" },
+        metadata: { userId: "user-1", planKey: "Bronze" },
         previous_billing_date: "2026-04-01T00:00:00.000Z",
         next_billing_date: "2026-05-01T00:00:00.000Z",
         cancel_at_next_billing_date: false,
@@ -51,7 +51,7 @@ describe("subscription webhooks", () => {
     });
     expect(upsertUserSubscription).toHaveBeenCalledWith({
       userId: "user-1",
-      planKey: "starter",
+      planKey: "Bronze",
       providerCustomerId: "cus_123",
       providerSubscriptionId: "sub_123",
       dodoSubscriptionId: "sub_123",
@@ -60,5 +60,24 @@ describe("subscription webhooks", () => {
       currentPeriodEnd: new Date("2026-05-01T00:00:00.000Z"),
       cancelAtPeriodEnd: false,
     });
+  });
+
+  it("rejects metadata plan keys that do not match the product id", async () => {
+    const recordSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+    const upsertUserSubscription = vi.fn().mockResolvedValue({ id: "sub" });
+    const handler = createSubscriptionWebhookHandler({
+      subscriptions: { recordSubscriptionEvent, upsertUserSubscription },
+    });
+
+    await expect(handler({
+      event_type: "subscription.active",
+      data: {
+        subscription_id: "sub_123",
+        product_id: "pdt_0Ne6oYX9ZLK155nv6Q416",
+        status: "active",
+        metadata: { userId: "user-1", planKey: "Gold" },
+      },
+    })).rejects.toThrow("plan metadata does not match product");
+    expect(upsertUserSubscription).not.toHaveBeenCalled();
   });
 });

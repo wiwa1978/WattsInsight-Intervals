@@ -33,6 +33,7 @@ type DashboardQuery = {
 
 type LocalSubscriptionRow = AdminSubscriptionFinanceDashboard["subscriptions"]["rows"][number];
 type LocalPaymentRow = AdminSubscriptionFinanceDashboard["transactions"]["localPayments"][number];
+type LocalDiscountRow = Omit<AdminSubscriptionFinanceDashboard["discounts"]["rows"][number], "providerDiscount">;
 type ProviderList<T> = { items: T[]; nextCursor?: string | null };
 
 const LIVE_PAGE_SIZE = 100;
@@ -70,7 +71,7 @@ export function createAdminSubscriptionFinanceDashboardService(deps: AdminSubscr
       : emptyProviderData(warnings);
 
     const enrichedSubscriptions = enrichSubscriptionsWithPayments(subscriptionsResult.rows, payments, providerPayments.items);
-    const allSubscriptions = subscriptionsResult.allRows;
+    const allSubscriptions: LocalSubscriptionRow[] = subscriptionsResult.allRows;
     const completedPayments = payments.filter((payment) => payment.paymentStatus === COMPLETED_PAYMENT_STATUS);
     const grossIncomeCents = completedPayments.reduce((total, payment) => total + payment.priceInclVat, 0);
     const localNetIncomeCents = completedPayments.reduce((total, payment) => total + payment.priceExclVat, 0);
@@ -298,7 +299,7 @@ export function createAdminSubscriptionFinanceDashboardService(deps: AdminSubscr
     return rows.map((row: any) => ({ ...row, createdAt: toIso(row.createdAt) }));
   }
 
-  async function getLocalDiscounts() {
+  async function getLocalDiscounts(): Promise<LocalDiscountRow[]> {
     const rows = await deps.db
       .select({ id: discounts.id, code: discounts.code, type: discounts.type, value: discounts.value, status: discounts.status, currentUses: discounts.currentUses, maxUses: discounts.maxUses, subscriptionCycles: discounts.subscriptionCycles, providerDiscountId: discounts.providerDiscountId, dodoDiscountId: discounts.dodoDiscountId })
       .from(discounts)

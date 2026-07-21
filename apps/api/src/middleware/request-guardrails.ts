@@ -80,10 +80,7 @@ function getClientIp(c: Parameters<MiddlewareHandler<AppEnv>>[0]) {
     return c.req.header("x-real-ip") ?? "unknown";
   }
 
-  const forwardedFor = c.req.header("x-forwarded-for");
-  const realIp = c.req.header("x-real-ip");
-
-  return c.req.header("cf-connecting-ip") ?? realIp ?? forwardedFor?.split(",")[0]?.trim() ?? "direct-client";
+  return "direct-client";
 }
 
 function findGuardrail(method: string, path: string) {

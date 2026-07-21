@@ -73,6 +73,7 @@ export const apiRoutes = {
   me: {
     session: "/me/session",
     applicationConfig: "/me/application-config",
+    profileAddress: "/me/profile-address",
     creditBalance: "/me/credits/balance",
     creditHistory: (limit = 50) => withQuery("/me/credits/history", { limit }),
     creditPurchases: (limit = 50) => withQuery("/me/credits/purchases", { limit }),
@@ -84,6 +85,7 @@ export const apiRoutes = {
     redeemVoucher: "/me/vouchers/redeem",
     notifications: (limit = 20) => withQuery("/me/notifications", { limit }),
     unreadNotificationsCount: "/me/notifications/unread-count",
+    activeBannerNotification: "/me/notifications/active-banner",
     markNotificationRead: (notificationId: string) => `/me/notifications/${notificationId}/read`,
     markAllNotificationsRead: "/me/notifications/read-all",
     deleteNotification: (notificationId: string) => `/me/notifications/${notificationId}`,
@@ -151,5 +153,7 @@ export const apiRoutes = {
     jobs: (query: AdminJobsQuery = {}) => withQuery("/admin/operations/jobs", query),
     jobRuns: (query: AdminJobRunsQuery = {}) => withQuery("/admin/operations/job-runs", query),
     pendingEmails: (query: AdminPendingEmailsQuery = {}) => withQuery("/admin/operations/pending-emails", query),
+    applicationSettings: "/admin/application-settings",
+    applicationSetting: "/admin/application-settings/setting",
   },
 } as const;

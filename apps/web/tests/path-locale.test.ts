@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getInternalNavigationPath, getPathLocale } from "../src/i18n/path-locale";
+import { getInternalNavigationPath, getPathLocale, sanitizeInternalRedirectPath } from "../src/i18n/path-locale";
 
 describe("getPathLocale", () => {
   it("parses supported locale from first path segment", () => {
@@ -30,5 +30,16 @@ describe("getInternalNavigationPath", () => {
 
   it("keeps unlocalized paths unchanged", () => {
     expect(getInternalNavigationPath("/dashboard")).toBe("/dashboard");
+  });
+});
+
+describe("sanitizeInternalRedirectPath", () => {
+  it("allows normal internal paths", () => {
+    expect(sanitizeInternalRedirectPath("/nl/billing?success=true", "/dashboard")).toBe("/billing?success=true");
+  });
+
+  it("rejects absolute and protocol-relative URLs", () => {
+    expect(sanitizeInternalRedirectPath("https://evil.example.com", "/dashboard")).toBe("/dashboard");
+    expect(sanitizeInternalRedirectPath("//evil.example.com", "/dashboard")).toBe("/dashboard");
   });
 });

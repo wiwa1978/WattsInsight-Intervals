@@ -9,6 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "resend": "^6.6.0"
+    "resend": "^6.17.2"
   }
 }

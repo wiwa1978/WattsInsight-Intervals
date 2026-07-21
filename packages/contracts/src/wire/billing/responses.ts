@@ -390,6 +390,11 @@ export const applicationConfigSchema = z.object({
     discounts: z.boolean(),
     notifications: z.boolean(),
   }),
+  ui: z.object({
+    notificationsDropdownLimit: z.number().int().min(1),
+    notificationsPollingIntervalMs: z.number().int().min(0),
+    deleteAccountCountdownSeconds: z.number().int().min(0),
+  }),
 });
 
 export const apiKeySummarySchema = z.object({

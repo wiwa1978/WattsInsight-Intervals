@@ -333,7 +333,8 @@ export function createPaymentEventHandler(deps: PaymentEventHandlerDeps): Paymen
       throw new Error(`Refusing payment ${event.paymentId}: invalid total amount.`);
     }
 
-    if (event.totalAmount !== matchedPackage.price) {
+    const discountCode = getMetadataString(event.metadata, "discountCode");
+    if (!discountCode && event.totalAmount !== matchedPackage.price) {
       throw new Error(
         `Refusing payment ${event.paymentId}: expected amount ${matchedPackage.price}, received ${event.totalAmount}.`,
       );

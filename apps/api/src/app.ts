@@ -44,6 +44,13 @@ app.use("/*", requestLogger);
 app.use("/*", securityHeaders);
 app.onError(errorHandler);
 
+app.use("/auth/admin/*", async (c, next) => {
+  if (c.req.path !== "/auth/admin/stop-impersonating") {
+    return c.json({ success: false, error: { code: "NOT_FOUND", message: "Not found" } }, 404);
+  }
+
+  await next();
+});
 app.use("/auth/admin/*", bootstrap.authModule.requireAuth);
 app.use("/auth/admin/*", bootstrap.authModule.requireAdminAccess);
 app.use("/auth/admin/*", async (c, next) => {

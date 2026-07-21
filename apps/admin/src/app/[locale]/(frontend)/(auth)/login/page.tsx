@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Link, useRouter } from "@/i18n/navigation";
+import { sanitizeInternalRedirectPath } from "@/i18n/path-locale";
 import { authClient, twoFactor } from "@/lib/auth-client";
 import { authConfig } from "@/config/auth";
 import { signInSchema } from "@/schemas";
@@ -54,8 +55,7 @@ function LoginPageContent() {
   const reason = searchParams.get("reason");
   const [loginStep, setLoginStep] = React.useState<AdminLoginStep>("credentials");
 
-  const callbackUrl = searchParams.get("callbackUrl");
-  const redirectTo = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : DEFAULT_REDIRECT;
+  const redirectTo = sanitizeInternalRedirectPath(searchParams.get("callbackUrl"), DEFAULT_REDIRECT);
 
   const getErrorMessage = (error: { code?: string; message?: string }) => {
     if (error.code) {

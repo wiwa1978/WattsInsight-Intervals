@@ -1,20 +1,64 @@
-node_modules
-.worktrees/
-/logs/
-/runtime-logs/
-runtime-logs/
+# Dependencies
+node_modules/
+.pnp/
+.pnp.*
+
+# Build outputs and framework caches
+.next/
+apps/*/.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+apps/*/tsconfig.tsbuildinfo
+packages/*/tsconfig.tsbuildinfo
+
+# Test and browser automation artifacts
 reports/
-apps/*/runtime-logs/
 apps/*/tests/.reports/
 apps/*/tests/.tmp-vitest-report.json
 apps/*/playwright-report/
 apps/*/test-results/
-apps/*/test-results/**
+playwright-report/
+test-results/
 
-# Environment files (secrets)
+# Runtime logs and local generated logs
+logs/
+runtime-logs/
+apps/*/runtime-logs/
+*.log
+*.pid
+
+# Local environment and secrets
 .env
 .env.*
 **/.env
 **/.env.*
 !.env.example
 !**/.env.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# Local workspaces and agent scratch state
+.worktrees/
+.superpowers/
+
+# Package manager caches
+.bun/
+.yarn/
+.pnpm-store/
+
+# Editor, OS, and tooling noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+.tmp/

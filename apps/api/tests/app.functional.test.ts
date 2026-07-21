@@ -162,7 +162,10 @@ const mocks = vi.hoisted(() => {
     select: vi.fn((selection?: Record<string, unknown>) => {
       let selectedLanguage = "en";
       const builder = {
-        from: vi.fn(() => builder),
+        from: vi.fn((table?: { name?: string }) => {
+          if (table?.name === "application_settings") return [];
+          return builder;
+        }),
         where: vi.fn((condition?: { value?: string }) => {
           selectedLanguage = condition?.value ?? "en";
           if (selection && "count" in selection) return [{ count: webhookRows.length }];
@@ -343,16 +346,23 @@ vi.mock("@platform/payments-core", () => ({
 }));
 
 vi.mock("dodopayments", () => ({
-  default: vi.fn(() => ({
+  default: vi.fn(function DodoPayments() {
+    return {
     customers: {
       customerPortal: mocks.dodoCustomerPortal,
     },
-  })),
+    };
+  }),
 }));
 
 vi.mock("@platform/platform-db", () => ({
   createPlatformDb: () => ({ db: mocks.db }),
   account: {},
+  applicationSettings: {
+    name: "application_settings",
+    key: "key",
+    value: "value",
+  },
   auditEntries: {},
   checkoutIntents: {},
   creditPurchases: {},
@@ -535,6 +545,11 @@ describe("API functional routes", () => {
           vouchers: true,
           discounts: true,
           notifications: true,
+        },
+        ui: {
+          "ui.notificationsDropdownLimit": 5,
+          "ui.notificationsPollingIntervalMs": 30000,
+          "ui.deleteAccountCountdownSeconds": 10,
         },
       },
     });

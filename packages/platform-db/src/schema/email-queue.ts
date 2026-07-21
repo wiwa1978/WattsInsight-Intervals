@@ -1,4 +1,5 @@
-import { index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, jsonb, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 import { createdAt, id, updatedAt } from "./helpers";
 
@@ -27,5 +28,7 @@ export const pendingEmails = pgTable(
   (table) => [
     index("pending_emails_status_next_attempt_idx").on(table.status, table.nextAttemptAt),
     index("pending_emails_created_idx").on(table.createdAt),
+    check("pending_emails_status_valid", sql`${table.status} IN ('pending', 'sending', 'sent', 'failed')`),
+    check("pending_emails_attempts_valid", sql`${table.attempts} >= 0 AND ${table.maxAttempts} > 0 AND ${table.attempts} <= ${table.maxAttempts}`),
   ],
 );

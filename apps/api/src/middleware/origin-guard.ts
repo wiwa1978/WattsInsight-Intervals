@@ -18,9 +18,14 @@ function configuredOrigins() {
 }
 
 const trustedOrigins = new Set(configuredOrigins());
+const adminTrustedOrigins = new Set([env.ADMIN_APP_URL].filter((origin): origin is string => Boolean(origin)));
 
 function isWebhookPath(path: string) {
   return path === "/payments/webhooks/dodo" || path.startsWith("/payments/webhooks/");
+}
+
+function isAdminPath(path: string) {
+  return path === "/admin" || path.startsWith("/admin/") || path.startsWith("/auth/admin/");
 }
 
 function isBearerRequest(authorization: string | undefined) {
@@ -46,14 +51,15 @@ function originFromReferer(referer: string | undefined) {
   }
 }
 
-export function isTrustedRequestOrigin(headers: Headers) {
+export function isTrustedRequestOrigin(headers: Headers, path = "") {
+  const allowedOrigins = isAdminPath(path) ? adminTrustedOrigins : trustedOrigins;
   const origin = headers.get("origin");
   if (origin) {
-    return trustedOrigins.has(origin);
+    return allowedOrigins.has(origin);
   }
 
   const refererOrigin = originFromReferer(headers.get("referer") ?? undefined);
-  return Boolean(refererOrigin && trustedOrigins.has(refererOrigin));
+  return Boolean(refererOrigin && allowedOrigins.has(refererOrigin));
 }
 
 export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -67,7 +73,7 @@ export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
     return next();
   }
 
-  if (!isTrustedRequestOrigin(c.req.raw.headers)) {
+  if (!isTrustedRequestOrigin(c.req.raw.headers, c.req.path)) {
     return c.json(
       {
         success: false,

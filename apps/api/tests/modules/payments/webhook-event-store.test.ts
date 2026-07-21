@@ -100,7 +100,7 @@ describe("createPaymentWebhookEventStore", () => {
     ).resolves.toEqual({ claimed: true });
     expect(db.update).toHaveBeenCalledWith(paymentWebhookEvents);
     expect(db.update().set).toHaveBeenCalledWith(expect.objectContaining({
-      sanitizedPayload: { id: "evt_1" },
+      sanitizedPayload: { id: "evt_1", data: {} },
       requestId: "req_2",
       correlationId: "corr_2",
       durationMs: null,
@@ -132,7 +132,7 @@ describe("createPaymentWebhookEventStore", () => {
     error.stack = "Error: provider exploded\n    at handler (/app/src/payment.ts:10:5)";
     (error as Error & { code: string; status: number; secret: string }).code = "provider_error";
     (error as Error & { code: string; status: number; secret: string }).status = 503;
-    (error as Error & { code: string; status: number; secret: string }).secret = "sk_live_secret";
+    (error as Error & { code: string; status: number; secret: string }).secret = "redacted-test-secret";
 
     await store.markFailed({ provider: "dodo", providerEventId: "evt_1", error, durationMs: 87 });
 
@@ -149,7 +149,7 @@ describe("createPaymentWebhookEventStore", () => {
     }));
   });
 
-  it("sanitizes sensitive payload fields before storage", async () => {
+  it("stores only safe webhook payload fields", async () => {
     const returning = vi.fn().mockResolvedValue([{ id: "row-1" }]);
     const onConflictDoNothing = vi.fn().mockReturnValue({ returning });
     const values = vi.fn().mockReturnValue({ onConflictDoNothing });
@@ -165,8 +165,11 @@ describe("createPaymentWebhookEventStore", () => {
       paymentId: "pay_1",
       sanitizedPayload: {
         id: "evt_1",
+        event_type: "payment.succeeded",
         customer_email: "buyer@example.com",
+        customer_name: "Buyer Name",
         token: "tok_secret",
+        data: { payment_id: "pay_1", subscription_id: "sub_1", product_id: "pdt_1", status: "succeeded" },
         nested: { authorization: "Bearer secret", keep: "safe" },
       },
     });
@@ -174,9 +177,13 @@ describe("createPaymentWebhookEventStore", () => {
     expect(values).toHaveBeenCalledWith(expect.objectContaining({
       sanitizedPayload: {
         id: "evt_1",
-        customer_email: "[redacted]",
-        token: "[redacted]",
-        nested: { authorization: "[redacted]", keep: "safe" },
+        event_type: "payment.succeeded",
+        data: {
+          payment_id: "pay_1",
+          subscription_id: "sub_1",
+          product_id: "pdt_1",
+          status: "succeeded",
+        },
       },
     }));
   });

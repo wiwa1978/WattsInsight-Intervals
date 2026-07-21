@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
   const showCreditBillingCharts = applicationConfig.billing.creditSurfacesEnabled;
 
   return (
-    <Container className="py-6">
+    <Container className="max-w-[100rem] py-6 2xl:max-w-[112rem]">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">{t("title")}</h1>
         <p className="text-muted-foreground mt-2">{t("description")}</p>

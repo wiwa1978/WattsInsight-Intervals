@@ -42,7 +42,7 @@ interface PurchaseHistoryProps {
     priceInclVat: number;
     priceExclVat: number;
     paymentStatus: "pending" | "completed" | "failed" | "refunded";
-    paymentId: string;
+    paymentId?: string;
     createdAt: string;
   }>;
 }
@@ -220,10 +220,10 @@ export function PurchaseHistory({ purchases }: PurchaseHistoryProps) {
       cell: ({ row }) => {
         const paymentStatus = row.original.paymentStatus;
         const paymentId = row.original.paymentId;
-        const isDownloading = downloadingInvoices.has(paymentId);
+        const isDownloading = paymentId ? downloadingInvoices.has(paymentId) : false;
         
         // Only show download button for completed payments
-        if (paymentStatus !== "completed") {
+        if (paymentStatus !== "completed" || !paymentId) {
           return (
             <div className="text-center">
               <span className="text-xs text-muted-foreground">N/A</span>

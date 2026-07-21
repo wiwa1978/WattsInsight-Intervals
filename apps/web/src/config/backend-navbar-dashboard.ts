@@ -44,6 +44,10 @@ export const UserDropdownNavItems: BackendNavDashboardItem[] = [
 ];
 
 function hasBillingSurface(config: BillingSurfaceConfig) {
+  if (!config?.billing) {
+    return true;
+  }
+
   const billingEnabled = config?.billing?.creditSurfacesEnabled === true || config?.billing?.subscriptionSurfacesEnabled === true;
 
   return billingEnabled;

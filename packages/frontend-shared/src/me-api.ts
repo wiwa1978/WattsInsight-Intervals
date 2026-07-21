@@ -1,5 +1,6 @@
 import type { ApiRequest } from "./credits";
 import type { ApplicationConfig, CreateCheckoutResponse, SubscriptionPayment, UserSubscription } from "@platform/contracts";
+import { apiRoutes } from "@platform/contracts/ts";
 
 type CustomerPortalResponse = {
   success: true;
@@ -13,6 +14,22 @@ export type CountryRecord = {
   name: string;
   code: string;
   language: string;
+};
+
+export type CheckoutAddressInput = {
+  street: string;
+  number: string;
+  zipcode: string;
+  town: string;
+  countryId: string;
+};
+
+export type UserProfileAddress = {
+  street: string | null;
+  number: string | null;
+  zipcode: string | null;
+  town: string | null;
+  countryId: string | null;
 };
 
 export type UserDataExportSummary = {
@@ -34,10 +51,13 @@ export type CreateUserDataExportResponse = UserDataExportSummary & {
 export function createMeApi(apiRequest: ApiRequest) {
   return {
     async getSession() {
-      return apiRequest("/me/session");
+      return apiRequest(apiRoutes.me.session);
     },
     async getApplicationConfig() {
-      return apiRequest<{ success: boolean; data: ApplicationConfig }>("/me/application-config");
+      return apiRequest<{ success: boolean; data: ApplicationConfig }>(apiRoutes.me.applicationConfig);
+    },
+    async getProfileAddress() {
+      return apiRequest<{ success: boolean; data: UserProfileAddress | null }>(apiRoutes.me.profileAddress);
     },
     async getSubscription() {
       return apiRequest<{ success: boolean; data: UserSubscription | null }>("/me/subscription");
@@ -61,16 +81,29 @@ export function createMeApi(apiRequest: ApiRequest) {
       const result = await apiRequest<{ success: boolean; data: CountryRecord[] }>(`/countries?lang=${lang}`);
       return result.data;
     },
-    async createCheckoutSession(packageKey: string) {
+    async createCheckoutSession(packageKey: string, discountCode?: string, address?: CheckoutAddressInput) {
+      const body = {
+        packageKey,
+        ...(discountCode ? { discountCode } : {}),
+        ...(address ? { address } : {}),
+      };
+
       return apiRequest<CreateCheckoutResponse>("/payments/checkout", {
         method: "POST",
-        body: JSON.stringify({ packageKey }),
+        body: JSON.stringify(body),
       });
     },
-    async createSubscriptionCheckoutSession(planKey: string, discountCode?: string) {
+    async createSubscriptionCheckoutSession(planKey: string, discountCode?: string, address?: CheckoutAddressInput) {
+      const body = {
+        billingMode: "subscriptions",
+        planKey,
+        ...(discountCode ? { discountCode } : {}),
+        ...(address ? { address } : {}),
+      };
+
       return apiRequest<CreateCheckoutResponse>("/payments/checkout", {
         method: "POST",
-        body: JSON.stringify({ billingMode: "subscriptions", planKey, discountCode }),
+        body: JSON.stringify(body),
       });
     },
     async createCustomerPortalSession() {

@@ -4,18 +4,18 @@ import { inferAdditionalFields, magicLinkClient, twoFactorClient } from "better-
 
 import { authAdditionalUserFields } from "@platform/auth-shared";
 
-import type { CreateWebAuthClientOptions } from "./types";
+import type { CreateWebAuthClientOptions, WebAuthInferOptions } from "./types";
 
 export function createBasePlugins(options: CreateWebAuthClientOptions) {
-  const features = options.features ?? {};
+  const extraPlugins = options.plugins ?? [];
 
   return [
     inferAdditionalFields({ user: authAdditionalUserFields }),
-    ...(features.billing === false ? [] : [dodopaymentsClient()]),
-    ...(features.twoFactor === false ? [] : [twoFactorClient()]),
-    ...(features.passkeys === false ? [] : [passkeyClient()]),
-    ...(features.magicLink === false ? [] : [magicLinkClient()]),
-    ...(options.plugins ?? []),
+    dodopaymentsClient(),
+    twoFactorClient(),
+    passkeyClient(),
+    magicLinkClient(),
+    ...extraPlugins,
   ];
 }
 
@@ -25,4 +25,20 @@ export function createFetchOptions(options: CreateWebAuthClientOptions) {
       options.onError?.({ error: e.error, context: e });
     },
   };
+}
+
+export function createInferAuthOptions(): WebAuthInferOptions {
+  return {
+    user: {
+      additionalFields: authAdditionalUserFields,
+    },
+    emailAndPassword: {
+      enabled: true,
+    },
+    socialProviders: {
+      google: {},
+      github: {},
+    },
+    plugins: [],
+  } as WebAuthInferOptions;
 }

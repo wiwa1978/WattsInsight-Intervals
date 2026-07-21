@@ -291,6 +291,7 @@ export function createDodoPaymentProvider(options: DodoPaymentProviderOptions): 
         referenceId: input.referenceId,
         discountCode: input.discountCode,
         customerEmail: input.customerEmail,
+        billingAddress: input.billingAddress,
         successUrl: input.successUrl ?? buildCheckoutReturnUrl({ appUrl: options.appUrl, path: CHECKOUT_SUCCESS_RETURN_PATH }),
         cancelUrl: input.cancelUrl ?? buildCheckoutReturnUrl({ appUrl: options.appUrl, path: CHECKOUT_CANCEL_RETURN_PATH }),
       });

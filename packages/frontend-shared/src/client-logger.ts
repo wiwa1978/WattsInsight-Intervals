@@ -3,9 +3,25 @@
 type LogLevel = "debug" | "info" | "warn" | "error";
 type LogContext = Record<string, unknown> | undefined;
 
-function toSerializable(value: unknown): unknown {
-  if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+const sensitiveKeyPattern = /(authorization|cookie|email|password|secret|signature|token|code)/i;
+
+function redactUrl(value: string) {
+  try {
+    const url = new URL(value);
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (sensitiveKeyPattern.test(key)) {
+        url.searchParams.set(key, "[REDACTED]");
+      }
+    }
+    return url.toString();
+  } catch {
     return value;
+  }
+}
+
+export function toSerializable(value: unknown): unknown {
+  if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return typeof value === "string" ? redactUrl(value) : value;
   }
 
   if (value instanceof Error) {
@@ -20,7 +36,7 @@ function toSerializable(value: unknown): unknown {
   }
 
   if (value instanceof URL) {
-    return value.toString();
+    return redactUrl(value.toString());
   }
 
   if (typeof Headers !== "undefined" && value instanceof Headers) {
@@ -57,7 +73,7 @@ function toSerializable(value: unknown): unknown {
     const output: Record<string, unknown> = {};
 
     for (const key of Object.getOwnPropertyNames(record)) {
-      output[key] = toSerializable(record[key]);
+      output[key] = sensitiveKeyPattern.test(key) ? "[REDACTED]" : toSerializable(record[key]);
     }
 
     return output;

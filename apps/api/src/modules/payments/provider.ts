@@ -32,6 +32,14 @@ export type CreateCheckoutInput = {
   referenceId?: string;
   discountCode?: string;
   customerEmail?: string | null;
+  billingAddress?: {
+    street: string;
+    number: string;
+    zipcode: string;
+    town: string;
+    countryCode: string;
+    countryName?: string | null;
+  } | null;
   successUrl?: string;
   cancelUrl?: string;
 };
