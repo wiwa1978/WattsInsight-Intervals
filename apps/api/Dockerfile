@@ -36,4 +36,4 @@ RUN chown -R node:node /app/apps/api
 
 USER node
 
-CMD ["bun", "run", "--cwd", "apps/api", "start"]
+CMD ["bun", "--cwd", "apps/api", "src/server.ts"]
