@@ -277,8 +277,8 @@ jobs:
           rule_name="github-actions-${GITHUB_RUN_ID}"
           az postgres flexible-server firewall-rule create \
             --resource-group "${POSTGRES_FIREWALL_RESOURCE_GROUP_NAME}" \
-            --name "${postgres_server_name}" \
-            --rule-name "${rule_name}" \
+            --server-name "${postgres_server_name}" \
+            --name "${rule_name}" \
             --start-ip-address "${runner_ip}" \
             --end-ip-address "${runner_ip}" \
             --output none
@@ -318,8 +318,8 @@ jobs:
           set -euo pipefail
           az postgres flexible-server firewall-rule delete \
             --resource-group "${POSTGRES_FIREWALL_RESOURCE_GROUP_NAME}" \
-            --name "${{ steps.postgres-firewall.outputs.postgres_server_name }}" \
-            --rule-name "${{ steps.postgres-firewall.outputs.rule_name }}" \
+            --server-name "${{ steps.postgres-firewall.outputs.postgres_server_name }}" \
+            --name "${{ steps.postgres-firewall.outputs.rule_name }}" \
             --yes \
             --output none
 
