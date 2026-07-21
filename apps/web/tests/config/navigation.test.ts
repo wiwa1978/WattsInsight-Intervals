@@ -51,7 +51,7 @@ describe("web navigation config", () => {
     );
   });
 
-  it("keeps billing portal hidden even when billing surfaces are enabled", () => {
+  it("keeps billing portal out of the primary sidebar even when billing surfaces are enabled", () => {
     expect(getBackendNavItems({
       billing: { enabled: true, mode: "credits", creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false },
       features: { vouchers: true, discounts: true, notifications: true },
@@ -73,6 +73,6 @@ describe("web navigation config", () => {
     expect(getUserDropdownNavItems({
       billing: { enabled: true, mode: "credits", creditSurfacesEnabled: true, subscriptionSurfacesEnabled: false },
       features: { vouchers: true, discounts: true, notifications: true },
-    })).not.toEqual(expect.arrayContaining([expect.objectContaining({ url: "/billing" })]));
+    })).toEqual(expect.arrayContaining([expect.objectContaining({ url: "/billing" })]));
   });
 });

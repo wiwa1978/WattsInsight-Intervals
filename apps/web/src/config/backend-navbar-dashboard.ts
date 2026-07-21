@@ -1,5 +1,5 @@
 import { getBillingCapability, type BillingCapabilityInput } from "@platform/frontend-shared";
-import { LayoutDashboard, LucideIcon, Settings } from "lucide-react";
+import { CreditCard, LayoutDashboard, LucideIcon, Settings } from "lucide-react";
 
 export interface BackendNavDashboardItem {
   title: string;
@@ -25,11 +25,17 @@ export const UserDropdownNavItems: BackendNavDashboardItem[] = [
     url: "/settings",
     icon: Settings,
   },
+  {
+    title: "dashboard.nav.billing",
+    url: "/billing",
+    icon: CreditCard,
+    requiresBillingSurface: true,
+  },
 ];
 
 function hasBillingSurface(config: BillingSurfaceConfig) {
   if (!config) {
-    return true;
+    return false;
   }
 
   return getBillingCapability(config).userBillingVisible;
