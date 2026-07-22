@@ -15,11 +15,19 @@ describe("web navigation config", () => {
   });
 
   it("contains expected dashboard sidebar entries", () => {
-    expect(BackendNavItems).toHaveLength(1);
+    expect(BackendNavItems).toHaveLength(3);
     expect(BackendNavItems).toEqual([
       expect.objectContaining({
         title: "dashboard.nav.overview",
         url: "/dashboard",
+      }),
+      expect.objectContaining({
+        title: "wattsinsight.nav.connections",
+        url: "/wattsinsight/connections",
+      }),
+      expect.objectContaining({
+        title: "wattsinsight.nav.calendar",
+        url: "/wattsinsight/calendar",
       }),
     ]);
   });
@@ -30,6 +38,8 @@ describe("web navigation config", () => {
       features: { vouchers: true, discounts: true, notifications: true },
     })).toEqual([
       expect.objectContaining({ url: "/dashboard" }),
+      expect.objectContaining({ url: "/wattsinsight/connections" }),
+      expect.objectContaining({ url: "/wattsinsight/calendar" }),
     ]);
   });
 
@@ -39,6 +49,8 @@ describe("web navigation config", () => {
       features: { vouchers: true, discounts: true, notifications: true },
     })).toEqual([
       expect.objectContaining({ url: "/dashboard" }),
+      expect.objectContaining({ url: "/wattsinsight/connections" }),
+      expect.objectContaining({ url: "/wattsinsight/calendar" }),
     ]);
   });
 

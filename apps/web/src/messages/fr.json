@@ -279,6 +279,41 @@
   },
   "projects": "Projets",
   "create": "Créer",
+  "wattsinsight": {
+    "nav": {
+      "connections": "Connexions",
+      "calendar": "Calendrier"
+    },
+    "connections": {
+      "title": "Connexion Intervals.icu",
+      "description": "Connectez votre compte Intervals.icu pour que WattsInsight synchronise vos activités.",
+      "emptyTitle": "Connectez votre compte Intervals.icu",
+      "emptyDescription": "Autorisez WattsInsight à lire vos activités et à construire votre calendrier d'entraînement.",
+      "connectedTitle": "Intervals.icu est connecté",
+      "connectedDescription": "Athlète connecté : {athleteId}",
+      "connect": "Connecter Intervals.icu",
+      "connecting": "Ouverture d'Intervals.icu...",
+      "connectFailed": "Impossible d'ouvrir la page d'autorisation Intervals.icu.",
+      "disconnect": "Déconnecter",
+      "disconnecting": "Déconnexion...",
+      "disconnectSuccess": "Intervals.icu est déconnecté.",
+      "disconnectFailed": "Impossible de déconnecter Intervals.icu.",
+      "statusUnavailable": "Statut de connexion indisponible",
+      "statusUnavailableDescription": "Impossible de charger le statut de votre connexion Intervals.icu.",
+      "retry": "Réessayer"
+    },
+    "calendar": {
+      "title": "Calendrier d'entraînement",
+      "description": "Consultez les activités Intervals.icu synchronisées par mois.",
+      "previous": "Précédent",
+      "next": "Suivant",
+      "syncNow": "Synchroniser maintenant",
+      "syncing": "Synchronisation...",
+      "syncSuccess": "{count} activités synchronisées.",
+      "syncFailed": "Impossible de synchroniser les activités Intervals.icu.",
+      "loadFailed": "Impossible de charger les activités de ce mois."
+    }
+  },
   "dashboard": {
     "title": "Tableau de bord",
     "welcomeBack": "Bon retour, {name} !",

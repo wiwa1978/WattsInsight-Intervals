@@ -8,3 +8,4 @@ export * from "./jobs";
 export * from "./email-queue";
 export * from "./api-keys";
 export * from "./application-settings";
+export * from "./wattsinsight";

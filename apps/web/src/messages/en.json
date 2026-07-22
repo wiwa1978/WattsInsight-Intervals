@@ -279,6 +279,41 @@
   },
   "projects": "Projects",
   "create": "Create",
+  "wattsinsight": {
+    "nav": {
+      "connections": "Connections",
+      "calendar": "Calendar"
+    },
+    "connections": {
+      "title": "Intervals.icu connection",
+      "description": "Connect your Intervals.icu account so WattsInsight can sync your activities.",
+      "emptyTitle": "Connect your Intervals.icu account",
+      "emptyDescription": "Authorize WattsInsight to read your activities and build your training calendar.",
+      "connectedTitle": "Intervals.icu is connected",
+      "connectedDescription": "Connected athlete: {athleteId}",
+      "connect": "Connect Intervals.icu",
+      "connecting": "Opening Intervals.icu...",
+      "connectFailed": "Could not open the Intervals.icu authorization page.",
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting...",
+      "disconnectSuccess": "Intervals.icu disconnected.",
+      "disconnectFailed": "Could not disconnect Intervals.icu.",
+      "statusUnavailable": "Connection status unavailable",
+      "statusUnavailableDescription": "We could not load your Intervals.icu connection status.",
+      "retry": "Retry"
+    },
+    "calendar": {
+      "title": "Training calendar",
+      "description": "Review synced Intervals.icu activities by month.",
+      "previous": "Previous",
+      "next": "Next",
+      "syncNow": "Sync now",
+      "syncing": "Syncing...",
+      "syncSuccess": "Synced {count} activities.",
+      "syncFailed": "Could not sync Intervals.icu activities.",
+      "loadFailed": "Could not load activities for this month."
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "welcomeBack": "Welcome back, {name}!",

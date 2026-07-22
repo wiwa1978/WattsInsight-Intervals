@@ -17,6 +17,8 @@
     "@platform/email-core": "*",
     "@platform/payments-core": "*",
     "@platform/platform-db": "*",
+    "@wattsinsight/core": "*",
+    "@wattsinsight/contracts": "*",
     "@better-auth/passkey": "^1.6.23",
     "@dodopayments/better-auth": "^1.6.4",
     "better-auth": "^1.6.23",

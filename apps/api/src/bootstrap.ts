@@ -43,6 +43,7 @@ import { createApiKeysService } from "./modules/api-keys/service";
 import { createEmailQueue } from "./modules/email/queue";
 import { createJobsRunner } from "./modules/jobs/runner";
 import { createWebhookRecoveryService } from "./modules/payments/webhook-recovery";
+import { createWattsInsightService } from "./modules/wattsinsight/service";
 
 const adminAllowlist = new Set(
   (env.ADMIN_ALLOWLIST ?? "")
@@ -80,6 +81,15 @@ const emailModule = createEmailModule({
 const notificationsService = createNotificationsService({ db });
 const privacyService = createPrivacyService({ db });
 const apiKeysService = createApiKeysService({ db });
+const wattsInsightService = createWattsInsightService({
+  db,
+  oauthConfig: {
+    clientId: env.INTERVALS_CLIENT_ID ?? "",
+    clientSecret: env.INTERVALS_CLIENT_SECRET ?? "",
+    redirectUri: env.INTERVALS_REDIRECT_URI ?? "",
+  },
+  tokenEncryptionKey: env.WATTSINSIGHT_TOKEN_ENCRYPTION_KEY ?? "",
+});
 
 const dodoPaymentsClient = env.DODO_PAYMENTS_API_KEY
   ? new DodoPayments({
@@ -464,6 +474,7 @@ export const bootstrap = {
   adminCreditsDashboardService,
   adminSubscriptionFinanceDashboardService,
   apiKeysService,
+  wattsInsightService,
   auditService,
   applicationSettingsService,
   billingService,

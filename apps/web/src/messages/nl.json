@@ -279,6 +279,41 @@
   },
   "projects": "Projecten",
   "create": "Maken",
+  "wattsinsight": {
+    "nav": {
+      "connections": "Koppelingen",
+      "calendar": "Kalender"
+    },
+    "connections": {
+      "title": "Intervals.icu-koppeling",
+      "description": "Koppel je Intervals.icu-account zodat WattsInsight je activiteiten kan synchroniseren.",
+      "emptyTitle": "Koppel je Intervals.icu-account",
+      "emptyDescription": "Geef WattsInsight toestemming om je activiteiten te lezen en je trainingskalender op te bouwen.",
+      "connectedTitle": "Intervals.icu is gekoppeld",
+      "connectedDescription": "Gekoppelde atleet: {athleteId}",
+      "connect": "Intervals.icu koppelen",
+      "connecting": "Intervals.icu openen...",
+      "connectFailed": "Kon de Intervals.icu-autorisatiepagina niet openen.",
+      "disconnect": "Ontkoppelen",
+      "disconnecting": "Ontkoppelen...",
+      "disconnectSuccess": "Intervals.icu is ontkoppeld.",
+      "disconnectFailed": "Kon Intervals.icu niet ontkoppelen.",
+      "statusUnavailable": "Koppelingsstatus niet beschikbaar",
+      "statusUnavailableDescription": "We konden je Intervals.icu-koppelingsstatus niet laden.",
+      "retry": "Opnieuw proberen"
+    },
+    "calendar": {
+      "title": "Trainingskalender",
+      "description": "Bekijk gesynchroniseerde Intervals.icu-activiteiten per maand.",
+      "previous": "Vorige",
+      "next": "Volgende",
+      "syncNow": "Nu synchroniseren",
+      "syncing": "Synchroniseren...",
+      "syncSuccess": "{count} activiteiten gesynchroniseerd.",
+      "syncFailed": "Kon Intervals.icu-activiteiten niet synchroniseren.",
+      "loadFailed": "Kon activiteiten voor deze maand niet laden."
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "welcomeBack": "Welkom terug, {name}!",

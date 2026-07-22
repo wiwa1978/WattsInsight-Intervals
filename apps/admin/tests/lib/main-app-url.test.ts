@@ -35,6 +35,7 @@ describe("admin main app url", () => {
     expect(getMainAppDashboardUrl("nl")).toBe("http://localhost:3100/nl/dashboard");
 
     delete process.env.NEXT_PUBLIC_MAIN_APP_URL;
+    delete process.env.NEXT_PUBLIC_APP_URL;
 
     expect(getMainAppDashboardUrl("en")).toBe("");
 

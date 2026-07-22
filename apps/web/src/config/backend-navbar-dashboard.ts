@@ -1,5 +1,5 @@
 import { getBillingCapability, type BillingCapabilityInput } from "@platform/frontend-shared";
-import { CreditCard, LayoutDashboard, LucideIcon, Settings } from "lucide-react";
+import { CalendarDays, CreditCard, LayoutDashboard, Link2, LucideIcon, Settings } from "lucide-react";
 
 export interface BackendNavDashboardItem {
   title: string;
@@ -16,6 +16,16 @@ export const BackendNavItems: BackendNavDashboardItem[] = [
     title: "dashboard.nav.overview",
     url: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "wattsinsight.nav.connections",
+    url: "/wattsinsight/connections",
+    icon: Link2,
+  },
+  {
+    title: "wattsinsight.nav.calendar",
+    url: "/wattsinsight/calendar",
+    icon: CalendarDays,
   },
 ];
 

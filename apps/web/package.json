@@ -20,6 +20,7 @@
     "@platform/auth-shared": "*",
     "@platform/contracts": "*",
     "@platform/frontend-shared": "*",
+    "@wattsinsight/contracts": "*",
     "@better-auth/passkey": "^1.6.23",
     "@dodopayments/better-auth": "^1.6.4",
     "@hookform/resolvers": "^5.4.0",

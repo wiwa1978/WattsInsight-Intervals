@@ -13,6 +13,7 @@ export const applicationConfig = {
     notifications: true,
     discounts: true,
     vouchers: true,
+    wattsinsight: true,
   },
 } as const;
 

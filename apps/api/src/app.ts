@@ -18,6 +18,8 @@ import { createJobsRouter } from "./routes/jobs";
 import { createMeRouter } from "./routes/me";
 import { createPaymentsRouter } from "./routes/payments";
 import { createSystemRouter } from "./routes/system";
+import { createWattsInsightActivitiesRouter } from "./routes/wattsinsight-activities";
+import { createWattsInsightConnectionsRouter } from "./routes/wattsinsight-connections";
 
 const app = new Hono<AppEnv>();
 
@@ -69,6 +71,8 @@ app.route("/", createLogsRouter());
 app.route("/", createJobsRouter());
 app.route("/", createPaymentsRouter());
 app.route("/me", createMeRouter());
+app.route("/wattsinsight/connections", createWattsInsightConnectionsRouter());
+app.route("/wattsinsight/activities", createWattsInsightActivitiesRouter());
 app.use("/admin/*", bootstrap.authModule.requireAuth);
 app.use("/admin/*", bootstrap.authModule.requireAdminAccess);
 app.route("/admin", createAdminRouter());
