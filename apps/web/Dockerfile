@@ -33,6 +33,8 @@ COPY packages/email-core/package.json packages/email-core/package.json
 COPY packages/frontend-shared/package.json packages/frontend-shared/package.json
 COPY packages/payments-core/package.json packages/payments-core/package.json
 COPY packages/platform-db/package.json packages/platform-db/package.json
+COPY packages/wattsinsight-contracts/package.json packages/wattsinsight-contracts/package.json
+COPY packages/wattsinsight-core/package.json packages/wattsinsight-core/package.json
 
 RUN bun install --frozen-lockfile
 
