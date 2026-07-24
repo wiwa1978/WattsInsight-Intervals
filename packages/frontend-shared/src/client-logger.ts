@@ -4,6 +4,18 @@ type LogLevel = "debug" | "info" | "warn" | "error";
 type LogContext = Record<string, unknown> | undefined;
 
 const sensitiveKeyPattern = /(authorization|cookie|email|password|secret|signature|token|code)/i;
+const MAX_STRING_LENGTH = 500;
+const MAX_ARRAY_ITEMS = 10;
+const MAX_OBJECT_KEYS = 20;
+const MAX_SERIALIZE_DEPTH = 4;
+
+function truncateString(value: string) {
+  if (value.length <= MAX_STRING_LENGTH) {
+    return value;
+  }
+
+  return `${value.slice(0, MAX_STRING_LENGTH)}...[truncated ${value.length - MAX_STRING_LENGTH} chars]`;
+}
 
 function redactUrl(value: string) {
   try {
@@ -13,15 +25,19 @@ function redactUrl(value: string) {
         url.searchParams.set(key, "[REDACTED]");
       }
     }
-    return url.toString();
+    return truncateString(url.toString());
   } catch {
-    return value;
+    return truncateString(value);
   }
 }
 
-export function toSerializable(value: unknown): unknown {
+export function toSerializable(value: unknown, depth = 0): unknown {
   if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return typeof value === "string" ? redactUrl(value) : value;
+  }
+
+  if (depth >= MAX_SERIALIZE_DEPTH) {
+    return "[TRUNCATED_DEPTH]";
   }
 
   if (value instanceof Error) {
@@ -29,9 +45,9 @@ export function toSerializable(value: unknown): unknown {
 
     return {
       name: value.name,
-      message: value.message,
-      stack: value.stack,
-      cause: toSerializable(errorWithCause.cause),
+      message: truncateString(value.message),
+      stack: value.stack ? truncateString(value.stack) : undefined,
+      cause: toSerializable(errorWithCause.cause, depth + 1),
     };
   }
 
@@ -48,7 +64,7 @@ export function toSerializable(value: unknown): unknown {
       method: value.method,
       url: value.url,
       credentials: value.credentials,
-      headers: toSerializable(value.headers),
+      headers: toSerializable(value.headers, depth + 1),
     };
   }
 
@@ -60,20 +76,29 @@ export function toSerializable(value: unknown): unknown {
       redirected: value.redirected,
       type: value.type,
       url: value.url,
-      headers: toSerializable(value.headers),
+      headers: toSerializable(value.headers, depth + 1),
     };
   }
 
   if (Array.isArray(value)) {
-    return value.map(toSerializable);
+    const items = value.slice(0, MAX_ARRAY_ITEMS).map((item) => toSerializable(item, depth + 1));
+    if (value.length > MAX_ARRAY_ITEMS) {
+      items.push(`[TRUNCATED ${value.length - MAX_ARRAY_ITEMS} items]`);
+    }
+    return items;
   }
 
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
     const output: Record<string, unknown> = {};
+    const keys = Object.getOwnPropertyNames(record);
 
-    for (const key of Object.getOwnPropertyNames(record)) {
-      output[key] = sensitiveKeyPattern.test(key) ? "[REDACTED]" : toSerializable(record[key]);
+    for (const key of keys.slice(0, MAX_OBJECT_KEYS)) {
+      output[key] = sensitiveKeyPattern.test(key) ? "[REDACTED]" : toSerializable(record[key], depth + 1);
+    }
+
+    if (keys.length > MAX_OBJECT_KEYS) {
+      output.__truncatedKeys = keys.length - MAX_OBJECT_KEYS;
     }
 
     return output;
